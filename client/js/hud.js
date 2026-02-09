@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { SHIP_COLORS, PLAYER_MAX_HP } from './constants.js';
+import { SHIP_COLORS, PLAYER_MAX_HP, WORLD_W, WORLD_H } from './constants.js';
 
 export function renderHUD(ctx) {
     const me = state.players.get(state.myID);
@@ -9,7 +9,10 @@ export function renderHUD(ctx) {
         drawHealthBar(ctx, state.screenW / 2, state.screenH - 40, 200, 16, me.hp, me.mhp);
     }
 
-    // Kill feed (top right)
+    // Minimap (top right)
+    drawMinimap(ctx);
+
+    // Kill feed (below minimap)
     drawKillFeed(ctx);
 
     // Scoreboard (top left)
@@ -62,10 +65,41 @@ function drawHealthBar(ctx, x, y, w, h, hp, maxHp) {
     ctx.fillText(`${hp}/${maxHp}`, x, y + h - 3);
 }
 
+function drawMinimap(ctx) {
+    const size = 180;
+    const margin = 10;
+    const x = state.screenW - size - margin;
+    const y = margin;
+
+    // Background
+    ctx.fillStyle = 'rgba(0, 40, 0, 0.5)';
+    ctx.fillRect(x, y, size, size);
+
+    // Border
+    ctx.strokeStyle = '#00ff00';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, size, size);
+
+    // Draw all alive players as dots
+    for (const p of state.players.values()) {
+        if (!p.a) continue;
+        const isMe = p.id === state.myID;
+        const colors = SHIP_COLORS[p.s] || SHIP_COLORS[0];
+        const dotX = x + (p.x / WORLD_W) * size;
+        const dotY = y + (p.y / WORLD_H) * size;
+        const radius = isMe ? 4 : 2;
+
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = isMe ? '#ffffff' : colors.main;
+        ctx.fill();
+    }
+}
+
 function drawKillFeed(ctx) {
     const now = performance.now();
     const x = state.screenW - 20;
-    let y = 60;
+    let y = 210; // below minimap (180 + margins)
 
     ctx.textAlign = 'right';
     ctx.font = '13px monospace';

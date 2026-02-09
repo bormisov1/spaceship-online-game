@@ -36,6 +36,9 @@ type Player struct {
 	TargetR  float64 // target rotation (toward mouse)
 	Firing   bool
 	Boosting bool
+	TargetX   float64 // mouse world X (for distance calc)
+	TargetY   float64 // mouse world Y (for distance calc)
+	SlowThresh float64 // distance threshold for speed modulation
 }
 
 // NewPlayer creates a new player at a random position
@@ -74,12 +77,38 @@ func (p *Player) Update(dt float64) {
 
 	// Accelerate in facing direction
 	accel := PlayerAccel * dt
+	if p.Boosting {
+		accel *= PlayerBoostMul
+	}
+
+	// Distance-based speed modulation: slow down as pointer approaches ship
+	dist := math.Sqrt((p.TargetX-p.X)*(p.TargetX-p.X) + (p.TargetY-p.Y)*(p.TargetY-p.Y))
+	thresh := p.SlowThresh
+	if thresh < 20 {
+		thresh = 20
+	}
+	const deadZone = 50.0
+	var speedFactor float64 = 1.0
+	if dist <= deadZone {
+		accel = 0
+		speedFactor = 0
+	} else if dist < thresh {
+		speedFactor = (dist - deadZone) / (thresh - deadZone)
+		accel *= speedFactor
+	}
+
 	p.VX += math.Cos(p.Rotation) * accel
 	p.VY += math.Sin(p.Rotation) * accel
 
-	// Apply friction
-	p.VX *= PlayerFriction
-	p.VY *= PlayerFriction
+	// Apply friction — use heavy braking when pointer is near the ship
+	// so the ship actually stops instead of coasting forever
+	friction := PlayerFriction
+	if speedFactor < 1.0 {
+		// Blend between brake (0.95) and normal friction based on speedFactor
+		friction = 0.95 + speedFactor*(PlayerFriction-0.95)
+	}
+	p.VX *= friction
+	p.VY *= friction
 
 	// Clamp speed
 	maxSpd := PlayerMaxSpeed

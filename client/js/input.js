@@ -7,9 +7,6 @@ export function setupInput() {
         const rect = canvas.getBoundingClientRect();
         state.mouseX = e.clientX - rect.left;
         state.mouseY = e.clientY - rect.top;
-        // Convert to world coords
-        state.mouseWorldX = state.mouseX + state.camX - state.screenW / 2;
-        state.mouseWorldY = state.mouseY + state.camY - state.screenH / 2;
     });
 
     document.addEventListener('keydown', (e) => {

@@ -51,11 +51,16 @@ export function send(type, data) {
 
 export function sendInput() {
     if (state.phase !== 'playing' || !state.myID) return;
+    // Recalculate world coords fresh every call so they stay correct
+    // even when the mouse is stationary but the camera moves
+    const mx = state.mouseX + state.camX - state.screenW / 2;
+    const my = state.mouseY + state.camY - state.screenH / 2;
     send('input', {
-        mx: state.mouseWorldX,
-        my: state.mouseWorldY,
+        mx,
+        my,
         fire: state.firing,
         boost: state.boosting,
+        thresh: Math.min(state.screenW, state.screenH) / 8,
     });
 }
 

@@ -32,6 +32,7 @@ type ClientInput struct {
 	MY    float64 `json:"my"`    // mouse Y (world coords)
 	Fire  bool    `json:"fire"`  // W key held
 	Boost bool    `json:"boost"` // Shift key held
+	Thresh float64 `json:"thresh"` // distance threshold for speed modulation
 }
 
 // JoinMsg is sent when player wants to join a session

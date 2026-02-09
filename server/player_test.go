@@ -131,6 +131,76 @@ func TestPlayerCanFire(t *testing.T) {
 	}
 }
 
+func TestPlayerBoostAccel(t *testing.T) {
+	// Non-boosting player
+	p1 := &Player{
+		ID: "test1", X: 100, Y: 100, Alive: true, HP: 100, MaxHP: 100,
+		TargetX: 500, TargetY: 100, SlowThresh: 200,
+	}
+	p1.TargetR = 0
+	p1.Update(1.0 / 60.0)
+	normalVX := p1.VX
+
+	// Boosting player
+	p2 := &Player{
+		ID: "test2", X: 100, Y: 100, Alive: true, HP: 100, MaxHP: 100,
+		Boosting: true, TargetX: 500, TargetY: 100, SlowThresh: 200,
+	}
+	p2.TargetR = 0
+	p2.Update(1.0 / 60.0)
+	boostedVX := p2.VX
+
+	if boostedVX <= normalVX {
+		t.Errorf("boosted VX (%f) should be greater than normal VX (%f)", boostedVX, normalVX)
+	}
+	// Boost should multiply acceleration by PlayerBoostMul
+	ratio := boostedVX / normalVX
+	if math.Abs(ratio-PlayerBoostMul) > 0.01 {
+		t.Errorf("expected boost ratio ~%f, got %f", PlayerBoostMul, ratio)
+	}
+}
+
+func TestSpeedModulationDeadZone(t *testing.T) {
+	// Pointer within dead zone (<=50px) — no acceleration
+	p := &Player{
+		ID: "test", X: 100, Y: 100, Alive: true, HP: 100, MaxHP: 100,
+		TargetX: 130, TargetY: 100, SlowThresh: 200,
+	}
+	p.TargetR = 0
+	p.Update(1.0 / 60.0)
+	if p.VX != 0 || p.VY != 0 {
+		t.Errorf("expected no velocity in dead zone, got VX=%f VY=%f", p.VX, p.VY)
+	}
+}
+
+func TestSpeedModulationPartial(t *testing.T) {
+	thresh := 200.0
+
+	// Pointer at half threshold distance — partial accel
+	halfDist := (thresh + 20) / 2 // midpoint between deadZone and thresh
+	pHalf := &Player{
+		ID: "half", X: 100, Y: 100, Alive: true, HP: 100, MaxHP: 100,
+		TargetX: 100 + halfDist, TargetY: 100, SlowThresh: thresh,
+	}
+	pHalf.TargetR = 0
+	pHalf.Update(1.0 / 60.0)
+
+	// Pointer far away — full accel
+	pFull := &Player{
+		ID: "full", X: 100, Y: 100, Alive: true, HP: 100, MaxHP: 100,
+		TargetX: 100 + thresh + 100, TargetY: 100, SlowThresh: thresh,
+	}
+	pFull.TargetR = 0
+	pFull.Update(1.0 / 60.0)
+
+	if pHalf.VX >= pFull.VX {
+		t.Errorf("partial speed VX (%f) should be less than full speed VX (%f)", pHalf.VX, pFull.VX)
+	}
+	if pHalf.VX <= 0 {
+		t.Errorf("partial speed VX should be positive, got %f", pHalf.VX)
+	}
+}
+
 func TestPlayerToState(t *testing.T) {
 	p := &Player{
 		ID:       "test",

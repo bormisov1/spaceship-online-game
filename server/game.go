@@ -110,6 +110,9 @@ func (g *Game) HandleInput(playerID string, input ClientInput) {
 	p.TargetR = math.Atan2(input.MY-p.Y, input.MX-p.X)
 	p.Firing = input.Fire
 	p.Boosting = input.Boost
+	p.TargetX = input.MX
+	p.TargetY = input.MY
+	p.SlowThresh = Clamp(input.Thresh, 50, 400)
 }
 
 // PlayerCount returns the number of players
