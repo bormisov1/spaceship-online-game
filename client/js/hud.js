@@ -130,7 +130,7 @@ function drawKillFeed(ctx) {
 function drawScoreboard(ctx) {
     // Collect and sort players by score
     const players = Array.from(state.players.values())
-        .sort((a, b) => b.sc - a.sc)
+        .sort((a, b) => b.sc - a.sc || a.id.localeCompare(b.id))
         .slice(0, 8);
 
     ctx.textAlign = 'left';
