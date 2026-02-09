@@ -17,6 +17,9 @@ export function setupInput() {
         if (e.key === 'Shift') {
             state.boosting = true;
         }
+        if (e.key === 'd' || e.key === 'D') {
+            state.debugHitboxes = !state.debugHitboxes;
+        }
     });
 
     document.addEventListener('keyup', (e) => {

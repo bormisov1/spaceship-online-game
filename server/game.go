@@ -152,6 +152,7 @@ func (g *Game) update() {
 
 	// Check collisions
 	g.checkCollisions()
+	g.checkPlayerCollisions()
 
 	// Broadcast state
 	if g.tick%BroadcastEvery == 0 {
@@ -197,6 +198,51 @@ func (g *Game) checkCollisions() {
 					}
 				}
 				break
+			}
+		}
+	}
+}
+
+// checkPlayerCollisions checks ship-to-ship collisions (both die)
+func (g *Game) checkPlayerCollisions() {
+	players := make([]*Player, 0, len(g.players))
+	for _, p := range g.players {
+		if p.Alive {
+			players = append(players, p)
+		}
+	}
+	for i := 0; i < len(players); i++ {
+		for j := i + 1; j < len(players); j++ {
+			a, b := players[i], players[j]
+			if !a.Alive || !b.Alive {
+				continue
+			}
+			if CheckCollision(a.X, a.Y, PlayerRadius, b.X, b.Y, PlayerRadius) {
+				a.TakeDamage(a.HP)
+				b.TakeDamage(b.HP)
+
+				// Notify kills (mutual)
+				killMsg1 := Envelope{T: MsgKill, Data: KillMsg{
+					KillerID: a.ID, KillerName: a.Name,
+					VictimID: b.ID, VictimName: b.Name,
+				}}
+				killMsg2 := Envelope{T: MsgKill, Data: KillMsg{
+					KillerID: b.ID, KillerName: b.Name,
+					VictimID: a.ID, VictimName: a.Name,
+				}}
+				g.broadcastMsg(killMsg1)
+				g.broadcastMsg(killMsg2)
+
+				if client, ok := g.clients[a.ID]; ok {
+					client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
+						KillerID: b.ID, KillerName: b.Name,
+					}})
+				}
+				if client, ok := g.clients[b.ID]; ok {
+					client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
+						KillerID: a.ID, KillerName: a.Name,
+					}})
+				}
 			}
 		}
 	}

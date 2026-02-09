@@ -43,6 +43,9 @@ export const state = {
     killFeed: [],   // { killer, victim, time }
     deathInfo: null, // { killerName }
 
+    // Debug
+    debugHitboxes: false,
+
     // Effects
     particles: [],
     explosions: [],

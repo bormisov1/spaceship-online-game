@@ -4,7 +4,7 @@ import { drawShip, initShips } from './ships.js';
 import { renderProjectiles } from './projectiles.js';
 import { updateParticles, renderParticles, renderExplosions, addEngineParticles } from './effects.js';
 import { renderHUD, drawPlayerHealthBar } from './hud.js';
-import { WORLD_W, WORLD_H } from './constants.js';
+import { WORLD_W, WORLD_H, PLAYER_RADIUS, PROJECTILE_RADIUS } from './constants.js';
 
 let shipsInited = false;
 
@@ -62,8 +62,46 @@ export function render(dt) {
         drawPlayerHealthBar(ctx, sx, sy, player.hp, player.mhp, player.n, isMe);
     }
 
+    // Debug hitboxes
+    if (state.debugHitboxes) {
+        drawHitboxes(ctx, offsetX, offsetY);
+    }
+
     // HUD overlay
     renderHUD(ctx);
+}
+
+function drawHitboxes(ctx, offsetX, offsetY) {
+    // Player hitboxes
+    for (const [, player] of state.players) {
+        if (!player.a) continue;
+        const sx = player.x - offsetX;
+        const sy = player.y - offsetY;
+        if (sx < -100 || sx > state.screenW + 100 || sy < -100 || sy > state.screenH + 100) continue;
+
+        ctx.beginPath();
+        ctx.arc(sx, sy, PLAYER_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.15)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // Projectile hitboxes
+    for (const [, proj] of state.projectiles) {
+        const sx = proj.x - offsetX;
+        const sy = proj.y - offsetY;
+        if (sx < -50 || sx > state.screenW + 50 || sy < -50 || sy > state.screenH + 50) continue;
+
+        ctx.beginPath();
+        ctx.arc(sx, sy, PROJECTILE_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
 }
 
 function drawWorldBounds(ctx, offsetX, offsetY) {
