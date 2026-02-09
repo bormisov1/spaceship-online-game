@@ -1,14 +1,18 @@
 import { state } from './state.js';
 import { SHIP_COLORS } from './constants.js';
 
+const MAX_PARTICLES = 200;
+
 // Engine particles
 export function addEngineParticles(x, y, rotation, speed, shipType) {
     if (speed < 20) return; // Only show when moving
+    if (state.particles.length >= MAX_PARTICLES) return;
 
     const colors = SHIP_COLORS[shipType] || SHIP_COLORS[0];
     const count = Math.min(Math.floor(speed / 50), 5);
 
     for (let i = 0; i < count; i++) {
+        if (state.particles.length >= MAX_PARTICLES) break;
         const angle = rotation + Math.PI + (Math.random() - 0.5) * 0.6;
         const spd = speed * 0.3 + Math.random() * 80;
         state.particles.push({
@@ -57,9 +61,11 @@ export function addExplosion(x, y) {
 }
 
 export function updateParticles(dt) {
-    // Update particles
-    for (let i = state.particles.length - 1; i >= 0; i--) {
-        const p = state.particles[i];
+    // Update particles with swap-and-pop removal
+    const particles = state.particles;
+    let i = 0;
+    while (i < particles.length) {
+        const p = particles[i];
         p.x += p.vx * dt;
         p.y += p.vy * dt;
         p.life -= dt;
@@ -67,18 +73,28 @@ export function updateParticles(dt) {
         p.vy *= 0.98;
 
         if (p.life <= 0) {
-            state.particles.splice(i, 1);
+            // Swap with last element and pop
+            particles[i] = particles[particles.length - 1];
+            particles.pop();
+            // Don't increment i — re-check the swapped element
+        } else {
+            i++;
         }
     }
 
-    // Update explosions (shockwaves)
-    for (let i = state.explosions.length - 1; i >= 0; i--) {
-        const e = state.explosions[i];
+    // Update explosions (shockwaves) with swap-and-pop
+    const explosions = state.explosions;
+    let j = 0;
+    while (j < explosions.length) {
+        const e = explosions[j];
         e.life -= dt;
         e.radius = e.maxRadius * (1 - e.life / e.maxLife);
 
         if (e.life <= 0) {
-            state.explosions.splice(i, 1);
+            explosions[j] = explosions[explosions.length - 1];
+            explosions.pop();
+        } else {
+            j++;
         }
     }
 }
@@ -94,9 +110,15 @@ export function renderParticles(ctx, offsetX, offsetY) {
 
         ctx.globalAlpha = alpha;
         ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(sx, sy, size, 0, Math.PI * 2);
-        ctx.fill();
+
+        if (size < 3) {
+            // Use rect for small particles — much cheaper than arc
+            ctx.fillRect(sx - size, sy - size, size * 2, size * 2);
+        } else {
+            ctx.beginPath();
+            ctx.arc(sx, sy, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
     ctx.globalAlpha = 1;
 }

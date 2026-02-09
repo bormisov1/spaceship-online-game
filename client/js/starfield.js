@@ -5,6 +5,16 @@ let stars = [];
 let lastCamX = -1;
 let lastCamY = -1;
 
+// Offscreen canvases for each parallax layer + nebula
+let layerCanvases = []; // indices 0, 1, 2 for star layers
+let nebulaCanvas = null;
+const LAYER_FACTORS = [PARALLAX_FACTOR * 0.3, PARALLAX_FACTOR * 0.6, PARALLAX_FACTOR];
+const NEBULA_FACTOR = PARALLAX_FACTOR * 0.2;
+
+// Dimensions of the offscreen canvases (screen size, for tiling)
+let cachedW = 0;
+let cachedH = 0;
+
 export function initStarfield() {
     stars = [];
     for (let i = 0; i < STAR_COUNT; i++) {
@@ -15,6 +25,62 @@ export function initStarfield() {
             brightness: Math.random() * 0.7 + 0.3,
             layer: Math.random() < 0.3 ? 2 : (Math.random() < 0.5 ? 1 : 0),
         });
+    }
+    // Force rebuild on next render
+    cachedW = 0;
+    cachedH = 0;
+}
+
+function buildOffscreenCanvases(w, h) {
+    cachedW = w;
+    cachedH = h;
+
+    // Build one offscreen canvas per star layer
+    layerCanvases = [];
+    for (let layer = 0; layer < 3; layer++) {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = w;
+        offscreen.height = h;
+        const offCtx = offscreen.getContext('2d');
+
+        // Draw stars for this layer
+        for (const star of stars) {
+            if (star.layer !== layer) continue;
+            // Place stars at their position mod canvas size (they tile)
+            const sx = ((star.x) % w + w) % w;
+            const sy = ((star.y) % h + h) % h;
+
+            offCtx.fillStyle = `rgba(255,255,255,${star.brightness})`;
+            offCtx.beginPath();
+            offCtx.arc(sx, sy, star.size, 0, Math.PI * 2);
+            offCtx.fill();
+        }
+
+        layerCanvases.push(offscreen);
+    }
+
+    // Build nebula offscreen canvas (large enough to hold all nebulae)
+    // We use a canvas the size of the world so nebulae stay in fixed positions
+    const nebulae = [
+        { x: 1000, y: 1000, r: 200, color: '40, 20, 80' },
+        { x: 3000, y: 2000, r: 150, color: '80, 20, 40' },
+        { x: 2000, y: 3500, r: 180, color: '20, 40, 80' },
+    ];
+
+    nebulaCanvas = document.createElement('canvas');
+    // Size to cover the nebulae region (with padding)
+    const nebulaW = WORLD_W;
+    const nebulaH = WORLD_H;
+    nebulaCanvas.width = nebulaW;
+    nebulaCanvas.height = nebulaH;
+    const nCtx = nebulaCanvas.getContext('2d');
+
+    for (const n of nebulae) {
+        const grad = nCtx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+        grad.addColorStop(0, `rgba(${n.color}, 0.08)`);
+        grad.addColorStop(1, `rgba(${n.color}, 0)`);
+        nCtx.fillStyle = grad;
+        nCtx.fillRect(n.x - n.r, n.y - n.r, n.r * 2, n.r * 2);
     }
 }
 
@@ -32,46 +98,30 @@ export function renderStarfield() {
     lastCamX = cx;
     lastCamY = cy;
 
+    // Rebuild offscreen canvases if screen size changed
+    if (w !== cachedW || h !== cachedH) {
+        buildOffscreenCanvases(w, h);
+    }
+
+    // Clear background
     ctx.fillStyle = '#0a0a1a';
     ctx.fillRect(0, 0, w, h);
 
-    const factors = [PARALLAX_FACTOR * 0.3, PARALLAX_FACTOR * 0.6, PARALLAX_FACTOR];
+    // Blit each star layer with parallax offset
+    for (let layer = 0; layer < 3; layer++) {
+        const factor = LAYER_FACTORS[layer];
+        const ox = ((cx * factor) % w + w) % w;
+        const oy = ((cy * factor) % h + h) % h;
 
-    for (const star of stars) {
-        const factor = factors[star.layer];
-        const sx = ((star.x - cx * factor) % w + w) % w;
-        const sy = ((star.y - cy * factor) % h + h) % h;
-
-        const alpha = star.brightness;
-        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-        ctx.beginPath();
-        ctx.arc(sx, sy, star.size, 0, Math.PI * 2);
-        ctx.fill();
+        // Draw the offscreen canvas 4 times to handle wrapping at edges
+        ctx.drawImage(layerCanvases[layer], -ox, -oy);
+        ctx.drawImage(layerCanvases[layer], w - ox, -oy);
+        ctx.drawImage(layerCanvases[layer], -ox, h - oy);
+        ctx.drawImage(layerCanvases[layer], w - ox, h - oy);
     }
 
-    // Add a few colored nebula spots for atmosphere
-    drawNebula(ctx, w, h, cx, cy);
-}
-
-function drawNebula(ctx, w, h, cx, cy) {
-    const nebulae = [
-        { x: 1000, y: 1000, r: 200, color: '40, 20, 80' },
-        { x: 3000, y: 2000, r: 150, color: '80, 20, 40' },
-        { x: 2000, y: 3500, r: 180, color: '20, 40, 80' },
-    ];
-
-    for (const n of nebulae) {
-        const factor = PARALLAX_FACTOR * 0.2;
-        const sx = n.x - cx * factor - (cx - w / 2);
-        const sy = n.y - cy * factor - (cy - h / 2);
-
-        // Only draw if on screen
-        if (sx < -n.r * 2 || sx > w + n.r * 2 || sy < -n.r * 2 || sy > h + n.r * 2) continue;
-
-        const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, n.r);
-        grad.addColorStop(0, `rgba(${n.color}, 0.08)`);
-        grad.addColorStop(1, `rgba(${n.color}, 0)`);
-        ctx.fillStyle = grad;
-        ctx.fillRect(sx - n.r, sy - n.r, n.r * 2, n.r * 2);
-    }
+    // Blit nebula layer with parallax
+    const nebulaOffX = cx * NEBULA_FACTOR + (cx - w / 2);
+    const nebulaOffY = cy * NEBULA_FACTOR + (cy - h / 2);
+    ctx.drawImage(nebulaCanvas, -nebulaOffX, -nebulaOffY);
 }

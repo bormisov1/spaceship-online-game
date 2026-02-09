@@ -1,6 +1,33 @@
 import { state } from './state.js';
 import { LASER_COLORS, PROJECTILE_RADIUS } from './constants.js';
 
+// Cached glow sprites per laser color
+const glowSprites = new Map();
+const GLOW_SIZE = PROJECTILE_RADIUS * 6;
+const SPRITE_DIM = GLOW_SIZE * 2;
+
+function getGlowSprite(color) {
+    let sprite = glowSprites.get(color);
+    if (sprite) return sprite;
+
+    // Create offscreen canvas with the radial gradient glow
+    const canvas = document.createElement('canvas');
+    canvas.width = SPRITE_DIM;
+    canvas.height = SPRITE_DIM;
+    const ctx = canvas.getContext('2d');
+
+    const cx = GLOW_SIZE;
+    const cy = GLOW_SIZE;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, GLOW_SIZE);
+    grad.addColorStop(0, color + '66');
+    grad.addColorStop(1, color + '00');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, SPRITE_DIM, SPRITE_DIM);
+
+    glowSprites.set(color, canvas);
+    return canvas;
+}
+
 export function renderProjectiles(ctx, offsetX, offsetY) {
     for (const [, proj] of state.projectiles) {
         const sx = proj.x - offsetX;
@@ -16,13 +43,9 @@ export function renderProjectiles(ctx, offsetX, offsetY) {
             color = LASER_COLORS[owner.s] || LASER_COLORS[0];
         }
 
-        // Draw glow
-        const glowSize = PROJECTILE_RADIUS * 6;
-        const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, glowSize);
-        grad.addColorStop(0, color + '66');
-        grad.addColorStop(1, color + '00');
-        ctx.fillStyle = grad;
-        ctx.fillRect(sx - glowSize, sy - glowSize, glowSize * 2, glowSize * 2);
+        // Draw cached glow sprite
+        const sprite = getGlowSprite(color);
+        ctx.drawImage(sprite, sx - GLOW_SIZE, sy - GLOW_SIZE);
 
         // Draw laser bolt
         ctx.save();
