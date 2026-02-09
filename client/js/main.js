@@ -40,6 +40,17 @@ function resize() {
     state.canvas.height = state.screenH;
     state.bgCanvas.width = state.screenW;
     state.bgCanvas.height = state.screenH;
+
+    // Zoom out on small screens so more of the world is visible
+    // Reference: screens with min dimension >= 700px get zoom 1.0 (no change)
+    const minDim = Math.min(state.screenW, state.screenH);
+    state.camZoom = Math.min(1.0, minDim / 700);
+
+    // On mobile, reset virtual mouse to center (dead zone) so ship doesn't drift
+    if (state.isMobile && !state.touchJoystick) {
+        state.mouseX = state.screenW / 2;
+        state.mouseY = state.screenH / 2;
+    }
 }
 
 function handleMessage(msg) {

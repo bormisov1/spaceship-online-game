@@ -28,6 +28,7 @@ export const state = {
     // Camera (centered on local player)
     camX: 0,
     camY: 0,
+    camZoom: 1, // <1 on small screens to show more world
 
     // Input
     mouseX: 0,
@@ -42,6 +43,10 @@ export const state = {
     sessions: [],
     killFeed: [],   // { killer, victim, time }
     deathInfo: null, // { killerName }
+
+    // Mobile
+    isMobile: false,
+    touchJoystick: null, // { startX, startY, currentX, currentY }
 
     // Debug
     debugHitboxes: false,

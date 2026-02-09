@@ -17,27 +17,36 @@ export function render(dt) {
     const ctx = state.ctx;
     const w = state.screenW;
     const h = state.screenH;
+    const zoom = state.camZoom;
 
-    // Camera offset (world coords -> screen coords)
-    const offsetX = state.camX - w / 2;
-    const offsetY = state.camY - h / 2;
+    // Virtual viewport in world units (what the camera sees)
+    const vw = w / zoom;
+    const vh = h / zoom;
 
-    // Render background stars
+    // Camera offset in world coords
+    const offsetX = state.camX - vw / 2;
+    const offsetY = state.camY - vh / 2;
+
+    // Render background stars (screen-space, no zoom)
     renderStarfield();
 
     // Clear foreground
     ctx.clearRect(0, 0, w, h);
+
+    // Apply zoom transform for all world rendering
+    ctx.save();
+    ctx.scale(zoom, zoom);
 
     // Draw world boundary
     drawWorldBounds(ctx, offsetX, offsetY);
 
     // Update and render particles
     updateParticles(dt);
-    renderParticles(ctx, offsetX, offsetY);
-    renderExplosions(ctx, offsetX, offsetY);
+    renderParticles(ctx, offsetX, offsetY, vw, vh);
+    renderExplosions(ctx, offsetX, offsetY, vw, vh);
 
     // Render projectiles
-    renderProjectiles(ctx, offsetX, offsetY);
+    renderProjectiles(ctx, offsetX, offsetY, vw, vh);
 
     // Render players
     for (const [id, player] of state.players) {
@@ -46,8 +55,8 @@ export function render(dt) {
         const sx = player.x - offsetX;
         const sy = player.y - offsetY;
 
-        // Skip if off screen (with margin)
-        if (sx < -100 || sx > w + 100 || sy < -100 || sy > h + 100) continue;
+        // Skip if off virtual viewport (with margin)
+        if (sx < -100 || sx > vw + 100 || sy < -100 || sy > vh + 100) continue;
 
         // Engine glow particles
         const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
@@ -64,20 +73,22 @@ export function render(dt) {
 
     // Debug hitboxes
     if (state.debugHitboxes) {
-        drawHitboxes(ctx, offsetX, offsetY);
+        drawHitboxes(ctx, offsetX, offsetY, vw, vh);
     }
 
-    // HUD overlay
+    ctx.restore(); // Remove zoom transform
+
+    // HUD overlay (screen coords, no zoom)
     renderHUD(ctx);
 }
 
-function drawHitboxes(ctx, offsetX, offsetY) {
+function drawHitboxes(ctx, offsetX, offsetY, vw, vh) {
     // Player hitboxes
     for (const [, player] of state.players) {
         if (!player.a) continue;
         const sx = player.x - offsetX;
         const sy = player.y - offsetY;
-        if (sx < -100 || sx > state.screenW + 100 || sy < -100 || sy > state.screenH + 100) continue;
+        if (sx < -100 || sx > vw + 100 || sy < -100 || sy > vh + 100) continue;
 
         ctx.beginPath();
         ctx.arc(sx, sy, PLAYER_RADIUS, 0, Math.PI * 2);
@@ -92,7 +103,7 @@ function drawHitboxes(ctx, offsetX, offsetY) {
     for (const [, proj] of state.projectiles) {
         const sx = proj.x - offsetX;
         const sy = proj.y - offsetY;
-        if (sx < -50 || sx > state.screenW + 50 || sy < -50 || sy > state.screenH + 50) continue;
+        if (sx < -50 || sx > vw + 50 || sy < -50 || sy > vh + 50) continue;
 
         ctx.beginPath();
         ctx.arc(sx, sy, PROJECTILE_RADIUS, 0, Math.PI * 2);

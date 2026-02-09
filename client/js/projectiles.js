@@ -28,13 +28,13 @@ function getGlowSprite(color) {
     return canvas;
 }
 
-export function renderProjectiles(ctx, offsetX, offsetY) {
+export function renderProjectiles(ctx, offsetX, offsetY, vw, vh) {
     for (const [, proj] of state.projectiles) {
         const sx = proj.x - offsetX;
         const sy = proj.y - offsetY;
 
-        // Skip if off screen
-        if (sx < -50 || sx > state.screenW + 50 || sy < -50 || sy > state.screenH + 50) continue;
+        // Skip if off viewport
+        if (sx < -50 || sx > vw + 50 || sy < -50 || sy > vh + 50) continue;
 
         // Determine color from owner's ship type
         let color = LASER_COLORS[0];

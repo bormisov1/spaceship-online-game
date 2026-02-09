@@ -107,7 +107,13 @@ func (g *Game) HandleInput(playerID string, input ClientInput) {
 	if !ok {
 		return
 	}
-	p.TargetR = math.Atan2(input.MY-p.Y, input.MX-p.X)
+	// Only update target rotation when target is far enough from ship
+	// to produce a stable angle (avoids flickering when idle on mobile)
+	dx := input.MX - p.X
+	dy := input.MY - p.Y
+	if dx*dx+dy*dy > 25 { // > 5px distance
+		p.TargetR = math.Atan2(dy, dx)
+	}
 	p.Firing = input.Fire
 	p.Boosting = input.Boost
 	p.TargetX = input.MX

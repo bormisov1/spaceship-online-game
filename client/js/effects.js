@@ -99,11 +99,11 @@ export function updateParticles(dt) {
     }
 }
 
-export function renderParticles(ctx, offsetX, offsetY) {
+export function renderParticles(ctx, offsetX, offsetY, vw, vh) {
     for (const p of state.particles) {
         const sx = p.x - offsetX;
         const sy = p.y - offsetY;
-        if (sx < -20 || sx > state.screenW + 20 || sy < -20 || sy > state.screenH + 20) continue;
+        if (sx < -20 || sx > vw + 20 || sy < -20 || sy > vh + 20) continue;
 
         const alpha = Math.max(0, p.life / p.maxLife);
         const size = p.size * (p.type === 'explosion' ? (1 + (1 - alpha) * 0.5) : alpha);
@@ -123,11 +123,11 @@ export function renderParticles(ctx, offsetX, offsetY) {
     ctx.globalAlpha = 1;
 }
 
-export function renderExplosions(ctx, offsetX, offsetY) {
+export function renderExplosions(ctx, offsetX, offsetY, vw, vh) {
     for (const e of state.explosions) {
         const sx = e.x - offsetX;
         const sy = e.y - offsetY;
-        if (sx < -100 || sx > state.screenW + 100 || sy < -100 || sy > state.screenH + 100) continue;
+        if (sx < -100 || sx > vw + 100 || sy < -100 || sy > vh + 100) continue;
 
         const alpha = (e.life / e.maxLife) * 0.4;
         ctx.strokeStyle = `rgba(255, 200, 50, ${alpha})`;

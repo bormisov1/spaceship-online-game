@@ -51,16 +51,17 @@ export function send(type, data) {
 
 export function sendInput() {
     if (state.phase !== 'playing' || !state.myID) return;
-    // Recalculate world coords fresh every call so they stay correct
-    // even when the mouse is stationary but the camera moves
-    const mx = state.mouseX + state.camX - state.screenW / 2;
-    const my = state.mouseY + state.camY - state.screenH / 2;
+    // Convert screen-space mouse to world coords, accounting for camera zoom.
+    // Screen center = player position; offset from center is scaled by 1/zoom.
+    const zoom = state.camZoom;
+    const mx = (state.mouseX - state.screenW / 2) / zoom + state.camX;
+    const my = (state.mouseY - state.screenH / 2) / zoom + state.camY;
     send('input', {
         mx,
         my,
         fire: state.firing,
         boost: state.boosting,
-        thresh: Math.min(state.screenW, state.screenH) / 8,
+        thresh: Math.min(state.screenW, state.screenH) / (8 * zoom),
     });
 }
 

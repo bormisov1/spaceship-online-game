@@ -6,7 +6,9 @@ export function renderHUD(ctx) {
 
     // Health bar
     if (me && me.a) {
-        drawHealthBar(ctx, state.screenW / 2, state.screenH - 40, 200, 16, me.hp, me.mhp);
+        const minDim = Math.min(state.screenW, state.screenH);
+        const barW = Math.max(120, Math.min(200, minDim * 0.28));
+        drawHealthBar(ctx, state.screenW / 2, state.screenH - 40, barW, 16, me.hp, me.mhp);
     }
 
     // Minimap (top right)
@@ -23,9 +25,14 @@ export function renderHUD(ctx) {
         drawDeathScreen(ctx);
     }
 
-    // Crosshair
-    if (state.phase === 'playing') {
+    // Crosshair (desktop only)
+    if (state.phase === 'playing' && !state.isMobile) {
         drawCrosshair(ctx);
+    }
+
+    // Mobile touch controls overlay
+    if (state.isMobile && (state.phase === 'playing' || state.phase === 'dead')) {
+        drawMobileControls(ctx);
     }
 
     // Connection status
@@ -66,7 +73,8 @@ function drawHealthBar(ctx, x, y, w, h, hp, maxHp) {
 }
 
 function drawMinimap(ctx) {
-    const size = 180;
+    const minDim = Math.min(state.screenW, state.screenH);
+    const size = Math.max(80, Math.min(180, minDim * 0.22));
     const margin = 10;
     const x = state.screenW - size - margin;
     const y = margin;
@@ -87,7 +95,7 @@ function drawMinimap(ctx) {
         const colors = SHIP_COLORS[p.s] || SHIP_COLORS[0];
         const dotX = x + (p.x / WORLD_W) * size;
         const dotY = y + (p.y / WORLD_H) * size;
-        const radius = isMe ? 4 : 2;
+        const radius = isMe ? 3 : 2;
 
         ctx.beginPath();
         ctx.arc(dotX, dotY, radius, 0, Math.PI * 2);
@@ -99,10 +107,13 @@ function drawMinimap(ctx) {
 function drawKillFeed(ctx) {
     const now = performance.now();
     const x = state.screenW - 20;
-    let y = 210; // below minimap (180 + margins)
+    const minDim = Math.min(state.screenW, state.screenH);
+    const mapSize = Math.max(80, Math.min(180, minDim * 0.22));
+    let y = mapSize + 30; // below minimap
 
     ctx.textAlign = 'right';
-    ctx.font = '13px monospace';
+    const fontSize = Math.max(10, Math.min(13, minDim * 0.018)) | 0;
+    ctx.font = `${fontSize}px monospace`;
 
     for (let i = state.killFeed.length - 1; i >= 0; i--) {
         const kill = state.killFeed[i];
@@ -128,37 +139,47 @@ function drawKillFeed(ctx) {
 }
 
 function drawScoreboard(ctx) {
+    const minDim = Math.min(state.screenW, state.screenH);
+    const scale = Math.max(0.7, Math.min(1, minDim / 800));
+    const fontSize = (13 * scale) | 0;
+    const headerSize = (12 * scale) | 0;
+    const lineH = (18 * scale) | 0;
+    const panelW = (180 * scale) | 0;
+    const scoreX = (150 * scale) | 0;
+    const maxPlayers = minDim < 500 ? 5 : 8;
+
     // Collect and sort players by score
     const players = Array.from(state.players.values())
         .sort((a, b) => b.sc - a.sc || a.id.localeCompare(b.id))
-        .slice(0, 8);
+        .slice(0, maxPlayers);
 
     ctx.textAlign = 'left';
-    ctx.font = '13px monospace';
+    ctx.font = `${fontSize}px monospace`;
 
     const x = 15;
-    let y = 60;
+    let y = 60 * scale;
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.fillRect(x - 5, y - 18, 180, players.length * 20 + 24);
+    ctx.fillRect(x - 5, y - lineH, panelW, players.length * (lineH + 2) + lineH + 6);
 
     ctx.fillStyle = '#ffffff88';
-    ctx.font = 'bold 12px monospace';
+    ctx.font = `bold ${headerSize}px monospace`;
     ctx.fillText('SCOREBOARD', x, y - 2);
-    y += 18;
+    y += lineH;
 
-    ctx.font = '13px monospace';
+    ctx.font = `${fontSize}px monospace`;
     for (const p of players) {
         const isMe = p.id === state.myID;
         const colors = SHIP_COLORS[p.s] || SHIP_COLORS[0];
 
         ctx.fillStyle = isMe ? '#ffffff' : '#aaaaaa';
-        const nameStr = p.n.length > 12 ? p.n.slice(0, 12) + '..' : p.n;
+        const maxNameLen = minDim < 500 ? 8 : 12;
+        const nameStr = p.n.length > maxNameLen ? p.n.slice(0, maxNameLen) + '..' : p.n;
         ctx.fillText(`${nameStr}`, x, y);
 
         ctx.fillStyle = colors.main;
-        ctx.fillText(`${p.sc}`, x + 150, y);
-        y += 18;
+        ctx.fillText(`${p.sc}`, x + scoreX, y);
+        y += lineH;
     }
 }
 
@@ -205,6 +226,45 @@ function drawCrosshair(ctx) {
     ctx.arc(mx, my, 2, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.fill();
+}
+
+function drawMobileControls(ctx) {
+    // Draw joystick when active
+    if (state.touchJoystick) {
+        const { startX, startY, currentX, currentY } = state.touchJoystick;
+        const maxRadius = 60;
+
+        // Base circle
+        ctx.beginPath();
+        ctx.arc(startX, startY, maxRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Inner dead zone circle
+        ctx.beginPath();
+        ctx.arc(startX, startY, 12, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Thumb position (clamped to base radius for visual)
+        let dx = currentX - startX;
+        let dy = currentY - startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > maxRadius) {
+            dx = (dx / dist) * maxRadius;
+            dy = (dy / dist) * maxRadius;
+        }
+
+        ctx.beginPath();
+        ctx.arc(startX + dx, startY + dy, 18, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
 }
 
 // Draw health bar above other players
