@@ -6,7 +6,7 @@ export const PROJECTILE_RADIUS = 4;
 export const PLAYER_MAX_HP = 100;
 
 // Rendering
-export const SHIP_SIZE = 48;
+export const SHIP_SIZE = 60;
 export const STAR_COUNT = 300;
 export const PARALLAX_FACTOR = 0.05;
 export const ENGINE_PARTICLES = 15;
