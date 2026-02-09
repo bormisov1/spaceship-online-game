@@ -1,0 +1,10 @@
+{
+    "name": "Star Wars Space Battle",
+    "short_name": "Space Battle",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#0a0a1a",
+    "theme_color": "#0a0a1a",
+    "description": "Multiplayer spaceship combat game"
+}
