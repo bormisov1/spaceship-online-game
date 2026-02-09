@@ -1,7 +1,7 @@
 import { state } from './state.js';
-import { connect, setMessageHandler } from './network.js';
+import { connect, setMessageHandler, onConnect, send } from './network.js';
 import { setupInput } from './input.js';
-import { initLobby, hideLobby, updateSessions } from './lobby.js';
+import { initLobby, hideLobby, showLobby, updateSessions, updateURL, checkURLSession, handleSessionCheck } from './lobby.js';
 import { render } from './renderer.js';
 import { initStarfield } from './starfield.js';
 import { addExplosion, addEngineParticles } from './effects.js';
@@ -26,11 +26,69 @@ export function init() {
     // Setup message routing
     setMessageHandler(handleMessage);
 
+    // On WS connect, check URL session if present
+    onConnect(() => checkURLSession());
+
+    // Handle browser back/forward
+    window.addEventListener('popstate', () => {
+        if (state.phase === 'playing' || state.phase === 'dead') {
+            send('leave', {});
+            state.sessionID = null;
+            state.myID = null;
+            showLobby();
+        }
+    });
+
+    // Fullscreen toggle
+    setupFullscreen();
+
     // Connect to server
     connect();
 
     // Start render loop
     requestAnimationFrame(gameLoop);
+}
+
+function setupFullscreen() {
+    const btn = document.getElementById('fullscreenBtn');
+    if (!btn) return;
+
+    // Hide button if already running as installed PWA (no browser chrome)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone;
+    if (isStandalone) {
+        btn.style.display = 'none';
+        return;
+    }
+
+    btn.addEventListener('click', () => {
+        const doc = document;
+        const elem = doc.documentElement;
+
+        if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen().catch(() => {});
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen();
+            }
+        } else {
+            if (doc.exitFullscreen) {
+                doc.exitFullscreen().catch(() => {});
+            } else if (doc.webkitExitFullscreen) {
+                doc.webkitExitFullscreen();
+            }
+        }
+    });
+
+    // Update button icon on fullscreen change
+    const updateIcon = () => {
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        btn.innerHTML = isFs
+            ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"/></svg>'
+            : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>';
+    };
+    document.addEventListener('fullscreenchange', updateIcon);
+    document.addEventListener('webkitfullscreenchange', updateIcon);
 }
 
 function resize() {
@@ -72,6 +130,9 @@ function handleMessage(msg) {
             break;
         case 'death':
             handleDeath(msg.d);
+            break;
+        case 'checked':
+            handleSessionCheck(msg.d);
             break;
         case 'error':
             console.error('Server error:', msg.d.msg);
@@ -123,6 +184,7 @@ function handleWelcome(data) {
 
 function handleJoined(data) {
     state.sessionID = data.sid;
+    updateURL(data.sid);
 }
 
 function handleKill(data) {

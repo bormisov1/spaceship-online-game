@@ -7,6 +7,7 @@ const (
 	MsgInput  = "input"
 	MsgCreate = "create" // create session
 	MsgList   = "list"   // list sessions
+	MsgCheck  = "check"  // check if session exists
 )
 
 // Server -> Client message types
@@ -18,6 +19,7 @@ const (
 	MsgSessions = "sessions"
 	MsgJoined   = "joined"
 	MsgError    = "error"
+	MsgChecked  = "checked" // session check response
 )
 
 // Envelope wraps all messages with a type field
@@ -109,4 +111,17 @@ type SessionInfo struct {
 // ErrorMsg sends error to client
 type ErrorMsg struct {
 	Msg string `json:"msg"`
+}
+
+// CheckMsg is sent by client to check if a session exists
+type CheckMsg struct {
+	SID string `json:"sid"`
+}
+
+// CheckedMsg is the response to a session check
+type CheckedMsg struct {
+	SID     string `json:"sid"`
+	Exists  bool   `json:"exists"`
+	Name    string `json:"name,omitempty"`
+	Players int    `json:"players,omitempty"`
 }

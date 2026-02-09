@@ -1,18 +1,31 @@
 import { state } from './state.js';
-import { listSessions, createSession, joinSession } from './network.js';
+import { listSessions, createSession, joinSession, checkSession } from './network.js';
+
+const UUID_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 let lobbyEl = null;
 let refreshInterval = null;
 
 export function initLobby() {
     lobbyEl = document.getElementById('lobby');
+
+    // Check URL for session UUID
+    const match = window.location.pathname.match(UUID_RE);
+    if (match) {
+        state.urlSessionID = match[1];
+    }
+
     renderLobby();
-    startRefresh();
+    if (!state.urlSessionID) {
+        startRefresh();
+    }
 }
 
 export function showLobby() {
     state.phase = 'lobby';
+    state.urlSessionID = null;
     lobbyEl.style.display = 'flex';
+    history.pushState({}, '', '/');
     renderLobby();
     startRefresh();
 }
@@ -20,6 +33,10 @@ export function showLobby() {
 export function hideLobby() {
     lobbyEl.style.display = 'none';
     stopRefresh();
+}
+
+export function updateURL(sid) {
+    history.pushState({}, '', '/' + sid);
 }
 
 function startRefresh() {
@@ -37,12 +54,79 @@ function stopRefresh() {
 
 export function updateSessions(sessions) {
     state.sessions = sessions;
-    if (state.phase === 'lobby') {
+    if (state.phase === 'lobby' && !state.urlSessionID) {
         renderSessionList();
     }
 }
 
+// Called when WS connects and we have a URL session ID to verify
+export function checkURLSession() {
+    if (state.urlSessionID) {
+        checkSession(state.urlSessionID);
+    }
+}
+
+export function handleSessionCheck(data) {
+    if (!state.urlSessionID) return;
+
+    const panel = lobbyEl.querySelector('.lobby-panel');
+    if (!panel) return;
+
+    const statusEl = panel.querySelector('.join-status');
+    const btnJoin = panel.querySelector('#btnJoin');
+
+    if (!data.exists) {
+        if (statusEl) {
+            statusEl.innerHTML = `
+                <p class="error-msg">Session does not exist or has ended.</p>
+                <a href="/" class="btn btn-primary" style="text-decoration:none;display:inline-block;margin-top:12px;">Go to Lobby</a>
+            `;
+        }
+        if (btnJoin) btnJoin.style.display = 'none';
+    } else {
+        if (statusEl) {
+            statusEl.innerHTML = `<p class="session-info">Battle: <strong>${escapeHtml(data.name)}</strong> — ${data.players} pilot${data.players !== 1 ? 's' : ''}</p>`;
+        }
+        if (btnJoin) {
+            btnJoin.disabled = false;
+            btnJoin.textContent = 'Join Battle';
+        }
+    }
+}
+
 function renderLobby() {
+    if (state.urlSessionID) {
+        renderJoinMode();
+    } else {
+        renderNormalLobby();
+    }
+}
+
+function renderJoinMode() {
+    lobbyEl.innerHTML = `
+        <div class="lobby-panel">
+            <h1 class="title">STAR WARS</h1>
+            <h2 class="subtitle">Space Battle</h2>
+            <div class="name-input-group">
+                <label for="playerName">Pilot Name</label>
+                <input type="text" id="playerName" maxlength="16" placeholder="Enter your name..." value="Pilot" />
+            </div>
+            <div class="join-status">
+                <p class="no-sessions">Checking session...</p>
+            </div>
+            <div class="lobby-actions">
+                <button id="btnJoin" class="btn btn-primary" disabled>Join Battle</button>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('btnJoin').addEventListener('click', () => {
+        const name = document.getElementById('playerName').value.trim() || 'Pilot';
+        joinSession(name, state.urlSessionID);
+    });
+}
+
+function renderNormalLobby() {
     lobbyEl.innerHTML = `
         <div class="lobby-panel">
             <h1 class="title">STAR WARS</h1>

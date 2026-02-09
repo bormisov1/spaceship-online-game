@@ -5,6 +5,7 @@ export const state = {
     myID: null,
     myShip: 0,
     sessionID: null,
+    urlSessionID: null, // UUID extracted from URL path
 
     // Game state from server
     players: new Map(),     // id -> PlayerState

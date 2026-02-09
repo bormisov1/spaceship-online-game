@@ -1,6 +1,12 @@
 import { state } from './state.js';
 import { RECONNECT_DELAY, INPUT_RATE } from './constants.js';
 
+let onConnectCallback = null;
+
+export function onConnect(cb) {
+    onConnectCallback = cb;
+}
+
 let ws = null;
 let messageHandler = null;
 let inputInterval = null;
@@ -19,6 +25,7 @@ export function connect() {
         state.connected = true;
         console.log('WebSocket connected');
         startInputLoop();
+        if (onConnectCallback) onConnectCallback();
     };
 
     ws.onclose = () => {
@@ -87,4 +94,8 @@ export function createSession(name, sessionName) {
 
 export function joinSession(name, sessionID) {
     send('join', { name, sid: sessionID });
+}
+
+export function checkSession(sid) {
+    send('check', { sid });
 }

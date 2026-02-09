@@ -124,6 +124,8 @@ func (c *Client) handleMessage(raw []byte) {
 		c.handleInput(raw)
 	case MsgLeave:
 		c.handleLeave()
+	case MsgCheck:
+		c.handleCheck(raw)
 	}
 }
 
@@ -205,6 +207,27 @@ func (c *Client) handleInput(raw []byte) {
 		return
 	}
 	sess.Game.HandleInput(c.playerID, msg.D)
+}
+
+func (c *Client) handleCheck(raw []byte) {
+	var msg struct {
+		T string   `json:"t"`
+		D CheckMsg `json:"d"`
+	}
+	if err := json.Unmarshal(raw, &msg); err != nil {
+		return
+	}
+	sess := c.hub.sessions.GetSession(msg.D.SID)
+	if sess == nil {
+		c.SendJSON(Envelope{T: MsgChecked, Data: CheckedMsg{SID: msg.D.SID, Exists: false}})
+		return
+	}
+	c.SendJSON(Envelope{T: MsgChecked, Data: CheckedMsg{
+		SID:     msg.D.SID,
+		Exists:  true,
+		Name:    sess.Name,
+		Players: sess.Game.PlayerCount(),
+	}})
 }
 
 func (c *Client) handleLeave() {

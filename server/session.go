@@ -29,7 +29,7 @@ func (sm *SessionManager) CreateSession(name string) *Session {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	id := GenerateID(4)
+	id := GenerateUUID()
 	game := NewGame()
 	sess := &Session{
 		ID:   id,
