@@ -97,6 +97,7 @@ func (c *Client) SendJSON(msg interface{}) {
 		log.Printf("marshal error: %v", err)
 		return
 	}
+	defer func() { recover() }()
 	select {
 	case c.send <- data:
 	default:

@@ -224,10 +224,13 @@ func (g *Game) broadcastState() {
 
 	for _, client := range g.clients {
 		if c, ok := client.(*Client); ok {
-			select {
-			case c.send <- data:
-			default:
-			}
+			func() {
+				defer func() { recover() }()
+				select {
+				case c.send <- data:
+				default:
+				}
+			}()
 		}
 	}
 }
