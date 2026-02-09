@@ -1,0 +1,49 @@
+// Global game state
+export const state = {
+    // Connection
+    connected: false,
+    myID: null,
+    myShip: 0,
+    sessionID: null,
+
+    // Game state from server
+    players: new Map(),     // id -> PlayerState
+    projectiles: new Map(), // id -> ProjectileState
+    tick: 0,
+
+    // Previous state for interpolation
+    prevPlayers: new Map(),
+    prevProjectiles: new Map(),
+    lastStateTime: 0,
+    stateInterval: 1000 / 30, // server broadcasts at 30Hz
+
+    // Local
+    canvas: null,
+    bgCanvas: null,
+    ctx: null,
+    bgCtx: null,
+    screenW: 0,
+    screenH: 0,
+
+    // Camera (centered on local player)
+    camX: 0,
+    camY: 0,
+
+    // Input
+    mouseX: 0,
+    mouseY: 0,
+    mouseWorldX: 0,
+    mouseWorldY: 0,
+    firing: false,
+    boosting: false,
+
+    // UI state
+    phase: 'lobby', // 'lobby' | 'playing' | 'dead'
+    sessions: [],
+    killFeed: [],   // { killer, victim, time }
+    deathInfo: null, // { killerName }
+
+    // Effects
+    particles: [],
+    explosions: [],
+};
