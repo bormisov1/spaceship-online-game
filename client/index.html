@@ -243,7 +243,28 @@
 <body>
     <canvas id="bgCanvas"></canvas>
     <canvas id="gameCanvas"></canvas>
-    <div id="lobby"></div>
+    <div id="lobby">
+        <div class="lobby-panel">
+            <h1 class="title">STAR WARS</h1>
+            <h2 class="subtitle">Space Battle</h2>
+            <div class="name-input-group">
+                <label for="playerName">Pilot Name</label>
+                <input type="text" id="playerName" maxlength="16" placeholder="Enter your name..." value="Pilot" />
+            </div>
+            <div class="lobby-actions">
+                <button id="btnCreate" class="btn btn-primary">Create Battle</button>
+            </div>
+            <div class="session-list-container">
+                <h3>Active Battles</h3>
+                <div id="sessionList" class="session-list">
+                    <p class="no-sessions">Searching for battles...</p>
+                </div>
+            </div>
+            <noscript>
+                <p class="no-sessions" style="margin-top:12px;">Enable JavaScript to play.</p>
+            </noscript>
+        </div>
+    </div>
     <button id="fullscreenBtn" title="Toggle Fullscreen">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
             <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/>

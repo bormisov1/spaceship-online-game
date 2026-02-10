@@ -85,7 +85,8 @@ export function handleSessionCheck(data) {
         if (btnJoin) btnJoin.style.display = 'none';
     } else {
         if (statusEl) {
-            statusEl.innerHTML = `<p class="session-info">Battle: <strong>${escapeHtml(data.name)}</strong> — ${data.players} pilot${data.players !== 1 ? 's' : ''}</p>`;
+            const players = Number.isFinite(data.players) ? data.players : 0;
+            statusEl.innerHTML = `<p class="session-info">Battle: <strong>${escapeHtml(data.name)}</strong> — ${players} pilot${players !== 1 ? 's' : ''}</p>`;
         }
         if (btnJoin) {
             btnJoin.disabled = false;
@@ -162,13 +163,16 @@ function renderSessionList() {
         return;
     }
 
-    listEl.innerHTML = state.sessions.map(s => `
+    listEl.innerHTML = state.sessions.map(s => {
+        const players = Number.isFinite(s.players) ? s.players : 0;
+        return `
         <div class="session-item" data-sid="${s.id}">
             <span class="session-name">${escapeHtml(s.name)}</span>
-            <span class="session-players">${s.players} pilot${s.players !== 1 ? 's' : ''}</span>
+            <span class="session-players">${players} pilot${players !== 1 ? 's' : ''}</span>
             <button class="btn btn-join" data-sid="${s.id}">Join</button>
         </div>
-    `).join('');
+    `;
+    }).join('');
 
     listEl.querySelectorAll('.btn-join').forEach(btn => {
         btn.addEventListener('click', () => {
