@@ -55,15 +55,22 @@ function setupFullscreen() {
 
     // Hide button if already running as installed PWA (no browser chrome)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.matchMedia('(display-mode: fullscreen)').matches
         || window.navigator.standalone;
     if (isStandalone) {
         btn.style.display = 'none';
         return;
     }
 
+    // Hide button if Fullscreen API is not supported (e.g. iOS Safari)
+    const elem = document.documentElement;
+    if (!elem.requestFullscreen && !elem.webkitRequestFullscreen) {
+        btn.style.display = 'none';
+        return;
+    }
+
     btn.addEventListener('click', () => {
         const doc = document;
-        const elem = doc.documentElement;
 
         if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
             if (elem.requestFullscreen) {

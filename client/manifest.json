@@ -2,7 +2,7 @@
     "name": "Star Wars Space Battle",
     "short_name": "Space Battle",
     "start_url": "/",
-    "display": "standalone",
+    "display": "fullscreen",
     "orientation": "any",
     "background_color": "#0a0a1a",
     "theme_color": "#0a0a1a",
