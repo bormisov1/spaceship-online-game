@@ -23,6 +23,9 @@ var uuidRegex = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab]
 func startTestServer(t *testing.T) (*httptest.Server, string, func()) {
 	t.Helper()
 
+	prevIdleTimeout := SessionIdleTimeout
+	SessionIdleTimeout = 150 * time.Millisecond
+
 	// Create a temp client dir with a minimal index.html
 	tmpDir := t.TempDir()
 	jsDir := filepath.Join(tmpDir, "js")
@@ -38,7 +41,10 @@ func startTestServer(t *testing.T) (*httptest.Server, string, func()) {
 
 	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws"
 
-	return srv, wsURL, func() { srv.Close() }
+	return srv, wsURL, func() {
+		SessionIdleTimeout = prevIdleTimeout
+		srv.Close()
+	}
 }
 
 // dialWS opens a WebSocket connection to the test server.
@@ -353,7 +359,7 @@ func TestCreateAndLeaveSession(t *testing.T) {
 	sendMsg(t, c, "leave", nil)
 
 	// Give a moment for cleanup
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(SessionIdleTimeout + 50*time.Millisecond)
 
 	// Session should be empty and cleaned up
 	sendMsg(t, c2, "check", map[string]string{"sid": sid})
@@ -617,6 +623,12 @@ func TestSessionManagerListSessions(t *testing.T) {
 }
 
 func TestSessionManagerRemovePlayer(t *testing.T) {
+	prevIdleTimeout := SessionIdleTimeout
+	SessionIdleTimeout = 20 * time.Millisecond
+	defer func() {
+		SessionIdleTimeout = prevIdleTimeout
+	}()
+
 	sm := NewSessionManager()
 	sess := sm.CreateSession("TempArena")
 	player := sess.Game.AddPlayer("TestPlayer")
@@ -624,7 +636,7 @@ func TestSessionManagerRemovePlayer(t *testing.T) {
 	sm.RemovePlayer(sess.ID, player.ID)
 
 	// Session should be cleaned up (0 players)
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(SessionIdleTimeout + 20*time.Millisecond)
 	got := sm.GetSession(sess.ID)
 	if got != nil {
 		t.Error("expected session to be removed after last player leaves")
@@ -753,7 +765,7 @@ func TestDisconnectCleansUpSession(t *testing.T) {
 	c1.Close()
 
 	// Wait for hub to process unregister
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(SessionIdleTimeout + 50*time.Millisecond)
 
 	// Check if session is gone
 	c2 := dialWS(t, wsURL)

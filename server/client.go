@@ -188,6 +188,7 @@ func (c *Client) handleCreate(raw []byte) {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "session full"}})
 		return
 	}
+	c.hub.sessions.MarkActive(sess.ID)
 	c.playerID = player.ID
 	c.sessionID = sess.ID
 
@@ -224,6 +225,7 @@ func (c *Client) handleJoin(raw []byte) {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "session full"}})
 		return
 	}
+	c.hub.sessions.MarkActive(sess.ID)
 	c.playerID = player.ID
 	c.sessionID = sess.ID
 

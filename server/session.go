@@ -2,15 +2,21 @@ package main
 
 import (
 	"sync"
+	"time"
 )
 
 const maxSessions = 100
+
+var SessionIdleTimeout = time.Minute
 
 // Session represents a game session that players can join
 type Session struct {
 	ID   string
 	Name string
 	Game *Game
+
+	cleanupMu    sync.Mutex
+	cleanupTimer *time.Timer
 }
 
 // SessionManager handles creation and lookup of sessions
@@ -54,6 +60,17 @@ func (sm *SessionManager) GetSession(id string) *Session {
 	return sm.sessions[id]
 }
 
+// MarkActive cancels any pending cleanup for a session.
+func (sm *SessionManager) MarkActive(sessionID string) {
+	sm.mu.RLock()
+	sess, ok := sm.sessions[sessionID]
+	sm.mu.RUnlock()
+	if !ok {
+		return
+	}
+	sess.cancelCleanup()
+}
+
 // RemovePlayer removes a player from a session
 func (sm *SessionManager) RemovePlayer(sessionID, playerID string) {
 	sm.mu.RLock()
@@ -64,12 +81,19 @@ func (sm *SessionManager) RemovePlayer(sessionID, playerID string) {
 	}
 	sess.Game.RemovePlayer(playerID)
 
-	// Clean up empty sessions
+	// Clean up empty sessions after idle timeout
 	if sess.Game.PlayerCount() == 0 {
-		sess.Game.Stop()
-		sm.mu.Lock()
-		delete(sm.sessions, sessionID)
-		sm.mu.Unlock()
+		sess.scheduleCleanup(SessionIdleTimeout, func() {
+			if sess.Game.PlayerCount() != 0 {
+				return
+			}
+			sess.Game.Stop()
+			sm.mu.Lock()
+			if sm.sessions[sessionID] == sess {
+				delete(sm.sessions, sessionID)
+			}
+			sm.mu.Unlock()
+		})
 	}
 }
 
@@ -87,4 +111,38 @@ func (sm *SessionManager) ListSessions() []SessionInfo {
 		})
 	}
 	return list
+}
+
+func (s *Session) scheduleCleanup(after time.Duration, fn func()) {
+	s.cleanupMu.Lock()
+	if s.cleanupTimer != nil {
+		s.cleanupTimer.Stop()
+	}
+	timer := time.AfterFunc(after, func() {
+		s.cleanupMu.Lock()
+		if s.cleanupTimer != timer {
+			s.cleanupMu.Unlock()
+			return
+		}
+		s.cleanupMu.Unlock()
+
+		fn()
+
+		s.cleanupMu.Lock()
+		if s.cleanupTimer == timer {
+			s.cleanupTimer = nil
+		}
+		s.cleanupMu.Unlock()
+	})
+	s.cleanupTimer = timer
+	s.cleanupMu.Unlock()
+}
+
+func (s *Session) cancelCleanup() {
+	s.cleanupMu.Lock()
+	if s.cleanupTimer != nil {
+		s.cleanupTimer.Stop()
+		s.cleanupTimer = nil
+	}
+	s.cleanupMu.Unlock()
 }
