@@ -9,34 +9,41 @@ import (
 )
 
 const (
-	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
-	pingPeriod     = (pongWait * 9) / 10
-	maxMessageSize = 4096
-	sendBufSize    = 256
+	writeWait         = 10 * time.Second
+	pongWait          = 60 * time.Second
+	pingPeriod        = (pongWait * 9) / 10
+	maxMessageSize    = 4096
+	sendBufSize       = 256
+	maxMessagesPerSec = 50
+	maxNameLen        = 16
 )
 
 // Client represents a WebSocket connection
 type Client struct {
-	hub       *Hub
-	conn      *websocket.Conn
-	send      chan []byte
-	playerID  string
-	sessionID string
+	hub        *Hub
+	conn       *websocket.Conn
+	send       chan []byte
+	playerID   string
+	sessionID  string
+	remoteAddr string
+	msgCount   int
+	msgResetAt time.Time
 }
 
 // NewClient creates a new Client
-func NewClient(hub *Hub, conn *websocket.Conn) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, remoteAddr string) *Client {
 	return &Client{
-		hub:  hub,
-		conn: conn,
-		send: make(chan []byte, sendBufSize),
+		hub:        hub,
+		conn:       conn,
+		send:       make(chan []byte, sendBufSize),
+		remoteAddr: remoteAddr,
 	}
 }
 
 // ReadPump reads messages from the WebSocket connection
 func (c *Client) ReadPump() {
 	defer func() {
+		c.hub.TrackDisconnect(c.remoteAddr)
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
@@ -56,6 +63,19 @@ func (c *Client) ReadPump() {
 			}
 			break
 		}
+
+		// Rate limiting
+		now := time.Now()
+		if now.After(c.msgResetAt) {
+			c.msgCount = 0
+			c.msgResetAt = now.Add(time.Second)
+		}
+		c.msgCount++
+		if c.msgCount > maxMessagesPerSec {
+			log.Printf("rate limit exceeded for %s, disconnecting", c.remoteAddr)
+			break
+		}
+
 		c.handleMessage(message)
 	}
 }
@@ -146,13 +166,28 @@ func (c *Client) handleCreate(raw []byte) {
 	if name == "" {
 		name = "Pilot"
 	}
+	if len(name) > maxNameLen {
+		name = name[:maxNameLen]
+	}
 	sname := msg.D.SessionName
 	if sname == "" {
 		sname = "Battle Arena"
 	}
+	if len(sname) > 30 {
+		sname = sname[:30]
+	}
 
 	sess := c.hub.sessions.CreateSession(sname)
+	if sess == nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "too many active sessions"}})
+		return
+	}
+
 	player := sess.Game.AddPlayer(name)
+	if player == nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "session full"}})
+		return
+	}
 	c.playerID = player.ID
 	c.sessionID = sess.ID
 
@@ -174,6 +209,9 @@ func (c *Client) handleJoin(raw []byte) {
 	if name == "" {
 		name = "Pilot"
 	}
+	if len(name) > maxNameLen {
+		name = name[:maxNameLen]
+	}
 
 	sess := c.hub.sessions.GetSession(msg.D.SessionID)
 	if sess == nil {
@@ -182,6 +220,10 @@ func (c *Client) handleJoin(raw []byte) {
 	}
 
 	player := sess.Game.AddPlayer(name)
+	if player == nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "session full"}})
+		return
+	}
 	c.playerID = player.ID
 	c.sessionID = sess.ID
 

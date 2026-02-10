@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 
@@ -15,8 +17,24 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for development
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // Non-browser clients don't send Origin
+		}
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+		return u.Host == r.Host
 	},
+}
+
+func extractIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // SetupRoutes configures HTTP routes
@@ -37,12 +55,21 @@ func SetupRoutes(hub *Hub, clientDir string) *http.ServeMux {
 
 	// WebSocket endpoint
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ip := extractIP(r)
+		if !hub.CanAccept(ip) {
+			http.Error(w, "too many connections", http.StatusServiceUnavailable)
+			return
+		}
+
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Printf("upgrade error: %v", err)
 			return
 		}
-		client := NewClient(hub, conn)
+
+		hub.TrackConnect(ip)
+
+		client := NewClient(hub, conn, ip)
 		hub.register <- client
 
 		go client.WritePump()

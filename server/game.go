@@ -14,6 +14,11 @@ const (
 	BroadcastEvery = TickRate / BroadcastRate
 )
 
+const (
+	maxProjectilesPerSession = 500
+	maxPlayersPerSession     = 20
+)
+
 // Broadcaster interface for sending messages to clients
 type Broadcaster interface {
 	SendJSON(msg interface{})
@@ -74,6 +79,10 @@ func (g *Game) Stop() {
 func (g *Game) AddPlayer(name string) *Player {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
+	if len(g.players) >= maxPlayersPerSession {
+		return nil
+	}
 
 	id := GenerateID(4)
 	ship := g.nextShip % 4
@@ -141,7 +150,7 @@ func (g *Game) update() {
 		p.Update(dt)
 
 		// Handle firing
-		if p.CanFire() {
+		if p.CanFire() && len(g.projectiles) < maxProjectilesPerSession {
 			proj := NewProjectile(p)
 			g.projectiles[proj.ID] = proj
 			p.FireCD = FireCooldown

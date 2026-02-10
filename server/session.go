@@ -4,6 +4,8 @@ import (
 	"sync"
 )
 
+const maxSessions = 100
+
 // Session represents a game session that players can join
 type Session struct {
 	ID   string
@@ -24,10 +26,14 @@ func NewSessionManager() *SessionManager {
 	}
 }
 
-// CreateSession creates a new game session
+// CreateSession creates a new game session. Returns nil if limit reached.
 func (sm *SessionManager) CreateSession(name string) *Session {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
+
+	if len(sm.sessions) >= maxSessions {
+		return nil
+	}
 
 	id := GenerateUUID()
 	game := NewGame()
