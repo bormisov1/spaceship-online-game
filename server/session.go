@@ -118,7 +118,8 @@ func (s *Session) scheduleCleanup(after time.Duration, fn func()) {
 	if s.cleanupTimer != nil {
 		s.cleanupTimer.Stop()
 	}
-	timer := time.AfterFunc(after, func() {
+	var timer *time.Timer
+	timer = time.AfterFunc(after, func() {
 		s.cleanupMu.Lock()
 		if s.cleanupTimer != timer {
 			s.cleanupMu.Unlock()
