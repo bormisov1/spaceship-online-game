@@ -91,6 +91,25 @@ func dataMap(t *testing.T, env Envelope) map[string]interface{} {
 	return m
 }
 
+// createAndJoin creates a session then joins it. Returns the session ID.
+func createAndJoin(t *testing.T, conn *websocket.Conn, name, sname string) string {
+	t.Helper()
+	sendMsg(t, conn, "create", map[string]string{"name": name, "sname": sname})
+	created := readEnvelope(t, conn)
+	if created.T != MsgCreated {
+		t.Fatalf("expected created, got %s", created.T)
+	}
+	sid := dataMap(t, created)["sid"].(string)
+
+	sendMsg(t, conn, "join", map[string]string{"name": name, "sid": sid})
+	joined := readEnvelope(t, conn)
+	if joined.T != MsgJoined {
+		t.Fatalf("expected joined, got %s", joined.T)
+	}
+	_ = readEnvelope(t, conn) // welcome
+	return sid
+}
+
 // ---------- UUID generation tests ----------
 
 func TestGenerateUUIDFormat(t *testing.T) {
@@ -201,21 +220,11 @@ func TestCheckSessionExists(t *testing.T) {
 	_ = srv
 	defer cleanup()
 
-	// Create a session via WS
+	// Create and join a session via WS
 	c1 := dialWS(t, wsURL)
 	defer c1.Close()
 
-	sendMsg(t, c1, "create", map[string]string{"name": "Pilot", "sname": "Arena"})
-
-	// Read joined
-	joined := readEnvelope(t, c1)
-	if joined.T != MsgJoined {
-		t.Fatalf("expected joined, got %s", joined.T)
-	}
-	sid := dataMap(t, joined)["sid"].(string)
-
-	// Read welcome
-	_ = readEnvelope(t, c1)
+	sid := createAndJoin(t, c1, "Pilot", "Arena")
 
 	// Now check that session with another client
 	c2 := dialWS(t, wsURL)
@@ -273,14 +282,11 @@ func TestJoinViaSessionID(t *testing.T) {
 	_ = srv
 	defer cleanup()
 
-	// Player 1 creates a session
+	// Player 1 creates and joins a session
 	c1 := dialWS(t, wsURL)
 	defer c1.Close()
 
-	sendMsg(t, c1, "create", map[string]string{"name": "Alice", "sname": "TestBattle"})
-	joined := readEnvelope(t, c1) // joined
-	sid := dataMap(t, joined)["sid"].(string)
-	_ = readEnvelope(t, c1) // welcome
+	sid := createAndJoin(t, c1, "Alice", "TestBattle")
 
 	// Player 2 checks, then joins
 	c2 := dialWS(t, wsURL)
@@ -336,15 +342,7 @@ func TestCreateAndLeaveSession(t *testing.T) {
 	c := dialWS(t, wsURL)
 	defer c.Close()
 
-	sendMsg(t, c, "create", map[string]string{"name": "Solo", "sname": "TempBattle"})
-
-	joined := readEnvelope(t, c)
-	if joined.T != MsgJoined {
-		t.Fatalf("expected joined, got %s", joined.T)
-	}
-	sid := dataMap(t, joined)["sid"].(string)
-
-	_ = readEnvelope(t, c) // welcome
+	sid := createAndJoin(t, c, "Solo", "TempBattle")
 
 	// Verify session exists via another client
 	c2 := dialWS(t, wsURL)
@@ -393,12 +391,10 @@ func TestListSessions(t *testing.T) {
 		t.Errorf("expected 0 sessions, got %d", len(sessions))
 	}
 
-	// Create a session
+	// Create and join a session
 	c2 := dialWS(t, wsURL)
 	defer c2.Close()
-	sendMsg(t, c2, "create", map[string]string{"name": "P1", "sname": "Arena1"})
-	_ = readEnvelope(t, c2) // joined
-	_ = readEnvelope(t, c2) // welcome
+	createAndJoin(t, c2, "P1", "Arena1")
 
 	// Now list should have 1 session
 	sendMsg(t, c, "list", nil)
@@ -427,9 +423,7 @@ func TestGameStateBroadcasts(t *testing.T) {
 	c := dialWS(t, wsURL)
 	defer c.Close()
 
-	sendMsg(t, c, "create", map[string]string{"name": "Tester", "sname": "StateTest"})
-	_ = readEnvelope(t, c) // joined
-	_ = readEnvelope(t, c) // welcome
+	createAndJoin(t, c, "Tester", "StateTest")
 
 	// Should start receiving state broadcasts
 	state := readEnvelope(t, c)
@@ -458,9 +452,7 @@ func TestInputHandling(t *testing.T) {
 	c := dialWS(t, wsURL)
 	defer c.Close()
 
-	sendMsg(t, c, "create", map[string]string{"name": "Inputter", "sname": "InputTest"})
-	_ = readEnvelope(t, c) // joined
-	_ = readEnvelope(t, c) // welcome
+	createAndJoin(t, c, "Inputter", "InputTest")
 
 	// Send input (shouldn't error/crash)
 	sendMsg(t, c, "input", ClientInput{
@@ -506,13 +498,10 @@ func TestMultiplePlayersInSession(t *testing.T) {
 	_ = srv
 	defer cleanup()
 
-	// Create session
+	// Create and join session
 	c1 := dialWS(t, wsURL)
 	defer c1.Close()
-	sendMsg(t, c1, "create", map[string]string{"name": "Alpha", "sname": "MultiTest"})
-	joined1 := readEnvelope(t, c1)
-	sid := dataMap(t, joined1)["sid"].(string)
-	_ = readEnvelope(t, c1) // welcome
+	sid := createAndJoin(t, c1, "Alpha", "MultiTest")
 
 	// Join with second player
 	c2 := dialWS(t, wsURL)
@@ -549,8 +538,15 @@ func TestDefaultPlayerName(t *testing.T) {
 	c := dialWS(t, wsURL)
 	defer c.Close()
 
-	// Create with empty name
+	// Create session, then join with empty name
 	sendMsg(t, c, "create", map[string]string{"name": "", "sname": ""})
+	created := readEnvelope(t, c)
+	if created.T != MsgCreated {
+		t.Fatalf("expected created, got %s", created.T)
+	}
+	sid := dataMap(t, created)["sid"].(string)
+
+	sendMsg(t, c, "join", map[string]string{"name": "", "sid": sid})
 	_ = readEnvelope(t, c) // joined
 	welcome := readEnvelope(t, c)
 	if welcome.T != MsgWelcome {
@@ -756,10 +752,7 @@ func TestDisconnectCleansUpSession(t *testing.T) {
 	defer cleanup()
 
 	c1 := dialWS(t, wsURL)
-	sendMsg(t, c1, "create", map[string]string{"name": "Temp", "sname": "TempArena"})
-	joined := readEnvelope(t, c1)
-	sid := dataMap(t, joined)["sid"].(string)
-	_ = readEnvelope(t, c1) // welcome
+	sid := createAndJoin(t, c1, "Temp", "TempArena")
 
 	// Disconnect
 	c1.Close()

@@ -183,19 +183,8 @@ func (c *Client) handleCreate(raw []byte) {
 		return
 	}
 
-	player := sess.Game.AddPlayer(name)
-	if player == nil {
-		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "session full"}})
-		return
-	}
 	c.hub.sessions.MarkActive(sess.ID)
-	c.playerID = player.ID
-	c.sessionID = sess.ID
-
-	sess.Game.SetClient(player.ID, c)
-
-	c.SendJSON(Envelope{T: MsgJoined, Data: map[string]string{"sid": sess.ID}})
-	c.SendJSON(Envelope{T: MsgWelcome, Data: WelcomeMsg{ID: player.ID, Ship: player.ShipType}})
+	c.SendJSON(Envelope{T: MsgCreated, Data: map[string]string{"sid": sess.ID}})
 }
 
 func (c *Client) handleJoin(raw []byte) {

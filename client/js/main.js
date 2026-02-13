@@ -129,6 +129,9 @@ function handleMessage(msg) {
         case 'joined':
             handleJoined(msg.d);
             break;
+        case 'created':
+            handleCreated(msg.d);
+            break;
         case 'sessions':
             updateSessions(msg.d || []);
             break;
@@ -216,6 +219,16 @@ function handleWelcome(data) {
 function handleJoined(data) {
     state.sessionID = data.sid;
     updateURL(data.sid);
+}
+
+function handleCreated(data) {
+    // Save pilot name so it's preserved across the navigation
+    const nameEl = document.getElementById('playerName');
+    if (nameEl && nameEl.value) {
+        sessionStorage.setItem('pilotName', nameEl.value.trim());
+    }
+    // Real navigation to the session URL
+    window.location.href = '/' + data.sid;
 }
 
 function handleKill(data) {

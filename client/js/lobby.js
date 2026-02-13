@@ -104,13 +104,16 @@ function renderLobby() {
 }
 
 function renderJoinMode() {
+    const savedName = sessionStorage.getItem('pilotName') || 'Pilot';
+    sessionStorage.removeItem('pilotName');
+
     lobbyEl.innerHTML = `
         <div class="lobby-panel">
             <h1 class="title">STAR WARS</h1>
             <h2 class="subtitle">Space Battle</h2>
             <div class="name-input-group">
                 <label for="playerName">Pilot Name</label>
-                <input type="text" id="playerName" maxlength="16" placeholder="Enter your name..." value="Pilot" />
+                <input type="text" id="playerName" maxlength="16" placeholder="Enter your name..." value="${escapeHtml(savedName)}" />
             </div>
             <div class="join-status">
                 <p class="no-sessions">Checking session...</p>

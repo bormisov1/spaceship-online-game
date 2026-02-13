@@ -18,6 +18,7 @@ const (
 	MsgKill     = "kill"
 	MsgSessions = "sessions"
 	MsgJoined   = "joined"
+	MsgCreated  = "created" // session created, client should navigate
 	MsgError    = "error"
 	MsgChecked  = "checked" // session check response
 )
