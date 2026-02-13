@@ -86,8 +86,8 @@ export function render(dt) {
         drawPlayerHealthBar(ctx, sx, sy, player.hp, player.mhp, player.n, isMe);
     }
 
-    // Controller aim reticle (after player loop, still in zoom transform)
-    if (state.controllerAttached && state.myID) {
+    // Auto-aim reticle (controller or mobile direct play, not desktop)
+    if ((state.controllerAttached || state.isMobile) && state.myID) {
         const me = state.players.get(state.myID);
         if (me && me.a) {
             updateAndDrawControllerAim(ctx, me, offsetX, offsetY, dt);
