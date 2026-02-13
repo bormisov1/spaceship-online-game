@@ -39,12 +39,11 @@ func TestGameShipTypeRotation(t *testing.T) {
 	p2 := g.AddPlayer("B")
 	p3 := g.AddPlayer("C")
 	p4 := g.AddPlayer("D")
-	p5 := g.AddPlayer("E")
 
-	if p1.ShipType != 0 || p2.ShipType != 1 || p3.ShipType != 2 || p4.ShipType != 3 {
-		t.Error("ship types should cycle 0-3")
+	if p1.ShipType != 0 || p2.ShipType != 1 || p3.ShipType != 2 {
+		t.Error("ship types should cycle 0-2")
 	}
-	if p5.ShipType != 0 {
+	if p4.ShipType != 0 {
 		t.Error("ship type should wrap back to 0")
 	}
 }

@@ -12,9 +12,17 @@ export const state = {
     projectiles: new Map(), // id -> ProjectileState
     tick: 0,
 
+    // New entities from server
+    mobs: new Map(),
+    asteroids: new Map(),
+    pickups: new Map(),
+
     // Previous state for interpolation
     prevPlayers: new Map(),
     prevProjectiles: new Map(),
+    prevMobs: new Map(),
+    prevAsteroids: new Map(),
+    prevPickups: new Map(),
     lastStateTime: 0,
     stateInterval: 1000 / 30, // server broadcasts at 30Hz
 

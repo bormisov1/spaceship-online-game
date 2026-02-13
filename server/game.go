@@ -17,6 +17,13 @@ const (
 const (
 	maxProjectilesPerSession = 500
 	maxPlayersPerSession     = 20
+	maxMobsPerSession        = 12
+	maxAsteroidsPerSession   = 5
+	maxPickupsPerSession     = 4
+	MobSpawnInterval         = 7.0
+	AsteroidSpawnInterval    = 10.0
+	PickupSpawnInterval      = 20.0
+	DeathScorePenalty        = 10
 )
 
 // Broadcaster interface for sending messages to clients
@@ -29,20 +36,33 @@ type Game struct {
 	mu          sync.RWMutex
 	players     map[string]*Player
 	projectiles map[string]*Projectile
+	mobs        map[string]*Mob
+	asteroids   map[string]*Asteroid
+	pickups     map[string]*Pickup
 	clients     map[string]Broadcaster // playerID -> client
 	tick        uint64
 	running     bool
 	stop        chan struct{}
 	nextShip    int
+
+	mobSpawnCD      float64
+	asteroidSpawnCD float64
+	pickupSpawnCD   float64
 }
 
 // NewGame creates a new Game
 func NewGame() *Game {
 	return &Game{
-		players:     make(map[string]*Player),
-		projectiles: make(map[string]*Projectile),
-		clients:     make(map[string]Broadcaster),
-		stop:        make(chan struct{}),
+		players:         make(map[string]*Player),
+		projectiles:     make(map[string]*Projectile),
+		mobs:            make(map[string]*Mob),
+		asteroids:       make(map[string]*Asteroid),
+		pickups:         make(map[string]*Pickup),
+		clients:         make(map[string]Broadcaster),
+		stop:            make(chan struct{}),
+		mobSpawnCD:      MobSpawnInterval,
+		asteroidSpawnCD: AsteroidSpawnInterval,
+		pickupSpawnCD:   PickupSpawnInterval,
 	}
 }
 
@@ -85,7 +105,7 @@ func (g *Game) AddPlayer(name string) *Player {
 	}
 
 	id := GenerateID(4)
-	ship := g.nextShip % 4
+	ship := g.nextShip % 3
 	g.nextShip++
 	player := NewPlayer(id, name, ship)
 	g.players[id] = player
@@ -165,9 +185,44 @@ func (g *Game) update() {
 		}
 	}
 
+	// Update mobs
+	for id, mob := range g.mobs {
+		mob.Update(dt, g.players)
+		if !mob.Alive {
+			delete(g.mobs, id)
+		}
+	}
+
+	// Mob-mob collisions (soft repulsion, explode if fast)
+	g.checkMobMobCollisions()
+
+	// Update asteroids
+	for id, ast := range g.asteroids {
+		ast.Update(dt)
+		if !ast.Alive {
+			delete(g.asteroids, id)
+		}
+	}
+
+	// Update pickups
+	for id, pk := range g.pickups {
+		pk.Update(dt)
+		if !pk.Alive {
+			delete(g.pickups, id)
+		}
+	}
+
 	// Check collisions
 	g.checkCollisions()
 	g.checkPlayerCollisions()
+	g.checkProjectileMobCollisions()
+	g.checkAsteroidPlayerCollisions()
+	g.checkAsteroidMobCollisions()
+	g.checkPlayerPickupCollisions()
+	g.checkPlayerMobCollisions()
+
+	// Spawn entities
+	g.spawnEntities(dt)
 
 	// Broadcast state
 	if g.tick%BroadcastEvery == 0 {
@@ -191,6 +246,7 @@ func (g *Game) checkCollisions() {
 				delete(g.projectiles, projID)
 
 				if died {
+					p.Score -= DeathScorePenalty
 					// Award kill to shooter
 					if killer, ok := g.players[proj.OwnerID]; ok {
 						killer.Score++
@@ -235,6 +291,8 @@ func (g *Game) checkPlayerCollisions() {
 			if CheckCollision(a.X, a.Y, PlayerRadius, b.X, b.Y, PlayerRadius) {
 				a.TakeDamage(a.HP)
 				b.TakeDamage(b.HP)
+				a.Score -= DeathScorePenalty
+				b.Score -= DeathScorePenalty
 
 				// Notify kills (mutual)
 				killMsg1 := Envelope{T: MsgKill, Data: KillMsg{
@@ -268,6 +326,9 @@ func (g *Game) broadcastState() {
 	state := GameState{
 		Players:     make([]PlayerState, 0, len(g.players)),
 		Projectiles: make([]ProjectileState, 0, len(g.projectiles)),
+		Mobs:        make([]MobState, 0, len(g.mobs)),
+		Asteroids:   make([]AsteroidState, 0, len(g.asteroids)),
+		Pickups:     make([]PickupState, 0, len(g.pickups)),
 		Tick:        g.tick,
 	}
 
@@ -276,6 +337,21 @@ func (g *Game) broadcastState() {
 	}
 	for _, proj := range g.projectiles {
 		state.Projectiles = append(state.Projectiles, proj.ToState())
+	}
+	for _, mob := range g.mobs {
+		if mob.Alive {
+			state.Mobs = append(state.Mobs, mob.ToState())
+		}
+	}
+	for _, ast := range g.asteroids {
+		if ast.Alive {
+			state.Asteroids = append(state.Asteroids, ast.ToState())
+		}
+	}
+	for _, pk := range g.pickups {
+		if pk.Alive {
+			state.Pickups = append(state.Pickups, pk.ToState())
+		}
 	}
 
 	data, err := json.Marshal(Envelope{T: MsgState, Data: state})
@@ -301,4 +377,235 @@ func (g *Game) broadcastMsg(msg Envelope) {
 	for _, client := range g.clients {
 		client.SendJSON(msg)
 	}
+}
+
+// checkMobMobCollisions applies soft repulsion between mobs and kills both if relative velocity is high
+func (g *Game) checkMobMobCollisions() {
+	mobs := make([]*Mob, 0, len(g.mobs))
+	for _, m := range g.mobs {
+		if m.Alive {
+			mobs = append(mobs, m)
+		}
+	}
+	for i := 0; i < len(mobs); i++ {
+		for j := i + 1; j < len(mobs); j++ {
+			a, b := mobs[i], mobs[j]
+			if !a.Alive || !b.Alive {
+				continue
+			}
+			dx := b.X - a.X
+			dy := b.Y - a.Y
+			dist := math.Sqrt(dx*dx + dy*dy)
+			if dist < MobRepelRadius && dist > 0.1 {
+				// Check relative velocity for explosion
+				rvx := a.VX - b.VX
+				rvy := a.VY - b.VY
+				relV := math.Sqrt(rvx*rvx + rvy*rvy)
+				if relV > MobExplodeRelV {
+					// Both explode
+					a.Alive = false
+					b.Alive = false
+					// Broadcast explosions
+					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+						KillerID: a.ID, KillerName: "Mob",
+						VictimID: b.ID, VictimName: "Mob",
+					}})
+					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+						KillerID: b.ID, KillerName: "Mob",
+						VictimID: a.ID, VictimName: "Mob",
+					}})
+					continue
+				}
+				// Soft repulsion — gentle nudge
+				nx := dx / dist
+				ny := dy / dist
+				force := MobRepelForce * (1 - dist/MobRepelRadius)
+				a.VX -= nx * force * (1.0 / 60.0)
+				a.VY -= ny * force * (1.0 / 60.0)
+				b.VX += nx * force * (1.0 / 60.0)
+				b.VY += ny * force * (1.0 / 60.0)
+			}
+		}
+	}
+}
+
+// checkProjectileMobCollisions checks projectile hits on mobs
+func (g *Game) checkProjectileMobCollisions() {
+	for projID, proj := range g.projectiles {
+		if !proj.Alive {
+			continue
+		}
+		for _, mob := range g.mobs {
+			if !mob.Alive {
+				continue
+			}
+			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, MobRadius) {
+				died := mob.TakeDamage(ProjectileDamage)
+				proj.Alive = false
+				delete(g.projectiles, projID)
+
+				if died {
+					if killer, ok := g.players[proj.OwnerID]; ok {
+						killer.Score += MobKillScore
+					}
+					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+						KillerID: proj.OwnerID, KillerName: g.playerName(proj.OwnerID),
+						VictimID: mob.ID, VictimName: "Mob",
+					}})
+				}
+				break
+			}
+		}
+	}
+}
+
+// checkAsteroidPlayerCollisions — asteroid kills player on contact
+func (g *Game) checkAsteroidPlayerCollisions() {
+	for _, ast := range g.asteroids {
+		if !ast.Alive {
+			continue
+		}
+		for _, p := range g.players {
+			if !p.Alive {
+				continue
+			}
+			if CheckCollision(ast.X, ast.Y, AsteroidRadius, p.X, p.Y, PlayerRadius) {
+				died := p.TakeDamage(p.HP)
+				if died {
+					p.Score -= DeathScorePenalty
+					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+						KillerID: "asteroid", KillerName: "Asteroid",
+						VictimID: p.ID, VictimName: p.Name,
+					}})
+					if client, ok := g.clients[p.ID]; ok {
+						client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
+							KillerID: "asteroid", KillerName: "Asteroid",
+						}})
+					}
+				}
+			}
+		}
+	}
+}
+
+// checkAsteroidMobCollisions — asteroid instantly kills mob on contact
+func (g *Game) checkAsteroidMobCollisions() {
+	for _, ast := range g.asteroids {
+		if !ast.Alive {
+			continue
+		}
+		for _, mob := range g.mobs {
+			if !mob.Alive {
+				continue
+			}
+			if CheckCollision(ast.X, ast.Y, AsteroidRadius, mob.X, mob.Y, MobRadius) {
+				mob.Alive = false
+				g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+					KillerID: "asteroid", KillerName: "Asteroid",
+					VictimID: mob.ID, VictimName: "Mob",
+				}})
+			}
+		}
+	}
+}
+
+// checkPlayerPickupCollisions — player picks up health orb
+func (g *Game) checkPlayerPickupCollisions() {
+	for pkID, pk := range g.pickups {
+		if !pk.Alive {
+			continue
+		}
+		for _, p := range g.players {
+			if !p.Alive {
+				continue
+			}
+			if CheckCollision(pk.X, pk.Y, PickupRadius, p.X, p.Y, PlayerRadius) {
+				pk.Alive = false
+				delete(g.pickups, pkID)
+				p.HP += PickupHeal
+				if p.HP > p.MaxHP {
+					p.HP = p.MaxHP
+				}
+				break
+			}
+		}
+	}
+}
+
+// checkPlayerMobCollisions — mob dies, player takes damage
+func (g *Game) checkPlayerMobCollisions() {
+	for _, mob := range g.mobs {
+		if !mob.Alive {
+			continue
+		}
+		for _, p := range g.players {
+			if !p.Alive {
+				continue
+			}
+			if CheckCollision(mob.X, mob.Y, MobRadius, p.X, p.Y, PlayerRadius) {
+				// Mob always dies
+				mob.Alive = false
+
+				// Player takes collision damage
+				died := p.TakeDamage(MobCollisionDmg)
+
+				// Player gets kill credit for the mob
+				p.Score += MobKillScore
+				g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+					KillerID: p.ID, KillerName: p.Name,
+					VictimID: mob.ID, VictimName: "Mob",
+				}})
+
+				if died {
+					p.Score -= DeathScorePenalty
+					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+						KillerID: mob.ID, KillerName: "Mob",
+						VictimID: p.ID, VictimName: p.Name,
+					}})
+					if client, ok := g.clients[p.ID]; ok {
+						client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
+							KillerID: mob.ID, KillerName: "Mob",
+						}})
+					}
+				}
+			}
+		}
+	}
+}
+
+// spawnEntities spawns mobs, asteroids, and pickups on timers
+func (g *Game) spawnEntities(dt float64) {
+	// Only spawn if there are players
+	if len(g.players) == 0 {
+		return
+	}
+
+	g.mobSpawnCD -= dt
+	if g.mobSpawnCD <= 0 && len(g.mobs) < maxMobsPerSession {
+		mob := NewMob()
+		g.mobs[mob.ID] = mob
+		g.mobSpawnCD = MobSpawnInterval
+	}
+
+	g.asteroidSpawnCD -= dt
+	if g.asteroidSpawnCD <= 0 && len(g.asteroids) < maxAsteroidsPerSession {
+		ast := NewAsteroid()
+		g.asteroids[ast.ID] = ast
+		g.asteroidSpawnCD = AsteroidSpawnInterval
+	}
+
+	g.pickupSpawnCD -= dt
+	if g.pickupSpawnCD <= 0 && len(g.pickups) < maxPickupsPerSession {
+		pk := NewPickup()
+		g.pickups[pk.ID] = pk
+		g.pickupSpawnCD = PickupSpawnInterval
+	}
+}
+
+// playerName returns a player's name or "Unknown"
+func (g *Game) playerName(id string) string {
+	if p, ok := g.players[id]; ok {
+		return p.Name
+	}
+	return "Unknown"
 }

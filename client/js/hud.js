@@ -102,6 +102,37 @@ function drawMinimap(ctx) {
         ctx.fillStyle = isMe ? '#ffffff' : colors.main;
         ctx.fill();
     }
+
+    // Mob dots (yellow)
+    for (const mob of state.mobs.values()) {
+        if (!mob.a) continue;
+        const dotX = x + (mob.x / WORLD_W) * size;
+        const dotY = y + (mob.y / WORLD_H) * size;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffff44';
+        ctx.fill();
+    }
+
+    // Asteroid dots (brown)
+    for (const ast of state.asteroids.values()) {
+        const dotX = x + (ast.x / WORLD_W) * size;
+        const dotY = y + (ast.y / WORLD_H) * size;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#aa7744';
+        ctx.fill();
+    }
+
+    // Pickup dots (green)
+    for (const pk of state.pickups.values()) {
+        const dotX = x + (pk.x / WORLD_W) * size;
+        const dotY = y + (pk.y / WORLD_H) * size;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#44ff88';
+        ctx.fill();
+    }
 }
 
 function drawKillFeed(ctx) {

@@ -23,6 +23,13 @@ export const SHIP_COLORS = [
     { main: '#ffff44', accent: '#ffffaa', engine: '#ffaa00' }, // Yellow
 ];
 
+// New entity sizes (must match server)
+export const MOB_RADIUS = 20;
+export const ASTEROID_RADIUS = 40;
+export const ASTEROID_RENDER_SIZE = 120;
+export const PICKUP_RADIUS = 15;
+export const PICKUP_RENDER_SIZE = 30;
+
 // Laser colors per ship type
 export const LASER_COLORS = [
     '#ff2222',

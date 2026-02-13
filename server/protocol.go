@@ -74,10 +74,41 @@ type ProjectileState struct {
 	Owner string `json:"o"`
 }
 
+// MobState is broadcast per mob
+type MobState struct {
+	ID    string  `json:"id"`
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+	R     float64 `json:"r"`
+	VX    float64 `json:"vx"`
+	VY    float64 `json:"vy"`
+	HP    int     `json:"hp"`
+	MaxHP int     `json:"mhp"`
+	Alive bool    `json:"a"`
+}
+
+// AsteroidState is broadcast per asteroid
+type AsteroidState struct {
+	ID string  `json:"id"`
+	X  float64 `json:"x"`
+	Y  float64 `json:"y"`
+	R  float64 `json:"r"`
+}
+
+// PickupState is broadcast per pickup
+type PickupState struct {
+	ID string  `json:"id"`
+	X  float64 `json:"x"`
+	Y  float64 `json:"y"`
+}
+
 // GameState is the full state broadcast
 type GameState struct {
 	Players     []PlayerState     `json:"p"`
 	Projectiles []ProjectileState `json:"pr"`
+	Mobs        []MobState        `json:"m"`
+	Asteroids   []AsteroidState   `json:"a"`
+	Pickups     []PickupState     `json:"pk"`
 	Tick        uint64            `json:"tick"`
 }
 

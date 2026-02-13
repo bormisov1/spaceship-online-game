@@ -151,6 +151,9 @@ function handleState(data) {
     // Store previous state for interpolation
     state.prevPlayers = new Map(state.players);
     state.prevProjectiles = new Map(state.projectiles);
+    state.prevMobs = new Map(state.mobs);
+    state.prevAsteroids = new Map(state.asteroids);
+    state.prevPickups = new Map(state.pickups);
     state.lastStateTime = performance.now();
 
     // Update current state
@@ -162,6 +165,27 @@ function handleState(data) {
     state.projectiles.clear();
     for (const pr of data.pr) {
         state.projectiles.set(pr.id, pr);
+    }
+
+    state.mobs.clear();
+    if (data.m) {
+        for (const m of data.m) {
+            state.mobs.set(m.id, m);
+        }
+    }
+
+    state.asteroids.clear();
+    if (data.a) {
+        for (const a of data.a) {
+            state.asteroids.set(a.id, a);
+        }
+    }
+
+    state.pickups.clear();
+    if (data.pk) {
+        for (const pk of data.pk) {
+            state.pickups.set(pk.id, pk);
+        }
     }
 
     state.tick = data.tick;
@@ -205,8 +229,8 @@ function handleKill(data) {
         state.killFeed.shift();
     }
 
-    // Add explosion at victim location
-    const victim = state.players.get(data.vid);
+    // Add explosion at victim location (could be player or mob)
+    const victim = state.players.get(data.vid) || state.mobs.get(data.vid);
     if (victim) {
         addExplosion(victim.x, victim.y);
     }
