@@ -20,6 +20,8 @@ const (
 	MobBurstSize      = 5
 	MobBurstFireRate  = 0.15  // seconds between shots in a burst
 	MobBurstCooldown  = 5.0   // seconds between bursts
+	MobWanderDrift    = 1.0   // max radians/s the wander angle changes
+	MobWanderTurn     = 1.5   // how fast mob turns toward wander heading (rad/s)
 )
 
 // Mob is an AI-controlled enemy ship
@@ -30,10 +32,11 @@ type Mob struct {
 	Rotation  float64
 	HP        int
 	MaxHP     int
-	Alive     bool
-	BurstLeft int     // shots remaining in current burst
-	FireCD    float64 // cooldown between individual shots
-	BurstCD   float64 // cooldown between bursts
+	Alive       bool
+	BurstLeft   int     // shots remaining in current burst
+	FireCD      float64 // cooldown between individual shots
+	BurstCD     float64 // cooldown between bursts
+	WanderAngle float64 // desired heading when idle
 }
 
 // NewMob spawns a mob at a random map edge
@@ -65,6 +68,7 @@ func NewMob() *Mob {
 
 	// Face toward center
 	m.Rotation = math.Atan2(WorldHeight/2-m.Y, WorldWidth/2-m.X)
+	m.WanderAngle = m.Rotation
 	return m
 }
 
@@ -101,22 +105,29 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 		}
 	}
 
-	if !found {
-		// Steer toward center
-		targetX = WorldWidth / 2
-		targetY = WorldHeight / 2
+	if found {
+		// Rotate toward target player
+		desiredR := math.Atan2(targetY-m.Y, targetX-m.X)
+		diff := NormalizeAngle(desiredR - m.Rotation)
+		maxTurn := MobTurnSpeed * dt
+		if diff > maxTurn {
+			diff = maxTurn
+		} else if diff < -maxTurn {
+			diff = -maxTurn
+		}
+		m.Rotation += diff
+	} else {
+		// Wander: drift the wander angle gently, then turn toward it
+		m.WanderAngle += (randFloat()*2 - 1) * MobWanderDrift * dt
+		diff := NormalizeAngle(m.WanderAngle - m.Rotation)
+		maxTurn := MobWanderTurn * dt
+		if diff > maxTurn {
+			diff = maxTurn
+		} else if diff < -maxTurn {
+			diff = -maxTurn
+		}
+		m.Rotation += diff
 	}
-
-	// Rotate toward target
-	desiredR := math.Atan2(targetY-m.Y, targetX-m.X)
-	diff := NormalizeAngle(desiredR - m.Rotation)
-	maxTurn := MobTurnSpeed * dt
-	if diff > maxTurn {
-		diff = maxTurn
-	} else if diff < -maxTurn {
-		diff = -maxTurn
-	}
-	m.Rotation += diff
 
 	// Accelerate in facing direction
 	accel := MobAccel * dt

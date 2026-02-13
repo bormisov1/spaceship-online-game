@@ -80,24 +80,26 @@ func TestMobAISteersTowardPlayer(t *testing.T) {
 	}
 }
 
-func TestMobAISteersTowardCenter(t *testing.T) {
+func TestMobAIWandersWhenIdle(t *testing.T) {
 	m := NewMob()
-	m.X = 100
-	m.Y = 100
+	m.X = 2000
+	m.Y = 2000
 	m.VX = 0
 	m.VY = 0
 	m.Rotation = 0
 
 	players := make(map[string]*Player) // no players
 
+	startX, startY := m.X, m.Y
 	for i := 0; i < 120; i++ {
 		m.Update(1.0/60.0, players)
 	}
 
-	// Should move toward center (2000, 2000)
-	dist := math.Sqrt((m.X-2000)*(m.X-2000) + (m.Y-2000)*(m.Y-2000))
-	initialDist := math.Sqrt((100-2000)*(100-2000) + (100-2000)*(100-2000))
-	if dist >= initialDist {
-		t.Errorf("mob should have moved closer to center, dist=%f initial=%f", dist, initialDist)
+	// Mob should have moved from its starting position
+	dx := m.X - startX
+	dy := m.Y - startY
+	dist := math.Sqrt(dx*dx + dy*dy)
+	if dist < 10 {
+		t.Errorf("mob should wander when idle, only moved %f", dist)
 	}
 }
