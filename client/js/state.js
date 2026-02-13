@@ -53,6 +53,9 @@ export const state = {
     killFeed: [],   // { killer, victim, time }
     deathInfo: null, // { killerName }
 
+    // Controller
+    controllerAttached: false, // true when phone controller is connected
+
     // Mobile
     isMobile: false,
     touchJoystick: null, // { startX, startY, currentX, currentY }

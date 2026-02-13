@@ -22,7 +22,9 @@ const (
 	MsgCreated  = "created" // session created, client should navigate
 	MsgError    = "error"
 	MsgChecked    = "checked"    // session check response
-	MsgControlOK  = "control_ok" // controller attach confirmed
+	MsgControlOK  = "control_ok"  // controller attach confirmed
+	MsgCtrlOn     = "ctrl_on"     // notify desktop: controller attached
+	MsgCtrlOff    = "ctrl_off"    // notify desktop: controller detached
 )
 
 // Envelope wraps all messages with a type field

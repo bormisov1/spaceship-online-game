@@ -128,6 +128,10 @@ func (g *Game) SetController(playerID string, client Broadcaster) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.controllers[playerID] = client
+	// Notify desktop client that a controller is now active
+	if main, ok := g.clients[playerID]; ok {
+		main.SendJSON(Envelope{T: MsgCtrlOn})
+	}
 }
 
 // RemoveController detaches a phone controller from a player
@@ -135,6 +139,10 @@ func (g *Game) RemoveController(playerID string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	delete(g.controllers, playerID)
+	// Notify desktop client that the controller disconnected
+	if main, ok := g.clients[playerID]; ok {
+		main.SendJSON(Envelope{T: MsgCtrlOff})
+	}
 }
 
 // HasPlayer returns true if the player exists in the game

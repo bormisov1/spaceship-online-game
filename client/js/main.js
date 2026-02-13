@@ -48,6 +48,7 @@ export function init() {
             send('leave', {});
             state.sessionID = null;
             state.myID = null;
+            state.controllerAttached = false;
             showLobby();
         }
     });
@@ -204,6 +205,12 @@ function handleMessage(msg) {
             break;
         case 'checked':
             handleSessionCheck(msg.d);
+            break;
+        case 'ctrl_on':
+            state.controllerAttached = true;
+            break;
+        case 'ctrl_off':
+            state.controllerAttached = false;
             break;
         case 'error':
             console.error('Server error:', msg.d.msg);

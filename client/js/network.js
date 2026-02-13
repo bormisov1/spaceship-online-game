@@ -58,6 +58,7 @@ export function send(type, data) {
 
 export function sendInput() {
     if (state.phase !== 'playing' || !state.myID) return;
+    if (state.controllerAttached) return; // phone controller is driving
     // Convert screen-space mouse to world coords, accounting for camera zoom.
     // Screen center = player position; offset from center is scaled by 1/zoom.
     const zoom = state.camZoom;
