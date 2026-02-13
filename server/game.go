@@ -492,12 +492,12 @@ func (g *Game) checkProjectileMobCollisions() {
 		if !proj.Alive {
 			continue
 		}
-		// Skip mob-fired projectiles so mobs don't hurt each other
-		if _, isPlayer := g.players[proj.OwnerID]; !isPlayer {
-			continue
-		}
 		for _, mob := range g.mobs {
 			if !mob.Alive {
+				continue
+			}
+			// Don't let a mob hit itself
+			if proj.OwnerID == mob.ID {
 				continue
 			}
 			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, MobRadius) {
@@ -509,8 +509,12 @@ func (g *Game) checkProjectileMobCollisions() {
 					if killer, ok := g.players[proj.OwnerID]; ok {
 						killer.Score += MobKillScore
 					}
+					killerName := g.playerName(proj.OwnerID)
+					if killerName == "Unknown" {
+						killerName = "Mob"
+					}
 					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
-						KillerID: proj.OwnerID, KillerName: g.playerName(proj.OwnerID),
+						KillerID: proj.OwnerID, KillerName: killerName,
 						VictimID: mob.ID, VictimName: "Mob",
 					}})
 				}
