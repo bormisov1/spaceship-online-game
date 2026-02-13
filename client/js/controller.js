@@ -13,8 +13,15 @@ let attached = false;
 // Player position from state broadcasts (for world-coord conversion)
 let playerX = 0;
 let playerY = 0;
+let playerR = 0;
 let screenW = 0;
 let screenH = 0;
+
+// Auto-aim state
+const AIM_ORBIT_R = 360;
+const AIM_DETECT_R = 50;
+let enemies = [];       // {id, x, y} from other players + mobs
+let lockTargetId = null;
 
 // Joystick state
 let joystickTouchId = null;
@@ -232,14 +239,29 @@ function handleMessage(msg) {
 }
 
 function handleState(data) {
-    if (!data.p) return;
-    for (const p of data.p) {
-        if (p.id === pid) {
-            playerX = p.x;
-            playerY = p.y;
-            break;
+    const newEnemies = [];
+
+    if (data.p) {
+        for (const p of data.p) {
+            if (p.id === pid) {
+                playerX = p.x;
+                playerY = p.y;
+                playerR = p.r;
+            } else if (p.a) {
+                newEnemies.push({ id: 'p_' + p.id, x: p.x, y: p.y });
+            }
         }
     }
+
+    if (data.m) {
+        for (const m of data.m) {
+            if (m.a) {
+                newEnemies.push({ id: 'm_' + m.id, x: m.x, y: m.y });
+            }
+        }
+    }
+
+    enemies = newEnemies;
 }
 
 function updateStatus(text) {
@@ -329,13 +351,68 @@ function stopInputLoop() {
 function sendInput() {
     if (!ws || ws.readyState !== WebSocket.OPEN || !attached) return;
 
-    let mx = playerX;
-    let my = playerY;
-
+    // Determine aim direction from joystick (or ship rotation if idle)
     const dist = Math.sqrt(joystickDX * joystickDX + joystickDY * joystickDY);
+    let aimAngle = playerR;
     if (dist > DEAD_ZONE) {
-        mx = playerX + joystickDX * JOYSTICK_SCALE;
-        my = playerY + joystickDY * JOYSTICK_SCALE;
+        aimAngle = Math.atan2(joystickDY, joystickDX);
+    }
+
+    // Orbit position in world coords
+    const orbitX = playerX + Math.cos(aimAngle) * AIM_ORBIT_R;
+    const orbitY = playerY + Math.sin(aimAngle) * AIM_ORBIT_R;
+
+    // Sticky lock: check if current target still within detection range
+    let locked = false;
+    if (lockTargetId !== null) {
+        const t = enemies.find(e => e.id === lockTargetId);
+        if (t) {
+            const dx = t.x - orbitX;
+            const dy = t.y - orbitY;
+            if (dx * dx + dy * dy <= AIM_DETECT_R * AIM_DETECT_R) {
+                locked = true;
+            }
+        }
+        if (!locked) lockTargetId = null;
+    }
+
+    // If not locked, find closest enemy in range
+    if (!locked) {
+        let bestDist = AIM_DETECT_R * AIM_DETECT_R;
+        for (const e of enemies) {
+            const dx = e.x - orbitX;
+            const dy = e.y - orbitY;
+            const d2 = dx * dx + dy * dy;
+            if (d2 <= bestDist) {
+                bestDist = d2;
+                lockTargetId = e.id;
+                locked = true;
+            }
+        }
+    }
+
+    let mx, my;
+    if (locked) {
+        // Auto-aim: send target position
+        const t = enemies.find(e => e.id === lockTargetId);
+        if (t) {
+            mx = t.x;
+            my = t.y;
+        } else {
+            // Target disappeared, fallback to normal
+            lockTargetId = null;
+            locked = false;
+        }
+    }
+
+    if (!locked) {
+        if (dist > DEAD_ZONE) {
+            mx = playerX + joystickDX * JOYSTICK_SCALE;
+            my = playerY + joystickDY * JOYSTICK_SCALE;
+        } else {
+            mx = playerX;
+            my = playerY;
+        }
     }
 
     ws.send(JSON.stringify({

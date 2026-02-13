@@ -84,10 +84,13 @@ export function render(dt) {
 
         // Health bar + name for other players
         drawPlayerHealthBar(ctx, sx, sy, player.hp, player.mhp, player.n, isMe);
+    }
 
-        // Controller aim reticle
-        if (isMe && state.controllerAttached) {
-            drawControllerAim(ctx, sx, sy, player.r);
+    // Controller aim reticle (after player loop, still in zoom transform)
+    if (state.controllerAttached && state.myID) {
+        const me = state.players.get(state.myID);
+        if (me && me.a) {
+            updateAndDrawControllerAim(ctx, me, offsetX, offsetY, dt);
         }
     }
 
@@ -181,43 +184,113 @@ function drawHitboxes(ctx, offsetX, offsetY, vw, vh) {
     }
 }
 
-const AIM_ORBIT_R = 300;  // world units from ship center
-const AIM_CIRCLE_R = 8;   // small circle radius
-const AIM_LINE_LEN = 20;  // line length from circle edge
-const AIM_GAP = 3;        // gap between circle and line start
+// --- Auto-aim dashed-circle reticle ---
+const AIM_ORBIT_R = 360;     // world units from ship center
+const AIM_DETECT_R = 50;     // detection radius (world units)
+const AIM_FREE_R = 50;       // visual radius when free
+const AIM_LOCK_R = 20;       // visual radius when locked
+const AIM_ANIM_SPEED = 4;    // progress units/sec (~0.25s transition)
+const AIM_SPIN_MAX = 8;      // rad/s when fully locked
 
-function drawControllerAim(ctx, shipSX, shipSY, rotation) {
-    // Aim position on the orbit
-    const ax = shipSX + Math.cos(rotation) * AIM_ORBIT_R;
-    const ay = shipSY + Math.sin(rotation) * AIM_ORBIT_R;
+let aimState = {
+    targetId: null,
+    targetX: 0,
+    targetY: 0,
+    progress: 0,  // 0 = free, 1 = locked
+    spinAngle: 0,
+};
 
-    // The aim rotates so one arm always points back at the ship
-    // rotation + PI points from aim back toward ship
-    const facing = rotation + Math.PI;
+function updateAndDrawControllerAim(ctx, me, offsetX, offsetY, dt) {
+    // Orbit position in world coords
+    const orbitWX = me.x + Math.cos(me.r) * AIM_ORBIT_R;
+    const orbitWY = me.y + Math.sin(me.r) * AIM_ORBIT_R;
 
-    ctx.save();
-    ctx.translate(ax, ay);
-    ctx.rotate(facing);
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-    ctx.lineWidth = 1.5;
-
-    // Small circle around center
-    ctx.beginPath();
-    ctx.arc(0, 0, AIM_CIRCLE_R, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // 4 lines from circle edges outward (at 0, 90, 180, 270 degrees in local space)
-    for (let i = 0; i < 4; i++) {
-        const a = (i * Math.PI) / 2;
-        const cos = Math.cos(a);
-        const sin = Math.sin(a);
-        const startR = AIM_CIRCLE_R + AIM_GAP;
-        ctx.beginPath();
-        ctx.moveTo(cos * startR, sin * startR);
-        ctx.lineTo(cos * (startR + AIM_LINE_LEN), sin * (startR + AIM_LINE_LEN));
-        ctx.stroke();
+    // Build list of enemies (other players + mobs)
+    const enemies = [];
+    for (const [id, p] of state.players) {
+        if (id === state.myID || !p.a) continue;
+        enemies.push({ id: 'p_' + id, x: p.x, y: p.y });
     }
+    for (const [id, m] of state.mobs) {
+        if (!m.a) continue;
+        enemies.push({ id: 'm_' + id, x: m.x, y: m.y });
+    }
+
+    // Sticky lock: check if current target is still in range
+    let locked = false;
+    if (aimState.targetId !== null) {
+        const t = enemies.find(e => e.id === aimState.targetId);
+        if (t) {
+            const dx = t.x - orbitWX;
+            const dy = t.y - orbitWY;
+            if (dx * dx + dy * dy <= AIM_DETECT_R * AIM_DETECT_R) {
+                locked = true;
+                aimState.targetX = t.x;
+                aimState.targetY = t.y;
+            }
+        }
+    }
+
+    // If not locked, search for nearest enemy in range
+    if (!locked) {
+        let bestDist = AIM_DETECT_R * AIM_DETECT_R;
+        let bestEnemy = null;
+        for (const e of enemies) {
+            const dx = e.x - orbitWX;
+            const dy = e.y - orbitWY;
+            const d2 = dx * dx + dy * dy;
+            if (d2 <= bestDist) {
+                bestDist = d2;
+                bestEnemy = e;
+            }
+        }
+        if (bestEnemy) {
+            locked = true;
+            aimState.targetId = bestEnemy.id;
+            aimState.targetX = bestEnemy.x;
+            aimState.targetY = bestEnemy.y;
+        } else {
+            aimState.targetId = null;
+        }
+    }
+
+    // Animate progress
+    const targetProgress = locked ? 1 : 0;
+    if (aimState.progress < targetProgress) {
+        aimState.progress = Math.min(1, aimState.progress + AIM_ANIM_SPEED * dt);
+    } else if (aimState.progress > targetProgress) {
+        aimState.progress = Math.max(0, aimState.progress - AIM_ANIM_SPEED * dt);
+    }
+
+    // Spin
+    const spinSpeed = aimState.progress * AIM_SPIN_MAX;
+    aimState.spinAngle += spinSpeed * dt;
+
+    // Screen positions
+    const orbitSX = orbitWX - offsetX;
+    const orbitSY = orbitWY - offsetY;
+    const targetSX = aimState.targetX - offsetX;
+    const targetSY = aimState.targetY - offsetY;
+
+    // Interpolate position and radius
+    const p = aimState.progress;
+    const cx = orbitSX + (targetSX - orbitSX) * p;
+    const cy = orbitSY + (targetSY - orbitSY) * p;
+    const radius = AIM_FREE_R + (AIM_LOCK_R - AIM_FREE_R) * p;
+
+    // Draw dashed circle
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(aimState.spinAngle);
+
+    const alpha = 0.3 + 0.3 * p; // brighter when locked
+    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
 
     ctx.restore();
 }
