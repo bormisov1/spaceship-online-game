@@ -19,7 +19,7 @@ let screenH = 0;
 
 // Auto-aim state
 const AIM_ORBIT_R = 360;
-const AIM_DETECT_R = 50;
+const AIM_DETECT_R = 150;
 let enemies = [];       // {id, x, y} from other players + mobs
 let lockTargetId = null;
 

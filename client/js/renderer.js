@@ -186,8 +186,8 @@ function drawHitboxes(ctx, offsetX, offsetY, vw, vh) {
 
 // --- Auto-aim dashed-circle reticle ---
 const AIM_ORBIT_R = 360;     // world units from ship center
-const AIM_DETECT_R = 50;     // detection radius (world units)
-const AIM_FREE_R = 50;       // visual radius when free
+const AIM_DETECT_R = 150;    // detection radius (world units)
+const AIM_FREE_R = 150;      // visual radius when free
 const AIM_LOCK_R = 20;       // visual radius when locked
 const AIM_ANIM_SPEED = 4;    // progress units/sec (~0.25s transition)
 const AIM_SPIN_MAX = 8;      // rad/s when fully locked
