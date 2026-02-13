@@ -13,6 +13,7 @@ import (
 )
 
 var uuidPathRe = regexp.MustCompile(`^/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+var rustUuidPathRe = regexp.MustCompile(`^/rust/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`)
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -39,7 +40,7 @@ func extractIP(r *http.Request) string {
 }
 
 // SetupRoutes configures HTTP routes
-func SetupRoutes(hub *Hub, clientDir string) *http.ServeMux {
+func SetupRoutes(hub *Hub, clientDir string, clientRustDir string) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	// Serve static files with no-cache so browsers always revalidate
@@ -53,6 +54,21 @@ func SetupRoutes(hub *Hub, clientDir string) *http.ServeMux {
 		}
 		fs.ServeHTTP(w, r)
 	}))
+
+	// Serve Rust/WASM client at /rust/
+	if clientRustDir != "" {
+		rustFs := http.FileServer(http.Dir(clientRustDir))
+		mux.Handle("/rust/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-cache")
+			// SPA: serve index.html for /rust/ and /rust/{uuid} paths
+			if r.URL.Path == "/rust/" || r.URL.Path == "/rust" || rustUuidPathRe.MatchString(r.URL.Path) {
+				http.ServeFile(w, r, filepath.Join(clientRustDir, "index.html"))
+				return
+			}
+			// Strip /rust/ prefix for static files
+			http.StripPrefix("/rust/", rustFs).ServeHTTP(w, r)
+		}))
+	}
 
 	// QR code endpoint – returns PNG for the given data parameter
 	mux.HandleFunc("/api/qr", func(w http.ResponseWriter, r *http.Request) {

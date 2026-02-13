@@ -1,0 +1,189 @@
+use web_sys::CanvasRenderingContext2d;
+use crate::state::{Particle, ParticleKind, Explosion};
+use crate::constants::SHIP_COLORS;
+
+const MAX_PARTICLES: usize = 200;
+
+pub fn add_engine_particles(
+    particles: &mut Vec<Particle>,
+    x: f64, y: f64, rotation: f64, speed: f64, ship_type: i32,
+) {
+    if speed < 20.0 { return; }
+    if particles.len() >= MAX_PARTICLES { return; }
+
+    let idx = (ship_type as usize).min(SHIP_COLORS.len() - 1);
+    let engine_color = SHIP_COLORS[idx].engine.to_string();
+    let count = ((speed / 50.0) as usize).min(5);
+
+    for _ in 0..count {
+        if particles.len() >= MAX_PARTICLES { break; }
+        let angle = rotation + std::f64::consts::PI + (js_sys::Math::random() - 0.5) * 0.6;
+        let spd = speed * 0.3 + js_sys::Math::random() * 80.0;
+        let life = 0.3 + js_sys::Math::random() * 0.3;
+        particles.push(Particle {
+            x: x - rotation.cos() * 15.0 + (js_sys::Math::random() - 0.5) * 6.0,
+            y: y - rotation.sin() * 15.0 + (js_sys::Math::random() - 0.5) * 6.0,
+            vx: angle.cos() * spd,
+            vy: angle.sin() * spd,
+            life,
+            max_life: life,
+            size: 2.0 + js_sys::Math::random() * 3.0,
+            color: engine_color.clone(),
+            kind: ParticleKind::Engine,
+        });
+    }
+}
+
+pub fn add_explosion(
+    particles: &mut Vec<Particle>,
+    explosions: &mut Vec<Explosion>,
+    x: f64, y: f64,
+) {
+    // Hot core particles - bright white/yellow, fast but short-lived
+    let core_colors = ["#ffffff", "#ffffcc", "#ffeeaa"];
+    for _ in 0..8 {
+        let angle = js_sys::Math::random() * std::f64::consts::PI * 2.0;
+        let spd = 40.0 + js_sys::Math::random() * 120.0;
+        let life = 0.15 + js_sys::Math::random() * 0.2;
+        let ci = (js_sys::Math::random() * core_colors.len() as f64) as usize;
+        particles.push(Particle {
+            x: x + (js_sys::Math::random() - 0.5) * 4.0,
+            y: y + (js_sys::Math::random() - 0.5) * 4.0,
+            vx: angle.cos() * spd,
+            vy: angle.sin() * spd,
+            life, max_life: life,
+            size: 4.0 + js_sys::Math::random() * 4.0,
+            color: core_colors[ci % core_colors.len()].to_string(),
+            kind: ParticleKind::Explosion,
+        });
+    }
+
+    // Fire particles - orange/red, medium speed
+    let fire_colors = ["#ff4400", "#ff6600", "#ff8800", "#ffaa00", "#ff2200"];
+    for i in 0..20 {
+        let angle = (std::f64::consts::PI * 2.0 * i as f64) / 20.0
+            + (js_sys::Math::random() - 0.5) * 0.8;
+        let spd = 80.0 + js_sys::Math::random() * 250.0;
+        let life = 0.4 + js_sys::Math::random() * 0.6;
+        let ci = (js_sys::Math::random() * fire_colors.len() as f64) as usize;
+        particles.push(Particle {
+            x: x + (js_sys::Math::random() - 0.5) * 8.0,
+            y: y + (js_sys::Math::random() - 0.5) * 8.0,
+            vx: angle.cos() * spd,
+            vy: angle.sin() * spd,
+            life, max_life: life,
+            size: 3.0 + js_sys::Math::random() * 5.0,
+            color: fire_colors[ci % fire_colors.len()].to_string(),
+            kind: ParticleKind::Explosion,
+        });
+    }
+
+    // Smoke/ember particles - dark red/grey, slow, long-lived
+    let smoke_colors = ["#882200", "#664422", "#553311", "#aa4400"];
+    for _ in 0..12 {
+        let angle = js_sys::Math::random() * std::f64::consts::PI * 2.0;
+        let spd = 20.0 + js_sys::Math::random() * 80.0;
+        let life = 0.8 + js_sys::Math::random() * 1.0;
+        let ci = (js_sys::Math::random() * smoke_colors.len() as f64) as usize;
+        particles.push(Particle {
+            x: x + (js_sys::Math::random() - 0.5) * 12.0,
+            y: y + (js_sys::Math::random() - 0.5) * 12.0,
+            vx: angle.cos() * spd,
+            vy: angle.sin() * spd,
+            life, max_life: life,
+            size: 4.0 + js_sys::Math::random() * 6.0,
+            color: smoke_colors[ci % smoke_colors.len()].to_string(),
+            kind: ParticleKind::Explosion,
+        });
+    }
+
+    // Primary shockwave - fast expanding
+    explosions.push(Explosion {
+        x, y,
+        radius: 0.0,
+        max_radius: 90.0,
+        life: 0.35,
+        max_life: 0.35,
+    });
+
+    // Secondary shockwave - slower, wider
+    explosions.push(Explosion {
+        x, y,
+        radius: 0.0,
+        max_radius: 50.0,
+        life: 0.5,
+        max_life: 0.5,
+    });
+}
+
+pub fn update_particles(particles: &mut Vec<Particle>, explosions: &mut Vec<Explosion>, dt: f64) {
+    let mut i = 0;
+    while i < particles.len() {
+        let p = &mut particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+
+        if p.life <= 0.0 {
+            particles.swap_remove(i);
+        } else {
+            i += 1;
+        }
+    }
+
+    let mut j = 0;
+    while j < explosions.len() {
+        let e = &mut explosions[j];
+        e.life -= dt;
+        e.radius = e.max_radius * (1.0 - e.life / e.max_life);
+        if e.life <= 0.0 {
+            explosions.swap_remove(j);
+        } else {
+            j += 1;
+        }
+    }
+}
+
+pub fn render_particles(ctx: &CanvasRenderingContext2d, particles: &[Particle], offset_x: f64, offset_y: f64, vw: f64, vh: f64) {
+    for p in particles {
+        let sx = p.x - offset_x;
+        let sy = p.y - offset_y;
+        if sx < -20.0 || sx > vw + 20.0 || sy < -20.0 || sy > vh + 20.0 { continue; }
+
+        let alpha = (p.life / p.max_life).max(0.0);
+        let size = p.size * if p.kind == ParticleKind::Explosion {
+            1.0 + (1.0 - alpha) * 0.5
+        } else {
+            alpha
+        };
+
+        ctx.set_global_alpha(alpha);
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(&p.color));
+
+        if size < 3.0 {
+            ctx.fill_rect(sx - size, sy - size, size * 2.0, size * 2.0);
+        } else {
+            ctx.begin_path();
+            let _ = ctx.arc(sx, sy, size, 0.0, std::f64::consts::PI * 2.0);
+            ctx.fill();
+        }
+    }
+    ctx.set_global_alpha(1.0);
+}
+
+pub fn render_explosions(ctx: &CanvasRenderingContext2d, explosions: &[Explosion], offset_x: f64, offset_y: f64, vw: f64, vh: f64) {
+    for e in explosions {
+        let sx = e.x - offset_x;
+        let sy = e.y - offset_y;
+        if sx < -100.0 || sx > vw + 100.0 || sy < -100.0 || sy > vh + 100.0 { continue; }
+
+        let alpha = (e.life / e.max_life) * 0.4;
+        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str(&format!("rgba(255, 200, 50, {})", alpha)));
+        ctx.set_line_width(3.0);
+        ctx.begin_path();
+        let _ = ctx.arc(sx, sy, e.radius, 0.0, std::f64::consts::PI * 2.0);
+        ctx.stroke();
+    }
+}

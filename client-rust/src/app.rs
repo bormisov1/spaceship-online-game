@@ -1,0 +1,258 @@
+use leptos::prelude::*;
+use wasm_bindgen::JsCast;
+use crate::state::{self, Phase, SharedState};
+use crate::network::{Network, SharedNetwork};
+use crate::protocol::{SessionInfo, CheckedMsg};
+use crate::lobby;
+use crate::game_loop;
+use crate::input;
+use crate::controller;
+
+#[component]
+pub fn App() -> impl IntoView {
+    // Check for controller mode
+    let window = web_sys::window().unwrap();
+    let location = window.location();
+    let search = location.search().unwrap_or_default();
+    let params = web_sys::UrlSearchParams::new_with_str(&search).unwrap();
+    let control_pid = params.get("c");
+
+    let pathname = location.pathname().unwrap_or_default();
+    let uuid_re = js_sys::RegExp::new(r"^/rust/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$", "");
+    let uuid_match = uuid_re.exec(&pathname);
+
+    // Controller mode
+    if let Some(pid) = control_pid {
+        if let Some(m) = uuid_match {
+            let sid = m.get(1).as_string().unwrap_or_default();
+            return view! { <ControllerMode sid=sid pid=pid /> }.into_any();
+        }
+    }
+
+    // Normal game mode
+    let game_state = state::new_shared_state();
+
+    // Check URL for session UUID
+    let uuid_re2 = js_sys::RegExp::new(r"^/rust/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$", "");
+    let uuid_match2 = uuid_re2.exec(&pathname);
+    if let Some(m) = uuid_match2 {
+        let sid = m.get(1).as_string().unwrap_or_default();
+        game_state.borrow_mut().url_session_id = Some(sid);
+    }
+
+    let phase_signal = RwSignal::new(Phase::Lobby);
+    let sessions_signal = RwSignal::new(Vec::<SessionInfo>::new());
+    let checked_signal = RwSignal::new(None::<CheckedMsg>);
+
+    let net = Network::new(
+        game_state.clone(),
+        phase_signal,
+        sessions_signal,
+        checked_signal,
+    );
+
+    Network::connect(&net);
+
+    // Start input send loop (20Hz)
+    let net_clone = net.clone();
+    let _input_interval = gloo_timers::callback::Interval::new(1000 / crate::constants::INPUT_RATE, move || {
+        Network::send_input(&net_clone);
+    });
+    // Leak the interval to keep it alive
+    std::mem::forget(_input_interval);
+
+    // Start session list refresh (3s) while in lobby
+    let net_clone = net.clone();
+    let _refresh_interval = gloo_timers::callback::Interval::new(3000, move || {
+        let phase = net_clone.borrow().state.borrow().phase.clone();
+        if phase == Phase::Lobby {
+            Network::list_sessions(&net_clone);
+        }
+    });
+    std::mem::forget(_refresh_interval);
+
+    // Initial session list fetch
+    Network::list_sessions(&net);
+
+    view! {
+        <GameView
+            state=game_state
+            net=net
+            phase=phase_signal
+            sessions=sessions_signal
+            checked=checked_signal
+        />
+    }.into_any()
+}
+
+#[component]
+fn GameView(
+    state: SharedState,
+    net: SharedNetwork,
+    phase: RwSignal<Phase>,
+    sessions: RwSignal<Vec<SessionInfo>>,
+    checked: RwSignal<Option<CheckedMsg>>,
+) -> impl IntoView {
+    let state_clone = send_wrapper::SendWrapper::new(state.clone());
+    let net_clone = send_wrapper::SendWrapper::new(net.clone());
+
+    // Setup canvases once mounted
+    let state_for_mount = send_wrapper::SendWrapper::new(state.clone());
+    let net_for_mount = send_wrapper::SendWrapper::new(net.clone());
+    let phase_for_mount = phase;
+
+    Effect::new(move |_| {
+        let state = (*state_for_mount).clone();
+        let net = (*net_for_mount).clone();
+        let _phase = phase_for_mount;
+
+        // Get canvases
+        let document = web_sys::window().unwrap().document().unwrap();
+        let bg_canvas = document.get_element_by_id("bgCanvas")
+            .and_then(|e| e.dyn_into::<web_sys::HtmlCanvasElement>().ok());
+        let game_canvas = document.get_element_by_id("gameCanvas")
+            .and_then(|e| e.dyn_into::<web_sys::HtmlCanvasElement>().ok());
+
+        if let (Some(_bg), Some(_game)) = (bg_canvas, game_canvas) {
+            // Resize
+            crate::canvas::resize(&state);
+
+            // Setup resize handler
+            crate::canvas::setup_resize_handler(state.clone());
+
+            // Setup input
+            input::setup_input(state.clone(), net.clone());
+
+            // Init starfield
+            crate::starfield::init_starfield(&state);
+
+            // Start game loop
+            game_loop::start_game_loop(state.clone());
+
+            // Handle popstate
+            let state_pop = state.clone();
+            let net_pop = net.clone();
+            let phase_pop = _phase;
+            let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_: web_sys::Event| {
+                let s = state_pop.borrow();
+                if s.phase == Phase::Playing || s.phase == Phase::Dead {
+                    drop(s);
+                    Network::send_leave(&net_pop);
+                    let mut s = state_pop.borrow_mut();
+                    s.session_id = None;
+                    s.my_id = None;
+                    s.controller_attached = false;
+                    s.phase = Phase::Lobby;
+                    phase_pop.set(Phase::Lobby);
+                }
+            }) as Box<dyn FnMut(web_sys::Event)>);
+            let window = web_sys::window().unwrap();
+            let _ = window.add_event_listener_with_callback("popstate", closure.as_ref().unchecked_ref());
+            closure.forget();
+        }
+    });
+
+    view! {
+        <canvas id="bgCanvas"></canvas>
+        <canvas id="gameCanvas"></canvas>
+
+        {move || {
+            let p = phase.get();
+            if p == Phase::Lobby {
+                let has_url_session = state_clone.borrow().url_session_id.is_some();
+                if has_url_session {
+                    view! {
+                        <lobby::JoinMode
+                            state=(*state_clone).clone()
+                            net=(*net_clone).clone()
+                            checked=checked
+                        />
+                    }.into_any()
+                } else {
+                    view! {
+                        <lobby::NormalLobby
+                            state=(*state_clone).clone()
+                            net=(*net_clone).clone()
+                            sessions=sessions
+                        />
+                    }.into_any()
+                }
+            } else {
+                view! {
+                    <IngameUI state=(*state_clone).clone() net=(*net_clone).clone() />
+                }.into_any()
+            }
+        }}
+    }
+}
+
+#[component]
+#[allow(unused_variables)]
+fn IngameUI(state: SharedState, net: SharedNetwork) -> impl IntoView {
+    // Setup buttons after this component mounts
+    let state_for_setup = send_wrapper::SendWrapper::new(state.clone());
+    Effect::new(move |_| {
+        crate::canvas::setup_fullscreen();
+        crate::canvas::setup_controller_btn((*state_for_setup).clone());
+    });
+
+    view! {
+        <button id="fullscreenBtn" title="Toggle Fullscreen">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/>
+            </svg>
+        </button>
+        <button id="controllerBtn" title="Phone Controller">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <rect x="4" y="1" width="8" height="14" rx="1.5"/>
+                <line x1="6" y1="12" x2="10" y2="12"/>
+            </svg>
+        </button>
+        <div id="controllerOverlay">
+            <p class="qr-hint">"Scan with your phone to use as controller"</p>
+            <div class="qr-box"><img id="qrImg" alt="QR Code"/></div>
+            <p class="qr-url" id="qrUrl"></p>
+            <button class="btn-close" id="qrClose">"Close"</button>
+        </div>
+    }
+}
+
+#[component]
+fn ControllerMode(sid: String, pid: String) -> impl IntoView {
+    // Init controller on mount
+    let sid_clone = sid.clone();
+    let pid_clone = pid.clone();
+    Effect::new(move |_| {
+        controller::init_controller(&sid_clone, &pid_clone);
+    });
+
+    view! {
+        <div id="controllerRoot">
+            <div id="ctrlRotateMsg">
+                <div class="rotate-icon">
+                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none" stroke="#6688aa" stroke-width="2">
+                        <rect x="20" y="10" width="40" height="60" rx="4" stroke-dasharray="4 2"/>
+                        <path d="M50 70 L70 50 L70 30 L30 30 L10 50 L10 70 Z" fill="rgba(50,100,200,0.1)" stroke="#4488ff" stroke-dasharray="4 2"/>
+                        <path d="M55 25 C60 15, 70 20, 65 28" stroke="#ffcc00" stroke-width="2" fill="none"/>
+                        <path d="M63 22 L65 28 L59 27" stroke="#ffcc00" stroke-width="2" fill="none"/>
+                    </svg>
+                </div>
+                <p>"Rotate your phone to landscape"</p>
+            </div>
+            <div id="ctrlPad" style="display:none;">
+                <div id="ctrlStatus">"Connecting..."</div>
+                <div class="ctrl-divider"></div>
+                <div class="ctrl-left">
+                    <div class="ctrl-label">"Drag to navigate"</div>
+                    <div class="ctrl-joystick-ring" id="joystickRing">
+                        <div class="ctrl-joystick-knob" id="joystickKnob"></div>
+                    </div>
+                </div>
+                <div class="ctrl-right">
+                    <div class="ctrl-label">"Tap to fire"</div>
+                    <div class="ctrl-fire-indicator" id="fireIndicator"></div>
+                </div>
+            </div>
+        </div>
+    }
+}

@@ -1,0 +1,10 @@
+[build]
+dist = "dist"
+public_url = "/rust/"
+
+[serve]
+port = 8081
+
+[[proxy]]
+backend = "http://localhost:8080/ws"
+ws = true

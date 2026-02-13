@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0a1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Star Wars Space Battle (Rust)</title>
+    <link data-trunk rel="rust" data-wasm-opt="s" />
+    <link data-trunk rel="copy-dir" href="assets" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a1a;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            touch-action: none;
+        }
+
+        #bgCanvas {
+            z-index: 0;
+        }
+
+        #gameCanvas {
+            z-index: 1;
+            cursor: none;
+        }
+
+        #lobby {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+        }
+
+        .lobby-panel {
+            background: rgba(10, 10, 30, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 40px;
+            width: 420px;
+            max-width: 95vw;
+            box-shadow: 0 0 40px rgba(0, 100, 255, 0.15);
+        }
+
+        .title {
+            font-size: 42px;
+            font-weight: bold;
+            text-align: center;
+            color: #ffcc00;
+            text-shadow: 0 0 20px rgba(255, 200, 0, 0.5);
+            letter-spacing: 8px;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            text-align: center;
+            color: #6688aa;
+            letter-spacing: 4px;
+            margin-bottom: 30px;
+        }
+
+        .name-input-group {
+            margin-bottom: 20px;
+        }
+
+        .name-input-group label {
+            display: block;
+            font-size: 12px;
+            color: #6688aa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+        }
+
+        .name-input-group input {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .name-input-group input:focus {
+            border-color: rgba(100, 150, 255, 0.5);
+        }
+
+        .lobby-actions {
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            width: 100%;
+            background: linear-gradient(135deg, #2266cc, #1144aa);
+            color: #fff;
+            border: 1px solid rgba(100, 150, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #3377dd, #2255bb);
+            box-shadow: 0 0 15px rgba(50, 100, 255, 0.3);
+        }
+
+        .btn-join {
+            background: rgba(50, 200, 100, 0.2);
+            color: #44dd88;
+            border: 1px solid rgba(50, 200, 100, 0.3);
+            padding: 6px 16px;
+            font-size: 12px;
+        }
+
+        .btn-join:hover {
+            background: rgba(50, 200, 100, 0.3);
+        }
+
+        .session-list-container h3 {
+            font-size: 12px;
+            color: #6688aa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .session-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .session-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+
+        .session-name {
+            font-weight: bold;
+            color: #ddd;
+        }
+
+        .session-players {
+            color: #6688aa;
+            font-size: 13px;
+            margin: 0 12px;
+        }
+
+        .no-sessions {
+            color: #556677;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .error-msg {
+            color: #ff6666;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .session-info {
+            color: #88aacc;
+            text-align: center;
+            padding: 10px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.1);
+            border-radius: 3px;
+        }
+
+        #controllerBtn {
+            position: fixed;
+            top: 10px;
+            left: calc(50% + 24px);
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            width: 34px;
+            height: 34px;
+            border-radius: 6px;
+            cursor: pointer;
+            opacity: 0.4;
+            transition: opacity 0.2s;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        #controllerBtn:hover,
+        #controllerBtn:active {
+            opacity: 0.9;
+        }
+
+        #controllerBtn svg {
+            pointer-events: none;
+        }
+
+        #controllerOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 50;
+            background: rgba(0,0,0,0.85);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        #controllerOverlay.visible {
+            display: flex;
+        }
+
+        #controllerOverlay .qr-box {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        #controllerOverlay .qr-box img {
+            display: block;
+            width: 200px;
+            height: 200px;
+        }
+
+        #controllerOverlay .qr-url {
+            color: #6688aa;
+            font-size: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            max-width: 320px;
+            word-break: break-all;
+            font-family: monospace;
+        }
+
+        #controllerOverlay .qr-hint {
+            color: #8899aa;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        #controllerOverlay .btn-close {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 8px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #controllerOverlay .btn-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        #fullscreenBtn {
+            position: fixed;
+            top: 10px;
+            left: calc(50% - 24px);
+            transform: translateX(-50%);
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            width: 34px;
+            height: 34px;
+            border-radius: 6px;
+            cursor: pointer;
+            opacity: 0.4;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        #fullscreenBtn:hover,
+        #fullscreenBtn:active {
+            opacity: 0.9;
+        }
+
+        #fullscreenBtn svg {
+            pointer-events: none;
+        }
+
+        /* Controller mode styles */
+        #controllerRoot {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 100; background: #0a0a1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #ctrlRotateMsg {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+        #ctrlRotateMsg p {
+            color: #6688aa; font-size: 18px; margin-top: 20px;
+        }
+        .rotate-icon { margin-bottom: 10px; }
+        #ctrlPad {
+            width: 100%; height: 100%; position: relative;
+            overflow: hidden;
+        }
+        #ctrlStatus {
+            position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+            font-size: 12px; color: #556677; z-index: 2;
+            letter-spacing: 2px; text-transform: uppercase;
+        }
+        .ctrl-divider {
+            position: absolute; top: 10%; bottom: 10%;
+            left: 50%; width: 0;
+            border-left: 2px dashed rgba(255,255,255,0.1);
+            z-index: 1;
+        }
+        .ctrl-left, .ctrl-right {
+            position: absolute; top: 0; bottom: 0; width: 50%;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        .ctrl-left { left: 0; }
+        .ctrl-right { right: 0; }
+        .ctrl-label {
+            color: #334455; font-size: 13px; text-transform: uppercase;
+            letter-spacing: 2px; margin-bottom: 20px;
+            pointer-events: none;
+        }
+        .ctrl-joystick-ring {
+            width: 140px; height: 140px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            position: relative;
+            pointer-events: none;
+        }
+        .ctrl-joystick-knob {
+            width: 50px; height: 50px;
+            background: rgba(68, 136, 255, 0.3);
+            border: 2px solid rgba(68, 136, 255, 0.5);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            transition: background 0.1s;
+            pointer-events: none;
+        }
+        .ctrl-fire-indicator {
+            width: 100px; height: 100px;
+            border: 2px solid rgba(255,68,68,0.2);
+            border-radius: 50%;
+            pointer-events: none;
+            transition: background 0.1s, border-color 0.1s;
+        }
+        .ctrl-fire-indicator.active {
+            background: rgba(255,68,68,0.3);
+            border-color: rgba(255,68,68,0.6);
+        }
+    </style>
+</head>
+<body>
+</body>
+</html>

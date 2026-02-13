@@ -1,0 +1,54 @@
+[package]
+name = "spaceship-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+leptos = { version = "0.7", features = ["csr"] }
+leptos_router = "0.7"
+gloo-net = { version = "0.6", features = ["websocket"] }
+gloo-timers = "0.3"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "HtmlCanvasElement",
+    "HtmlImageElement",
+    "HtmlInputElement",
+    "CanvasRenderingContext2d",
+    "CanvasGradient",
+    "MouseEvent",
+    "KeyboardEvent",
+    "TouchEvent",
+    "TouchList",
+    "Touch",
+    "Event",
+    "EventTarget",
+    "AddEventListenerOptions",
+    "DomRect",
+    "Performance",
+    "Navigator",
+    "MediaQueryList",
+    "History",
+    "Location",
+    "Url",
+    "UrlSearchParams",
+    "Screen",
+    "ScreenOrientation",
+    "console",
+    "CssStyleDeclaration",
+    "ImageData",
+    "TextMetrics",
+] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+console_error_panic_hook = "0.1"
+send_wrapper = "0.6"
+
+[profile.release]
+opt-level = "s"
+lto = true
