@@ -28,6 +28,11 @@ export function showLobby() {
     history.pushState({}, '', '/');
     renderLobby();
     startRefresh();
+    // Hide controller QR button when returning to lobby
+    const ctrlBtn = document.getElementById('controllerBtn');
+    if (ctrlBtn) ctrlBtn.style.display = 'none';
+    const ctrlOverlay = document.getElementById('controllerOverlay');
+    if (ctrlOverlay) ctrlOverlay.classList.remove('visible');
 }
 
 export function hideLobby() {

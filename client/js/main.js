@@ -6,9 +6,22 @@ import { render } from './renderer.js';
 import { initStarfield } from './starfield.js';
 import { addExplosion, addEngineParticles } from './effects.js';
 import { WORLD_W, WORLD_H } from './constants.js';
+import { initController } from './controller.js';
 
 // Initialize game
 export function init() {
+    // Check for controller mode (?c=playerID)
+    const params = new URLSearchParams(window.location.search);
+    const controlPID = params.get('c');
+    if (controlPID) {
+        const UUID_RE = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+        const match = window.location.pathname.match(UUID_RE);
+        if (match) {
+            initController(match[1], controlPID);
+            return;
+        }
+    }
+
     // Setup canvases
     state.bgCanvas = document.getElementById('bgCanvas');
     state.canvas = document.getElementById('gameCanvas');
@@ -41,6 +54,9 @@ export function init() {
 
     // Fullscreen toggle
     setupFullscreen();
+
+    // Controller QR overlay
+    setupControllerBtn();
 
     // Connect to server
     connect();
@@ -96,6 +112,51 @@ function setupFullscreen() {
     };
     document.addEventListener('fullscreenchange', updateIcon);
     document.addEventListener('webkitfullscreenchange', updateIcon);
+}
+
+function setupControllerBtn() {
+    const btn = document.getElementById('controllerBtn');
+    const overlay = document.getElementById('controllerOverlay');
+    const qrClose = document.getElementById('qrClose');
+    if (!btn || !overlay) return;
+
+    btn.addEventListener('click', () => {
+        if (!state.myID || !state.sessionID) return;
+        const controllerURL = `${location.origin}/${state.sessionID}?c=${state.myID}`;
+        const qrImg = document.getElementById('qrImg');
+        const qrUrl = document.getElementById('qrUrl');
+        if (qrImg) qrImg.src = `/api/qr?data=${encodeURIComponent(controllerURL)}`;
+        if (qrUrl) qrUrl.textContent = controllerURL;
+        overlay.classList.add('visible');
+    });
+
+    if (qrClose) {
+        qrClose.addEventListener('click', () => {
+            overlay.classList.remove('visible');
+        });
+    }
+
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') overlay.classList.remove('visible');
+    });
+}
+
+function showControllerBtn() {
+    const btn = document.getElementById('controllerBtn');
+    if (!btn) return;
+    // Only show on desktop
+    const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (!isMobile) {
+        btn.style.display = 'flex';
+    }
+}
+
+function hideControllerBtn() {
+    const btn = document.getElementById('controllerBtn');
+    if (btn) btn.style.display = 'none';
+    const overlay = document.getElementById('controllerOverlay');
+    if (overlay) overlay.classList.remove('visible');
 }
 
 function resize() {
@@ -214,6 +275,7 @@ function handleWelcome(data) {
     state.myShip = data.s;
     state.phase = 'playing';
     hideLobby();
+    showControllerBtn();
 }
 
 function handleJoined(data) {

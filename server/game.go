@@ -40,6 +40,7 @@ type Game struct {
 	asteroids   map[string]*Asteroid
 	pickups     map[string]*Pickup
 	clients     map[string]Broadcaster // playerID -> client
+	controllers map[string]Broadcaster // playerID -> phone controller
 	tick        uint64
 	running     bool
 	stop        chan struct{}
@@ -59,6 +60,7 @@ func NewGame() *Game {
 		asteroids:       make(map[string]*Asteroid),
 		pickups:         make(map[string]*Pickup),
 		clients:         make(map[string]Broadcaster),
+		controllers:     make(map[string]Broadcaster),
 		stop:            make(chan struct{}),
 		mobSpawnCD:      MobSpawnInterval,
 		asteroidSpawnCD: AsteroidSpawnInterval,
@@ -118,6 +120,29 @@ func (g *Game) RemovePlayer(id string) {
 	defer g.mu.Unlock()
 	delete(g.players, id)
 	delete(g.clients, id)
+	delete(g.controllers, id)
+}
+
+// SetController associates a phone controller with a player
+func (g *Game) SetController(playerID string, client Broadcaster) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.controllers[playerID] = client
+}
+
+// RemoveController detaches a phone controller from a player
+func (g *Game) RemoveController(playerID string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	delete(g.controllers, playerID)
+}
+
+// HasPlayer returns true if the player exists in the game
+func (g *Game) HasPlayer(id string) bool {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	_, ok := g.players[id]
+	return ok
 }
 
 // SetClient associates a broadcaster with a player
@@ -377,22 +402,28 @@ func (g *Game) broadcastState() {
 		return
 	}
 
-	for _, client := range g.clients {
-		if c, ok := client.(*Client); ok {
-			func() {
-				defer func() { recover() }()
-				select {
-				case c.send <- data:
-				default:
-				}
-			}()
+	// Send to main clients and controllers
+	for _, m := range []map[string]Broadcaster{g.clients, g.controllers} {
+		for _, client := range m {
+			if c, ok := client.(*Client); ok {
+				func() {
+					defer func() { recover() }()
+					select {
+					case c.send <- data:
+					default:
+					}
+				}()
+			}
 		}
 	}
 }
 
-// broadcastMsg sends a message to all clients in the session
+// broadcastMsg sends a message to all clients and controllers in the session
 func (g *Game) broadcastMsg(msg Envelope) {
 	for _, client := range g.clients {
+		client.SendJSON(msg)
+	}
+	for _, client := range g.controllers {
 		client.SendJSON(msg)
 	}
 }

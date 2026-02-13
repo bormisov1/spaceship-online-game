@@ -20,14 +20,15 @@ const (
 
 // Client represents a WebSocket connection
 type Client struct {
-	hub        *Hub
-	conn       *websocket.Conn
-	send       chan []byte
-	playerID   string
-	sessionID  string
-	remoteAddr string
-	msgCount   int
-	msgResetAt time.Time
+	hub          *Hub
+	conn         *websocket.Conn
+	send         chan []byte
+	playerID     string
+	sessionID    string
+	remoteAddr   string
+	isController bool
+	msgCount     int
+	msgResetAt   time.Time
 }
 
 // NewClient creates a new Client
@@ -146,6 +147,8 @@ func (c *Client) handleMessage(raw []byte) {
 		c.handleLeave()
 	case MsgCheck:
 		c.handleCheck(raw)
+	case MsgControl:
+		c.handleControl(raw)
 	}
 }
 
@@ -265,8 +268,42 @@ func (c *Client) handleCheck(raw []byte) {
 
 func (c *Client) handleLeave() {
 	if c.sessionID != "" {
-		c.hub.sessions.RemovePlayer(c.sessionID, c.playerID)
+		if c.isController {
+			sess := c.hub.sessions.GetSession(c.sessionID)
+			if sess != nil {
+				sess.Game.RemoveController(c.playerID)
+			}
+		} else {
+			c.hub.sessions.RemovePlayer(c.sessionID, c.playerID)
+		}
 		c.sessionID = ""
 		c.playerID = ""
+		c.isController = false
 	}
+}
+
+func (c *Client) handleControl(raw []byte) {
+	var msg struct {
+		T string     `json:"t"`
+		D ControlMsg `json:"d"`
+	}
+	if err := json.Unmarshal(raw, &msg); err != nil {
+		return
+	}
+	sess := c.hub.sessions.GetSession(msg.D.SID)
+	if sess == nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "session not found"}})
+		return
+	}
+	if !sess.Game.HasPlayer(msg.D.PlayerID) {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "player not found"}})
+		return
+	}
+
+	c.sessionID = msg.D.SID
+	c.playerID = msg.D.PlayerID
+	c.isController = true
+
+	sess.Game.SetController(msg.D.PlayerID, c)
+	c.SendJSON(Envelope{T: MsgControlOK, Data: map[string]string{"pid": msg.D.PlayerID}})
 }

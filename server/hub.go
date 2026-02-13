@@ -79,7 +79,14 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 			// Remove from session if in one
 			if client.sessionID != "" {
-				h.sessions.RemovePlayer(client.sessionID, client.playerID)
+				if client.isController {
+					sess := h.sessions.GetSession(client.sessionID)
+					if sess != nil {
+						sess.Game.RemoveController(client.playerID)
+					}
+				} else {
+					h.sessions.RemovePlayer(client.sessionID, client.playerID)
+				}
 			}
 		}
 	}

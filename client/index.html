@@ -209,10 +209,97 @@
             border-radius: 3px;
         }
 
+        #controllerBtn {
+            position: fixed;
+            top: 10px;
+            left: calc(50% + 24px);
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            width: 34px;
+            height: 34px;
+            border-radius: 6px;
+            cursor: pointer;
+            opacity: 0.4;
+            transition: opacity 0.2s;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        #controllerBtn:hover,
+        #controllerBtn:active {
+            opacity: 0.9;
+        }
+
+        #controllerBtn svg {
+            pointer-events: none;
+        }
+
+        #controllerOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 50;
+            background: rgba(0,0,0,0.85);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        #controllerOverlay.visible {
+            display: flex;
+        }
+
+        #controllerOverlay .qr-box {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        #controllerOverlay .qr-box img {
+            display: block;
+            width: 200px;
+            height: 200px;
+        }
+
+        #controllerOverlay .qr-url {
+            color: #6688aa;
+            font-size: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            max-width: 320px;
+            word-break: break-all;
+            font-family: monospace;
+        }
+
+        #controllerOverlay .qr-hint {
+            color: #8899aa;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        #controllerOverlay .btn-close {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 8px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        #controllerOverlay .btn-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
         #fullscreenBtn {
             position: fixed;
             top: 10px;
-            left: 50%;
+            left: calc(50% - 24px);
             transform: translateX(-50%);
             z-index: 20;
             background: rgba(255, 255, 255, 0.08);
@@ -270,6 +357,18 @@
             <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/>
         </svg>
     </button>
+    <button id="controllerBtn" title="Phone Controller">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <rect x="4" y="1" width="8" height="14" rx="1.5"/>
+            <line x1="6" y1="12" x2="10" y2="12"/>
+        </svg>
+    </button>
+    <div id="controllerOverlay">
+        <p class="qr-hint">Scan with your phone to use as controller</p>
+        <div class="qr-box"><img id="qrImg" alt="QR Code"></div>
+        <p class="qr-url" id="qrUrl"></p>
+        <button class="btn-close" id="qrClose">Close</button>
+    </div>
 
     <script type="module" src="js/main.js"></script>
     <script type="module" src="js/tests.js"></script>

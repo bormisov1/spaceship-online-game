@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"github.com/gorilla/websocket"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 var uuidPathRe = regexp.MustCompile(`^/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -52,6 +53,23 @@ func SetupRoutes(hub *Hub, clientDir string) *http.ServeMux {
 		}
 		fs.ServeHTTP(w, r)
 	}))
+
+	// QR code endpoint – returns PNG for the given data parameter
+	mux.HandleFunc("/api/qr", func(w http.ResponseWriter, r *http.Request) {
+		data := r.URL.Query().Get("data")
+		if data == "" {
+			http.Error(w, "missing data param", http.StatusBadRequest)
+			return
+		}
+		png, err := qrcode.Encode(data, qrcode.Medium, 256)
+		if err != nil {
+			http.Error(w, "qr encode error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Write(png)
+	})
 
 	// WebSocket endpoint
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

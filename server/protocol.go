@@ -2,12 +2,13 @@ package main
 
 // Client -> Server message types
 const (
-	MsgJoin   = "join"
-	MsgLeave  = "leave"
-	MsgInput  = "input"
-	MsgCreate = "create" // create session
-	MsgList   = "list"   // list sessions
-	MsgCheck  = "check"  // check if session exists
+	MsgJoin    = "join"
+	MsgLeave   = "leave"
+	MsgInput   = "input"
+	MsgCreate  = "create"  // create session
+	MsgList    = "list"    // list sessions
+	MsgCheck   = "check"   // check if session exists
+	MsgControl = "control" // phone controller attach
 )
 
 // Server -> Client message types
@@ -20,7 +21,8 @@ const (
 	MsgJoined   = "joined"
 	MsgCreated  = "created" // session created, client should navigate
 	MsgError    = "error"
-	MsgChecked  = "checked" // session check response
+	MsgChecked    = "checked"    // session check response
+	MsgControlOK  = "control_ok" // controller attach confirmed
 )
 
 // Envelope wraps all messages with a type field
@@ -143,6 +145,12 @@ type SessionInfo struct {
 // ErrorMsg sends error to client
 type ErrorMsg struct {
 	Msg string `json:"msg"`
+}
+
+// ControlMsg is sent by a phone controller to attach to a player
+type ControlMsg struct {
+	SID      string `json:"sid"`
+	PlayerID string `json:"pid"`
 }
 
 // CheckMsg is sent by client to check if a session exists

@@ -6,7 +6,7 @@ const (
 	MobRadius         = 20.0
 	MobMaxHP          = 60
 	MobSpeed          = 180.0
-	MobDetectRange    = 1200.0
+	MobDetectRange    = 700.0
 	MobShootRange     = 900.0  // start shooting when this close
 	MobRepelRadius    = 50.0
 	MobRepelForce     = 120.0 // gentle nudge, allows head-on collisions
