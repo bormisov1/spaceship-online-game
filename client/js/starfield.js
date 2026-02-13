@@ -34,6 +34,8 @@ export function initStarfield() {
 function buildOffscreenCanvases(w, h) {
     cachedW = w;
     cachedH = h;
+    const minDim = Math.min(w, h);
+    const sizeScale = Math.max(0.4, Math.min(1, minDim / 900));
 
     // Build one offscreen canvas per star layer
     layerCanvases = [];
@@ -52,7 +54,7 @@ function buildOffscreenCanvases(w, h) {
 
             offCtx.fillStyle = `rgba(255,255,255,${star.brightness})`;
             offCtx.beginPath();
-            offCtx.arc(sx, sy, star.size, 0, Math.PI * 2);
+            offCtx.arc(sx, sy, star.size * sizeScale, 0, Math.PI * 2);
             offCtx.fill();
         }
 
