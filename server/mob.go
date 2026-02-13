@@ -3,30 +3,37 @@ package main
 import "math"
 
 const (
-	MobRadius       = 20.0
-	MobMaxHP        = 60
-	MobSpeed        = 180.0
-	MobDetectRange  = 600.0
-	MobRepelRadius  = 50.0
-	MobRepelForce   = 120.0 // gentle nudge, allows head-on collisions
-	MobExplodeRelV  = 250.0
-	MobAccel        = 200.0
-	MobFriction     = 0.96
-	MobTurnSpeed    = 4.0
-	MobShipType     = 3
-	MobKillScore    = 5
-	MobCollisionDmg = 30
+	MobRadius         = 20.0
+	MobMaxHP          = 60
+	MobSpeed          = 180.0
+	MobDetectRange    = 1200.0
+	MobShootRange     = 900.0  // start shooting when this close
+	MobRepelRadius    = 50.0
+	MobRepelForce     = 120.0 // gentle nudge, allows head-on collisions
+	MobExplodeRelV    = 250.0
+	MobAccel          = 200.0
+	MobFriction       = 0.96
+	MobTurnSpeed      = 4.0
+	MobShipType       = 3
+	MobKillScore      = 5
+	MobCollisionDmg   = 30
+	MobBurstSize      = 5
+	MobBurstFireRate  = 0.15  // seconds between shots in a burst
+	MobBurstCooldown  = 5.0   // seconds between bursts
 )
 
 // Mob is an AI-controlled enemy ship
 type Mob struct {
-	ID       string
-	X, Y     float64
-	VX, VY   float64
-	Rotation float64
-	HP       int
-	MaxHP    int
-	Alive    bool
+	ID        string
+	X, Y      float64
+	VX, VY    float64
+	Rotation  float64
+	HP        int
+	MaxHP     int
+	Alive     bool
+	BurstLeft int     // shots remaining in current burst
+	FireCD    float64 // cooldown between individual shots
+	BurstCD   float64 // cooldown between bursts
 }
 
 // NewMob spawns a mob at a random map edge
@@ -61,10 +68,19 @@ func NewMob() *Mob {
 	return m
 }
 
-// Update moves the mob and steers toward nearest player or center
-func (m *Mob) Update(dt float64, players map[string]*Player) {
+// Update moves the mob and steers toward nearest player or center.
+// Returns true if the mob wants to fire this tick.
+func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 	if !m.Alive {
-		return
+		return false
+	}
+
+	// Tick cooldowns
+	if m.FireCD > 0 {
+		m.FireCD -= dt
+	}
+	if m.BurstCD > 0 {
+		m.BurstCD -= dt
 	}
 
 	// Find nearest alive player within detect range
@@ -134,6 +150,31 @@ func (m *Mob) Update(dt float64, players map[string]*Player) {
 	} else if m.Y > WorldHeight {
 		m.Y -= WorldHeight
 	}
+
+	// Burst fire logic
+	wantFire := false
+	if found && bestDist < MobShootRange {
+		if m.BurstLeft > 0 && m.FireCD <= 0 {
+			// Continue burst
+			wantFire = true
+			m.BurstLeft--
+			m.FireCD = MobBurstFireRate
+			if m.BurstLeft == 0 {
+				m.BurstCD = MobBurstCooldown
+			}
+		} else if m.BurstLeft == 0 && m.BurstCD <= 0 {
+			// Start new burst
+			m.BurstLeft = MobBurstSize
+			wantFire = true
+			m.BurstLeft--
+			m.FireCD = MobBurstFireRate
+			if m.BurstLeft == 0 {
+				m.BurstCD = MobBurstCooldown
+			}
+		}
+	}
+
+	return wantFire
 }
 
 // TakeDamage reduces HP and returns true if mob died

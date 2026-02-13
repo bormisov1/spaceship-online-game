@@ -187,9 +187,14 @@ func (g *Game) update() {
 
 	// Update mobs
 	for id, mob := range g.mobs {
-		mob.Update(dt, g.players)
+		wantFire := mob.Update(dt, g.players)
 		if !mob.Alive {
 			delete(g.mobs, id)
+			continue
+		}
+		if wantFire && len(g.projectiles) < maxProjectilesPerSession {
+			proj := NewMobProjectile(mob)
+			g.projectiles[proj.ID] = proj
 		}
 	}
 
@@ -264,6 +269,18 @@ func (g *Game) checkCollisions() {
 							client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
 								KillerID:   killer.ID,
 								KillerName: killer.Name,
+							}})
+						}
+					} else {
+						// Killed by mob
+						g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+							KillerID: proj.OwnerID, KillerName: "Mob",
+							VictimID: p.ID, VictimName: p.Name,
+						}})
+						if client, ok := g.clients[p.ID]; ok {
+							client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
+								KillerID:   proj.OwnerID,
+								KillerName: "Mob",
 							}})
 						}
 					}
@@ -433,6 +450,10 @@ func (g *Game) checkMobMobCollisions() {
 func (g *Game) checkProjectileMobCollisions() {
 	for projID, proj := range g.projectiles {
 		if !proj.Alive {
+			continue
+		}
+		// Skip mob-fired projectiles so mobs don't hurt each other
+		if _, isPlayer := g.players[proj.OwnerID]; !isPlayer {
 			continue
 		}
 		for _, mob := range g.mobs {

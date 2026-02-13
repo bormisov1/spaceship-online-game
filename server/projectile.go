@@ -39,6 +39,24 @@ func NewProjectile(owner *Player) *Projectile {
 	}
 }
 
+// NewMobProjectile creates a projectile from a mob's position and facing direction
+func NewMobProjectile(mob *Mob) *Projectile {
+	id := GenerateID(3)
+	vx := math.Cos(mob.Rotation) * ProjectileSpeed
+	vy := math.Sin(mob.Rotation) * ProjectileSpeed
+	return &Projectile{
+		ID:       id,
+		OwnerID:  mob.ID,
+		X:        mob.X + math.Cos(mob.Rotation)*ProjectileOffset,
+		Y:        mob.Y + math.Sin(mob.Rotation)*ProjectileOffset,
+		VX:       vx + mob.VX*0.3,
+		VY:       vy + mob.VY*0.3,
+		Rotation: mob.Rotation,
+		Life:     ProjectileLifetime,
+		Alive:    true,
+	}
+}
+
 // Update moves the projectile one tick
 func (p *Projectile) Update(dt float64) {
 	if !p.Alive {
