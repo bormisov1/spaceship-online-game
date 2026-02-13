@@ -208,9 +208,11 @@ function handleMessage(msg) {
             break;
         case 'ctrl_on':
             state.controllerAttached = true;
+            if (state.canvas) state.canvas.style.cursor = 'default';
             break;
         case 'ctrl_off':
             state.controllerAttached = false;
+            if (state.canvas) state.canvas.style.cursor = 'none';
             break;
         case 'error':
             console.error('Server error:', msg.d.msg);

@@ -25,8 +25,8 @@ export function renderHUD(ctx) {
         drawDeathScreen(ctx);
     }
 
-    // Crosshair (desktop only)
-    if (state.phase === 'playing' && !state.isMobile) {
+    // Crosshair (desktop only, hide when controller is driving)
+    if (state.phase === 'playing' && !state.isMobile && !state.controllerAttached) {
         drawCrosshair(ctx);
     }
 

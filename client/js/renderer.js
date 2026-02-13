@@ -84,6 +84,11 @@ export function render(dt) {
 
         // Health bar + name for other players
         drawPlayerHealthBar(ctx, sx, sy, player.hp, player.mhp, player.n, isMe);
+
+        // Controller aim reticle
+        if (isMe && state.controllerAttached) {
+            drawControllerAim(ctx, sx, sy, player.r);
+        }
     }
 
     // Debug hitboxes
@@ -174,6 +179,47 @@ function drawHitboxes(ctx, offsetX, offsetY, vw, vh) {
         ctx.lineWidth = 1;
         ctx.stroke();
     }
+}
+
+const AIM_ORBIT_R = 300;  // world units from ship center
+const AIM_CIRCLE_R = 8;   // small circle radius
+const AIM_LINE_LEN = 20;  // line length from circle edge
+const AIM_GAP = 3;        // gap between circle and line start
+
+function drawControllerAim(ctx, shipSX, shipSY, rotation) {
+    // Aim position on the orbit
+    const ax = shipSX + Math.cos(rotation) * AIM_ORBIT_R;
+    const ay = shipSY + Math.sin(rotation) * AIM_ORBIT_R;
+
+    // The aim rotates so one arm always points back at the ship
+    // rotation + PI points from aim back toward ship
+    const facing = rotation + Math.PI;
+
+    ctx.save();
+    ctx.translate(ax, ay);
+    ctx.rotate(facing);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 1.5;
+
+    // Small circle around center
+    ctx.beginPath();
+    ctx.arc(0, 0, AIM_CIRCLE_R, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 4 lines from circle edges outward (at 0, 90, 180, 270 degrees in local space)
+    for (let i = 0; i < 4; i++) {
+        const a = (i * Math.PI) / 2;
+        const cos = Math.cos(a);
+        const sin = Math.sin(a);
+        const startR = AIM_CIRCLE_R + AIM_GAP;
+        ctx.beginPath();
+        ctx.moveTo(cos * startR, sin * startR);
+        ctx.lineTo(cos * (startR + AIM_LINE_LEN), sin * (startR + AIM_LINE_LEN));
+        ctx.stroke();
+    }
+
+    ctx.restore();
 }
 
 function drawWorldBounds(ctx, offsetX, offsetY) {
