@@ -17,7 +17,7 @@ const (
 const (
 	maxProjectilesPerSession = 500
 	maxPlayersPerSession     = 20
-	maxMobsPerSession        = 12
+	maxMobsPerSession        = 8
 	maxAsteroidsPerSession   = 5
 	maxPickupsPerSession     = 4
 	MobSpawnInterval         = 7.0
@@ -623,9 +623,14 @@ func (g *Game) spawnEntities(dt float64) {
 
 	g.mobSpawnCD -= dt
 	if g.mobSpawnCD <= 0 && len(g.mobs) < maxMobsPerSession {
+		// Spawn one mob per tick until we reach the cap
 		mob := NewMob()
 		g.mobs[mob.ID] = mob
-		g.mobSpawnCD = MobSpawnInterval
+		if len(g.mobs) < maxMobsPerSession {
+			g.mobSpawnCD = 0.5 // quick respawn to fill back up
+		} else {
+			g.mobSpawnCD = MobSpawnInterval
+		}
 	}
 
 	g.asteroidSpawnCD -= dt
