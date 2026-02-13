@@ -223,6 +223,7 @@ func (g *Game) update() {
 	g.checkProjectileMobCollisions()
 	g.checkAsteroidPlayerCollisions()
 	g.checkAsteroidMobCollisions()
+	g.checkProjectileAsteroidCollisions()
 	g.checkPlayerPickupCollisions()
 	g.checkPlayerMobCollisions()
 
@@ -525,6 +526,25 @@ func (g *Game) checkAsteroidMobCollisions() {
 					KillerID: "asteroid", KillerName: "Asteroid",
 					VictimID: mob.ID, VictimName: "Mob",
 				}})
+			}
+		}
+	}
+}
+
+// checkProjectileAsteroidCollisions — projectiles are destroyed by asteroids
+func (g *Game) checkProjectileAsteroidCollisions() {
+	for projID, proj := range g.projectiles {
+		if !proj.Alive {
+			continue
+		}
+		for _, ast := range g.asteroids {
+			if !ast.Alive {
+				continue
+			}
+			if CheckCollision(proj.X, proj.Y, ProjectileRadius, ast.X, ast.Y, AsteroidRadius) {
+				proj.Alive = false
+				delete(g.projectiles, projID)
+				break
 			}
 		}
 	}
