@@ -34,6 +34,12 @@ let joystickDY = 0;
 let fireTouchId = null;
 let firing = false;
 
+// Boost state
+let boostTouchId = null;
+let boosting = false;
+
+const BOOST_COLUMN_HALF = 50;
+
 let inputInterval = null;
 
 export function initController(sessionID, playerID) {
@@ -77,7 +83,12 @@ function buildUI() {
         </div>
         <div id="ctrlPad" style="display:none;">
             <div id="ctrlStatus">Connecting...</div>
-            <div class="ctrl-divider"></div>
+            <div class="ctrl-divider-left"></div>
+            <div class="ctrl-divider-right"></div>
+            <div class="ctrl-center">
+                <div class="ctrl-boost-indicator" id="boostIndicator"></div>
+                <div class="ctrl-label">BOOST</div>
+            </div>
             <div class="ctrl-left">
                 <div class="ctrl-label">Drag to navigate</div>
                 <div class="ctrl-joystick-ring" id="joystickRing">
@@ -123,14 +134,35 @@ function buildUI() {
             font-size: 12px; color: #556677; z-index: 2;
             letter-spacing: 2px; text-transform: uppercase;
         }
-        .ctrl-divider {
+        .ctrl-divider-left, .ctrl-divider-right {
             position: absolute; top: 10%; bottom: 10%;
-            left: 50%; width: 0;
-            border-left: 2px dashed rgba(255,255,255,0.1);
+            width: 0;
+            border-left: 2px dashed rgba(255,255,255,0.12);
             z-index: 1;
         }
+        .ctrl-divider-left { left: calc(50% - 50px); }
+        .ctrl-divider-right { left: calc(50% + 50px); }
+        .ctrl-center {
+            position: absolute; top: 0; bottom: 0;
+            left: calc(50% - 50px); width: 100px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 1; pointer-events: none;
+        }
+        .ctrl-boost-indicator {
+            width: 40px; height: 40px;
+            border: 2px solid rgba(100, 180, 255, 0.2);
+            border-radius: 50%;
+            pointer-events: none;
+            transition: background 0.1s, border-color 0.1s;
+            margin-bottom: 8px;
+        }
+        .ctrl-boost-indicator.active {
+            background: rgba(80, 160, 255, 0.4);
+            border-color: rgba(100, 200, 255, 0.8);
+        }
         .ctrl-left, .ctrl-right {
-            position: absolute; top: 0; bottom: 0; width: 50%;
+            position: absolute; top: 0; bottom: 0; width: calc(50% - 50px);
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
         }
@@ -274,17 +306,25 @@ function updateStatus(text) {
 function onTouchStart(e) {
     e.preventDefault();
     const halfW = screenW / 2;
+    const centerLeft = halfW - BOOST_COLUMN_HALF;
+    const centerRight = halfW + BOOST_COLUMN_HALF;
     for (const touch of e.changedTouches) {
-        if (touch.clientX < halfW && joystickTouchId === null) {
+        const cx = touch.clientX;
+        if (cx < centerLeft && joystickTouchId === null) {
             joystickTouchId = touch.identifier;
-            joystickStartX = touch.clientX;
+            joystickStartX = cx;
             joystickStartY = touch.clientY;
             joystickDX = 0;
             joystickDY = 0;
-        } else if (touch.clientX >= halfW && fireTouchId === null) {
+        } else if (cx > centerRight && fireTouchId === null) {
             fireTouchId = touch.identifier;
             firing = true;
             const ind = document.getElementById('fireIndicator');
+            if (ind) ind.classList.add('active');
+        } else if (cx >= centerLeft && cx <= centerRight && boostTouchId === null) {
+            boostTouchId = touch.identifier;
+            boosting = true;
+            const ind = document.getElementById('boostIndicator');
             if (ind) ind.classList.add('active');
         }
     }
@@ -314,6 +354,12 @@ function onTouchEnd(e) {
             fireTouchId = null;
             firing = false;
             const ind = document.getElementById('fireIndicator');
+            if (ind) ind.classList.remove('active');
+        }
+        if (touch.identifier === boostTouchId) {
+            boostTouchId = null;
+            boosting = false;
+            const ind = document.getElementById('boostIndicator');
             if (ind) ind.classList.remove('active');
         }
     }
@@ -421,7 +467,7 @@ function sendInput() {
             mx,
             my,
             fire: firing,
-            boost: false,
+            boost: boosting,
             thresh: 50,
         }
     }));
