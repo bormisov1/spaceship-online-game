@@ -146,6 +146,84 @@ pub fn update_particles(particles: &mut Vec<Particle>, explosions: &mut Vec<Expl
     }
 }
 
+/// Draw a glowing engine beam behind a ship (Star Wars style blue thrust)
+pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotation: f64, speed: f64, ship_type: i32) {
+    if speed < 15.0 { return; }
+
+    let intensity = ((speed - 15.0) / 200.0).min(1.0); // 0..1 based on speed
+    let beam_len = 18.0 + intensity * 22.0; // 18-40px long
+    let beam_width = 3.0 + intensity * 3.0; // 3-6px wide at base
+
+    // Beam points backward from ship
+    let bx = -rotation.cos();
+    let by = -rotation.sin();
+    // Perpendicular
+    let px = -by;
+    let py = bx;
+
+    // Nozzle position (back of ship)
+    let nozzle_x = sx + bx * 16.0;
+    let nozzle_y = sy + by * 16.0;
+    // Tip position
+    let tip_x = nozzle_x + bx * beam_len;
+    let tip_y = nozzle_y + by * beam_len;
+
+    // Outer glow (wide, faint blue)
+    ctx.save();
+    ctx.set_global_alpha(intensity * 0.25);
+    ctx.begin_path();
+    ctx.move_to(nozzle_x + px * beam_width * 1.8, nozzle_y + py * beam_width * 1.8);
+    ctx.line_to(nozzle_x - px * beam_width * 1.8, nozzle_y - py * beam_width * 1.8);
+    ctx.line_to(tip_x, tip_y);
+    ctx.close_path();
+
+    let idx = (ship_type as usize).min(SHIP_COLORS.len() - 1);
+    let glow_color = match idx {
+        0 => "rgba(255, 100, 50, 0.6)",
+        1 => "rgba(50, 150, 255, 0.6)",
+        2 => "rgba(50, 255, 100, 0.6)",
+        _ => "rgba(255, 200, 50, 0.6)",
+    };
+    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(glow_color));
+    ctx.fill();
+
+    // Core beam (bright white-blue, narrower)
+    ctx.set_global_alpha(intensity * 0.6);
+    ctx.begin_path();
+    ctx.move_to(nozzle_x + px * beam_width, nozzle_y + py * beam_width);
+    ctx.line_to(nozzle_x - px * beam_width, nozzle_y - py * beam_width);
+    ctx.line_to(tip_x, tip_y);
+    ctx.close_path();
+
+    let core_color = match idx {
+        0 => "rgba(255, 180, 120, 0.8)",
+        1 => "rgba(150, 200, 255, 0.8)",
+        2 => "rgba(150, 255, 180, 0.8)",
+        _ => "rgba(255, 240, 150, 0.8)",
+    };
+    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(core_color));
+    ctx.fill();
+
+    // Inner hot core (white, thinnest)
+    ctx.set_global_alpha(intensity * 0.8);
+    ctx.begin_path();
+    ctx.move_to(nozzle_x + px * beam_width * 0.4, nozzle_y + py * beam_width * 0.4);
+    ctx.line_to(nozzle_x - px * beam_width * 0.4, nozzle_y - py * beam_width * 0.4);
+    ctx.line_to(nozzle_x + bx * beam_len * 0.6, nozzle_y + by * beam_len * 0.6);
+    ctx.close_path();
+    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.9)"));
+    ctx.fill();
+
+    // Nozzle glow dot
+    ctx.set_global_alpha(intensity * 0.5);
+    ctx.begin_path();
+    let _ = ctx.arc(nozzle_x, nozzle_y, beam_width * 1.2, 0.0, std::f64::consts::PI * 2.0);
+    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.6)"));
+    ctx.fill();
+
+    ctx.restore();
+}
+
 pub fn render_particles(ctx: &CanvasRenderingContext2d, particles: &[Particle], offset_x: f64, offset_y: f64, vw: f64, vh: f64) {
     for p in particles {
         let sx = p.x - offset_x;

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use web_sys::CanvasRenderingContext2d;
 use crate::protocol::MobState;
 use crate::ships;
+use crate::effects;
 
 pub fn render_mobs(
     ctx: &CanvasRenderingContext2d,
@@ -13,6 +14,10 @@ pub fn render_mobs(
         let sx = mob.x - offset_x;
         let sy = mob.y - offset_y;
         if sx < -60.0 || sx > vw + 60.0 || sy < -60.0 || sy > vh + 60.0 { continue; }
+
+        // Engine beam behind mob
+        let speed = (mob.vx * mob.vx + mob.vy * mob.vy).sqrt();
+        effects::draw_engine_beam(ctx, sx, sy, mob.r, speed, 3);
 
         // Draw ship type 3 (Destroyer)
         ships::draw_ship(ctx, sx, sy, mob.r, 3);
