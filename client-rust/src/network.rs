@@ -125,6 +125,15 @@ impl Network {
         }
     }
 
+    pub fn send_binary(net: &SharedNetwork, data: &[u8]) {
+        let net_ref = net.borrow();
+        if let Some(ws) = &net_ref.ws {
+            if ws.ready_state() == 1 {
+                let _ = ws.send_with_u8_array(data);
+            }
+        }
+    }
+
     pub fn send_input(net: &SharedNetwork) {
         let state = net.borrow().state.clone();
         let s = state.borrow();
@@ -205,8 +214,22 @@ impl Network {
         }
         drop(s);
 
-        let input = ClientInput { mx, my, fire: state.borrow().firing, boost: state.borrow().boosting, thresh };
-        Network::send_raw(net, "input", &serde_json::to_value(&input).unwrap());
+        let fire = state.borrow().firing;
+        let boost = state.borrow().boosting;
+
+        // Binary input: 8 bytes [0x01, mx_hi, mx_lo, my_hi, my_lo, flags, thresh_hi, thresh_lo]
+        let mx_i = mx.round() as i16;
+        let my_i = my.round() as i16;
+        let thresh_i = thresh.round().max(0.0).min(65535.0) as u16;
+        let flags: u8 = (if fire { 0x01 } else { 0 }) | (if boost { 0x02 } else { 0 });
+        let buf: [u8; 8] = [
+            0x01,
+            (mx_i as u16 >> 8) as u8, mx_i as u8,
+            (my_i as u16 >> 8) as u8, my_i as u8,
+            flags,
+            (thresh_i >> 8) as u8, thresh_i as u8,
+        ];
+        Network::send_binary(net, &buf);
     }
 
     pub fn list_sessions(net: &SharedNetwork) {

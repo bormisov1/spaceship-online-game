@@ -57,7 +57,7 @@ func (c *Client) ReadPump() {
 	})
 
 	for {
-		_, message, err := c.conn.ReadMessage()
+		msgType, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 				log.Printf("ws error: %v", err)
@@ -77,7 +77,12 @@ func (c *Client) ReadPump() {
 			break
 		}
 
-		c.handleMessage(message)
+		// Binary input messages: 8 bytes [0x01, mx_hi, mx_lo, my_hi, my_lo, flags, thresh_hi, thresh_lo]
+		if msgType == websocket.BinaryMessage && len(message) == 8 && message[0] == 0x01 {
+			c.handleBinaryInput(message)
+		} else {
+			c.handleMessage(message)
+		}
 	}
 }
 
@@ -224,6 +229,31 @@ func (c *Client) handleJoin(data json.RawMessage) {
 
 	c.SendJSON(Envelope{T: MsgJoined, Data: map[string]string{"sid": sess.ID}})
 	c.SendJSON(Envelope{T: MsgWelcome, Data: WelcomeMsg{ID: player.ID, Ship: player.ShipType}})
+}
+
+// handleBinaryInput decodes a compact 8-byte binary input message
+func (c *Client) handleBinaryInput(msg []byte) {
+	if c.sessionID == "" || c.playerID == "" {
+		return
+	}
+	// Decode: [0x01, mx_hi, mx_lo, my_hi, my_lo, flags, thresh_hi, thresh_lo]
+	mx := float64(int16(uint16(msg[1])<<8 | uint16(msg[2])))
+	my := float64(int16(uint16(msg[3])<<8 | uint16(msg[4])))
+	flags := msg[5]
+	thresh := float64(uint16(msg[6])<<8 | uint16(msg[7]))
+
+	input := ClientInput{
+		MX:     mx,
+		MY:     my,
+		Fire:   flags&0x01 != 0,
+		Boost:  flags&0x02 != 0,
+		Thresh: thresh,
+	}
+	sess := c.hub.sessions.GetSession(c.sessionID)
+	if sess == nil {
+		return
+	}
+	sess.Game.HandleInput(c.playerID, input)
 }
 
 func (c *Client) handleInput(data json.RawMessage) {
