@@ -7,6 +7,8 @@ use crate::constants::{SHIP_COLORS, WORLD_W, WORLD_H};
 thread_local! {
     static TEXT_WIDTH_CACHE: RefCell<HashMap<String, f64>> = RefCell::new(HashMap::new());
     static CACHED_FONT_SIZE: RefCell<i32> = RefCell::new(0);
+    /// Cached sorted scoreboard: (tick, sorted player list)
+    static SCOREBOARD_CACHE: RefCell<(u64, Vec<crate::protocol::PlayerState>)> = RefCell::new((0, Vec::new()));
 }
 
 fn cached_measure_text(ctx: &CanvasRenderingContext2d, text: &str, font_size: i32) -> f64 {
@@ -212,43 +214,51 @@ fn draw_scoreboard(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, 
     let score_x = 150.0 * scale;
     let max_players = if min_dim < 500.0 { 5 } else { 8 };
 
-    let mut players: Vec<_> = s.players.values().collect();
-    players.sort_by(|a, b| b.sc.cmp(&a.sc).then_with(|| a.id.cmp(&b.id)));
-    players.truncate(max_players);
+    // Re-sort only when tick changes (new server state arrived)
+    SCOREBOARD_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if cache.0 != s.tick {
+            cache.1.clear();
+            cache.1.extend(s.players.values().cloned());
+            cache.1.sort_by(|a, b| b.sc.cmp(&a.sc).then_with(|| a.id.cmp(&b.id)));
+            cache.1.truncate(max_players);
+            cache.0 = s.tick;
+        }
 
-    ctx.set_text_align("left");
-    ctx.set_font(&format!("{}px monospace", font_size));
+        ctx.set_text_align("left");
+        ctx.set_font(&format!("{}px monospace", font_size));
 
-    let x = 15.0;
-    let mut y = 60.0 * scale;
+        let x = 15.0;
+        let mut y = 60.0 * scale;
 
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 0, 0, 0.4)"));
-    ctx.fill_rect(x - 5.0, y - line_h as f64, panel_w, (players.len() as f64 * (line_h as f64 + 2.0)) + line_h as f64 + 6.0);
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 0, 0, 0.4)"));
+        ctx.fill_rect(x - 5.0, y - line_h as f64, panel_w, (cache.1.len() as f64 * (line_h as f64 + 2.0)) + line_h as f64 + 6.0);
 
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff88"));
-    ctx.set_font(&format!("bold {}px monospace", header_size));
-    let _ = ctx.fill_text("SCOREBOARD", x, y - 2.0);
-    y += line_h as f64;
-
-    ctx.set_font(&format!("{}px monospace", font_size));
-    let max_name_len = if min_dim < 500.0 { 8 } else { 12 };
-
-    for p in &players {
-        let is_me = s.my_id.as_ref() == Some(&p.id);
-        let idx = (p.s as usize).min(SHIP_COLORS.len() - 1);
-
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(if is_me { "#ffffff" } else { "#aaaaaa" }));
-        let name = if p.n.len() > max_name_len {
-            format!("{}..", &p.n[..max_name_len])
-        } else {
-            p.n.clone()
-        };
-        let _ = ctx.fill_text(&name, x, y);
-
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(SHIP_COLORS[idx].main));
-        let _ = ctx.fill_text(&p.sc.to_string(), x + score_x, y);
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff88"));
+        ctx.set_font(&format!("bold {}px monospace", header_size));
+        let _ = ctx.fill_text("SCOREBOARD", x, y - 2.0);
         y += line_h as f64;
-    }
+
+        ctx.set_font(&format!("{}px monospace", font_size));
+        let max_name_len = if min_dim < 500.0 { 8 } else { 12 };
+
+        for p in &cache.1 {
+            let is_me = s.my_id.as_ref() == Some(&p.id);
+            let idx = (p.s as usize).min(SHIP_COLORS.len() - 1);
+
+            ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(if is_me { "#ffffff" } else { "#aaaaaa" }));
+            let name = if p.n.len() > max_name_len {
+                format!("{}..", &p.n[..max_name_len])
+            } else {
+                p.n.clone()
+            };
+            let _ = ctx.fill_text(&name, x, y);
+
+            ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(SHIP_COLORS[idx].main));
+            let _ = ctx.fill_text(&p.sc.to_string(), x + score_x, y);
+            y += line_h as f64;
+        }
+    });
 }
 
 fn draw_death_screen(ctx: &CanvasRenderingContext2d, screen_w: f64, screen_h: f64, killer_name: &str) {
