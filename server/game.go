@@ -50,6 +50,14 @@ type Game struct {
 	mobSpawnCD      float64
 	asteroidSpawnCD float64
 	pickupSpawnCD   float64
+
+	// Reusable broadcast buffers (reset with [:0] each tick)
+	bcastPlayers   []PlayerState
+	bcastMobs      []MobState
+	bcastAsteroids []AsteroidState
+	bcastPickups   []PickupState
+	bcastProjs     []projWithPos
+	bcastFiltered  []ProjectileState
 }
 
 // NewGame creates a new Game
@@ -66,6 +74,12 @@ func NewGame() *Game {
 		mobSpawnCD:      MobSpawnInterval,
 		asteroidSpawnCD: AsteroidSpawnInterval,
 		pickupSpawnCD:   PickupSpawnInterval,
+		bcastPlayers:    make([]PlayerState, 0, maxPlayersPerSession),
+		bcastMobs:       make([]MobState, 0, maxMobsPerSession),
+		bcastAsteroids:  make([]AsteroidState, 0, maxAsteroidsPerSession),
+		bcastPickups:    make([]PickupState, 0, maxPickupsPerSession),
+		bcastProjs:      make([]projWithPos, 0, 64),
+		bcastFiltered:   make([]ProjectileState, 0, 64),
 	}
 }
 
@@ -373,41 +387,43 @@ func (g *Game) checkPlayerCollisions() {
 	}
 }
 
+// projWithPos holds a converted projectile state with raw position for culling
+type projWithPos struct {
+	state ProjectileState
+	x, y  float64
+}
+
 // broadcastState sends the current game state to all clients with per-client projectile culling
 func (g *Game) broadcastState() {
-	// Pre-build common state (shared across all clients)
-	players := make([]PlayerState, 0, len(g.players))
+	// Reuse slices: reset length to 0 but keep capacity
+	g.bcastPlayers = g.bcastPlayers[:0]
 	for _, p := range g.players {
-		players = append(players, p.ToState())
+		g.bcastPlayers = append(g.bcastPlayers, p.ToState())
 	}
-	mobs := make([]MobState, 0, len(g.mobs))
+	g.bcastMobs = g.bcastMobs[:0]
 	for _, mob := range g.mobs {
 		if mob.Alive {
-			mobs = append(mobs, mob.ToState())
+			g.bcastMobs = append(g.bcastMobs, mob.ToState())
 		}
 	}
-	asteroids := make([]AsteroidState, 0, len(g.asteroids))
+	g.bcastAsteroids = g.bcastAsteroids[:0]
 	for _, ast := range g.asteroids {
 		if ast.Alive {
-			asteroids = append(asteroids, ast.ToState())
+			g.bcastAsteroids = append(g.bcastAsteroids, ast.ToState())
 		}
 	}
-	pickups := make([]PickupState, 0, len(g.pickups))
+	g.bcastPickups = g.bcastPickups[:0]
 	for _, pk := range g.pickups {
 		if pk.Alive {
-			pickups = append(pickups, pk.ToState())
+			g.bcastPickups = append(g.bcastPickups, pk.ToState())
 		}
 	}
 
 	// Pre-convert all projectiles to state once
-	type projWithPos struct {
-		state ProjectileState
-		x, y  float64
-	}
-	allProjsWithPos := make([]projWithPos, 0, len(g.projectiles))
+	g.bcastProjs = g.bcastProjs[:0]
 	for _, proj := range g.projectiles {
 		ps := proj.ToState()
-		allProjsWithPos = append(allProjsWithPos, projWithPos{state: ps, x: proj.X, y: proj.Y})
+		g.bcastProjs = append(g.bcastProjs, projWithPos{state: ps, x: proj.X, y: proj.Y})
 	}
 
 	// Viewport culling radius (half-viewport + margin)
@@ -423,43 +439,36 @@ func (g *Game) broadcastState() {
 			continue
 		}
 
-		// Filter projectiles near this player
-		filtered := make([]ProjectileState, 0, len(allProjsWithPos))
+		// Filter projectiles near this player (reuse slice)
+		g.bcastFiltered = g.bcastFiltered[:0]
 		px, py := player.X, player.Y
-		for _, p := range allProjsWithPos {
+		for _, p := range g.bcastProjs {
 			dx := p.x - px
 			dy := p.y - py
 			if dx < 0 { dx = -dx }
 			if dy < 0 { dy = -dy }
 			if dx <= cullDist && dy <= cullDist {
-				filtered = append(filtered, p.state)
+				g.bcastFiltered = append(g.bcastFiltered, p.state)
 			}
 		}
 
 		state := GameState{
-			Players:     players,
-			Projectiles: filtered,
-			Mobs:        mobs,
-			Asteroids:   asteroids,
-			Pickups:     pickups,
+			Players:     g.bcastPlayers,
+			Projectiles: g.bcastFiltered,
+			Mobs:        g.bcastMobs,
+			Asteroids:   g.bcastAsteroids,
+			Pickups:     g.bcastPickups,
 			Tick:        g.tick,
 		}
 
+		// Must marshal before reusing bcastFiltered for the next player
 		data, err := json.Marshal(Envelope{T: MsgState, Data: state})
 		if err != nil {
 			continue
 		}
 		playerData[playerID] = data
 
-		if c, ok := client.(*Client); ok {
-			func() {
-				defer func() { recover() }()
-				select {
-				case c.send <- data:
-				default:
-				}
-			}()
-		}
+		client.SendRaw(data)
 	}
 
 	// Send to controllers using same data as their linked player
@@ -467,16 +476,16 @@ func (g *Game) broadcastState() {
 		data, ok := playerData[playerID]
 		if !ok {
 			// Fallback: send with all projectiles
-			allProjs := make([]ProjectileState, 0, len(allProjsWithPos))
-			for _, p := range allProjsWithPos {
-				allProjs = append(allProjs, p.state)
+			g.bcastFiltered = g.bcastFiltered[:0]
+			for _, p := range g.bcastProjs {
+				g.bcastFiltered = append(g.bcastFiltered, p.state)
 			}
 			state := GameState{
-				Players:     players,
-				Projectiles: allProjs,
-				Mobs:        mobs,
-				Asteroids:   asteroids,
-				Pickups:     pickups,
+				Players:     g.bcastPlayers,
+				Projectiles: g.bcastFiltered,
+				Mobs:        g.bcastMobs,
+				Asteroids:   g.bcastAsteroids,
+				Pickups:     g.bcastPickups,
 				Tick:        g.tick,
 			}
 			var err error
@@ -485,15 +494,7 @@ func (g *Game) broadcastState() {
 				continue
 			}
 		}
-		if c, ok := client.(*Client); ok {
-			func() {
-				defer func() { recover() }()
-				select {
-				case c.send <- data:
-				default:
-				}
-			}()
-		}
+		client.SendRaw(data)
 	}
 }
 
