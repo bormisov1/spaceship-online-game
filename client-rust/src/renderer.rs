@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use wasm_bindgen::JsCast;
 use web_sys::CanvasRenderingContext2d;
 use crate::state::SharedState;
@@ -144,63 +143,50 @@ pub fn render(state: &SharedState, dt: f64) {
         projectiles::render_projectiles(&ctx, &s.projectiles, &s.players, offset_x, offset_y, vw, vh);
     }
 
-    // Players (with interpolation)
+    // Players (with interpolation — render inline to avoid per-frame Vec/String allocations)
     {
-        let (my_id, my_boosting) = {
-            let s = state.borrow();
-            (s.my_id.clone(), s.boosting)
-        };
+        let s = state.borrow();
+        let my_id = s.my_id.as_deref();
+        let my_boosting = s.boosting;
 
-        // Collect player data with interpolated positions
-        let player_data: Vec<(String, f64, f64, f64, f64, f64, i32, i32, i32, String)> = {
-            let s = state.borrow();
-            s.players.iter()
-                .filter(|(_, p)| p.a)
-                .map(|(id, p)| {
-                    // Interpolate from prev position if available
-                    if let Some(prev) = s.prev_players.get(id) {
-                        let ix = prev.x + (p.x - prev.x) * interp_t;
-                        let iy = prev.y + (p.y - prev.y) * interp_t;
-                        let ir = lerp_angle(prev.r, p.r, interp_t);
-                        (id.clone(), ix, iy, ir, p.vx, p.vy, p.s, p.hp, p.mhp, p.n.clone())
-                    } else {
-                        // New entity — render at current position
-                        (id.clone(), p.x, p.y, p.r, p.vx, p.vy, p.s, p.hp, p.mhp, p.n.clone())
-                    }
-                })
-                .collect()
-        };
+        for (id, p) in &s.players {
+            if !p.a { continue; }
+            let (px, py, pr) = if let Some(prev) = s.prev_players.get(id) {
+                (prev.x + (p.x - prev.x) * interp_t,
+                 prev.y + (p.y - prev.y) * interp_t,
+                 lerp_angle(prev.r, p.r, interp_t))
+            } else {
+                (p.x, p.y, p.r)
+            };
 
-        for (ref id, px, py, pr, pvx, pvy, ps, php, pmhp, ref pn) in &player_data {
             let sx = px - offset_x;
             let sy = py - offset_y;
             if sx < -60.0 || sx > vw + 60.0 || sy < -60.0 || sy > vh + 60.0 { continue; }
 
-            let is_me = my_id.as_deref() == Some(id.as_str());
-            let speed = (pvx * pvx + pvy * pvy).sqrt();
+            let is_me = my_id == Some(id.as_str());
+            let speed = (p.vx * p.vx + p.vy * p.vy).sqrt();
             let boosting = is_me && my_boosting;
 
-            effects::draw_engine_beam(&ctx, sx, sy, *pr, speed, *ps, boosting);
-            ships::draw_ship(&ctx, sx, sy, *pr, *ps);
-            hud::draw_player_health_bar(&ctx, sx, sy, *php, *pmhp, pn, is_me);
+            effects::draw_engine_beam(&ctx, sx, sy, pr, speed, p.s, boosting);
+            ships::draw_ship(&ctx, sx, sy, pr, p.s);
+            hud::draw_player_health_bar(&ctx, sx, sy, p.hp, p.mhp, &p.n, is_me);
         }
     }
 
-    // Mobs (with interpolation)
+    // Mobs (with interpolation — render inline to avoid per-frame HashMap allocation)
     {
         let s = state.borrow();
-        let interp_mobs: HashMap<String, crate::protocol::MobState> = s.mobs.iter().map(|(id, m)| {
-            if let Some(prev) = s.prev_mobs.get(id) {
-                let mut im = m.clone();
-                im.x = prev.x + (m.x - prev.x) * interp_t;
-                im.y = prev.y + (m.y - prev.y) * interp_t;
-                im.r = lerp_angle(prev.r, m.r, interp_t);
-                (id.clone(), im)
+        for (id, mob) in &s.mobs {
+            if !mob.a { continue; }
+            let (mx, my, mr) = if let Some(prev) = s.prev_mobs.get(id) {
+                (prev.x + (mob.x - prev.x) * interp_t,
+                 prev.y + (mob.y - prev.y) * interp_t,
+                 lerp_angle(prev.r, mob.r, interp_t))
             } else {
-                (id.clone(), m.clone())
-            }
-        }).collect();
-        mobs::render_mobs(&ctx, &interp_mobs, offset_x, offset_y, vw, vh);
+                (mob.x, mob.y, mob.r)
+            };
+            mobs::render_mob(&ctx, mx, my, mr, mob.vx, mob.vy, mob.hp, mob.mhp, offset_x, offset_y, vw, vh);
+        }
     }
 
     // Particles & Explosions
