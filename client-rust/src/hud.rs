@@ -1,6 +1,34 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use web_sys::CanvasRenderingContext2d;
 use crate::state::{SharedState, Phase};
 use crate::constants::{SHIP_COLORS, WORLD_W, WORLD_H};
+
+thread_local! {
+    static TEXT_WIDTH_CACHE: RefCell<HashMap<String, f64>> = RefCell::new(HashMap::new());
+    static CACHED_FONT_SIZE: RefCell<i32> = RefCell::new(0);
+}
+
+fn cached_measure_text(ctx: &CanvasRenderingContext2d, text: &str, font_size: i32) -> f64 {
+    // Invalidate cache when font size changes
+    CACHED_FONT_SIZE.with(|fs| {
+        let mut fs = fs.borrow_mut();
+        if *fs != font_size {
+            TEXT_WIDTH_CACHE.with(|c| c.borrow_mut().clear());
+            *fs = font_size;
+        }
+    });
+
+    TEXT_WIDTH_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(&width) = cache.get(text) {
+            return width;
+        }
+        let width = ctx.measure_text(text).map(|m| m.width()).unwrap_or(0.0);
+        cache.insert(text.to_string(), width);
+        width
+    })
+}
 
 pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
     let s = state.borrow();
@@ -154,10 +182,10 @@ fn draw_kill_feed(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, s
         let alpha = if age > 6.0 { (8.0 - age) / 2.0 } else { 1.0 };
         ctx.set_global_alpha(alpha);
 
-        // Measure text segments right-to-left
-        let victim_w = ctx.measure_text(&kill.victim).map(|m| m.width()).unwrap_or(0.0);
+        // Measure text segments right-to-left (cached)
+        let victim_w = cached_measure_text(ctx, &kill.victim, font_size);
         let killed_text = " killed ";
-        let killed_w = ctx.measure_text(killed_text).map(|m| m.width()).unwrap_or(0.0);
+        let killed_w = cached_measure_text(ctx, killed_text, font_size);
 
         // Draw killer name (orange)
         ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffaa00"));
