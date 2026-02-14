@@ -82,6 +82,13 @@ pub fn setup_input(state: SharedState, _net: SharedNetwork) {
                 let mut s = state_kd.borrow_mut();
                 s.boosting = true;
                 s.shift_pressed = true;
+                // Lock rotation at moment shift is pressed
+                if s.hyperspace_locked_r.is_none() {
+                    let locked_r = s.my_id.as_ref()
+                        .and_then(|id| s.players.get(id))
+                        .map(|p| p.r);
+                    s.hyperspace_locked_r = locked_r;
+                }
             }
             "d" | "D" => {
                 let mut s = state_kd.borrow_mut();
@@ -102,6 +109,7 @@ pub fn setup_input(state: SharedState, _net: SharedNetwork) {
                 let mut s = state_ku.borrow_mut();
                 s.boosting = false;
                 s.shift_pressed = false;
+                s.hyperspace_locked_r = None;
             }
             _ => {}
         }
@@ -154,6 +162,12 @@ fn setup_touch_input(state: SharedState, canvas: &web_sys::Element) {
                     let mut s = state_ts.borrow_mut();
                     s.boosting = true;
                     s.shift_pressed = true;
+                    if s.hyperspace_locked_r.is_none() {
+                        let locked_r = s.my_id.as_ref()
+                            .and_then(|id| s.players.get(id))
+                            .map(|p| p.r);
+                        s.hyperspace_locked_r = locked_r;
+                    }
                     continue;
                 }
 
@@ -227,6 +241,7 @@ fn setup_touch_input(state: SharedState, canvas: &web_sys::Element) {
                 if bdx * bdx + bdy * bdy <= hud::BOOST_BTN_RADIUS * hud::BOOST_BTN_RADIUS * 2.0 {
                     s.boosting = false;
                     s.shift_pressed = false;
+                    s.hyperspace_locked_r = None;
                     continue;
                 }
 

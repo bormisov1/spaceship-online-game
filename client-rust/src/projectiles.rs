@@ -59,7 +59,7 @@ pub fn render_projectiles(
 
         // Glow sprite (ambient light around bolt)
         let sprite = get_glow_sprite(color);
-        let glow_size = 30.0;
+        let glow_size = 15.0;
         ctx.save();
         ctx.set_global_alpha(0.8);
         let _ = ctx.draw_image_with_html_canvas_element_and_dw_and_dh(

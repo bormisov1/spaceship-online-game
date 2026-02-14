@@ -83,7 +83,14 @@ pub fn render(state: &SharedState, dt: f64) {
     }
 
     // Starfield on bg canvas
-    starfield::render_starfield(&bg_ctx, cam_x, cam_y, screen_w, screen_h, hyperspace_t);
+    let player_rotation = {
+        let s = state.borrow();
+        s.my_id.as_ref()
+            .and_then(|id| s.players.get(id))
+            .map(|p| p.r)
+            .unwrap_or(0.0)
+    };
+    starfield::render_starfield(&bg_ctx, cam_x, cam_y, screen_w, screen_h, hyperspace_t, player_rotation);
 
     // Clear game canvas
     ctx.clear_rect(0.0, 0.0, screen_w, screen_h);

@@ -120,7 +120,7 @@ pub fn init_starfield(state: &SharedState) {
     }
 }
 
-pub fn render_starfield(ctx: &CanvasRenderingContext2d, cx: f64, cy: f64, w: f64, h: f64, hyperspace_t: f64) {
+pub fn render_starfield(ctx: &CanvasRenderingContext2d, cx: f64, cy: f64, w: f64, h: f64, hyperspace_t: f64, player_rotation: f64) {
     let cached_w = CACHED_W.with(|cw| *cw.borrow());
     let cached_h = CACHED_H.with(|ch| *ch.borrow());
 
@@ -156,9 +156,10 @@ pub fn render_starfield(ctx: &CanvasRenderingContext2d, cx: f64, cy: f64, w: f64
             }
         });
     } else {
-        // Hyperspace mode: render stars individually as streaking lines
-        let screen_cx = w / 2.0;
-        let screen_cy = h / 2.0;
+        // Hyperspace mode: parallel streaks opposite to ship heading, max 5px
+        // Streak direction = opposite of where the ship is flying (trail behind)
+        let trail_nx = -(player_rotation.cos());
+        let trail_ny = -(player_rotation.sin());
 
         STAR_DATA.with(|sd| {
             let stars = sd.borrow();
@@ -167,24 +168,16 @@ pub fn render_starfield(ctx: &CanvasRenderingContext2d, cx: f64, cy: f64, w: f64
                 let ox = ((cx * factor) % w + w) % w;
                 let oy = ((cy * factor) % h + h) % h;
 
-                // Wrap star position into visible area
                 let sx = ((star.x - ox) % w + w) % w;
                 let sy = ((star.y - oy) % h + h) % h;
 
-                // Direction from screen center (radial streaks)
-                let dx = sx - screen_cx;
-                let dy = sy - screen_cy;
-                let dist = (dx * dx + dy * dy).sqrt().max(1.0);
-                let nx = dx / dist;
-                let ny = dy / dist;
+                // All streaks parallel, 5px max length
+                let streak = hyperspace_t * 12.5;
+                let x2 = sx + trail_nx * streak;
+                let y2 = sy + trail_ny * streak;
 
-                // Streak length grows with distance from center and hyperspace_t
-                let streak = hyperspace_t * (10.0 + dist * 0.4) * (1.0 + star.layer as f64 * 0.5);
-                let x2 = sx - nx * streak;
-                let y2 = sy - ny * streak;
-
-                let alpha = star.alpha * (1.0 + hyperspace_t * 0.5);
-                let width = star.size * (0.5 + hyperspace_t * 0.5);
+                let alpha = star.alpha * (1.0 + hyperspace_t * 0.3);
+                let width = star.size;
 
                 ctx.set_global_alpha(alpha.min(1.0));
                 ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str(
@@ -196,8 +189,8 @@ pub fn render_starfield(ctx: &CanvasRenderingContext2d, cx: f64, cy: f64, w: f64
                 ctx.line_to(x2, y2);
                 ctx.stroke();
 
-                // Also draw a small dot at the leading edge
-                let dot_size = star.size * (1.0 - hyperspace_t * 0.5).max(0.2);
+                // Dot at leading edge
+                let dot_size = star.size * (1.0 - hyperspace_t * 0.3).max(0.3);
                 ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(
                     &format!("rgb({},{},{})", star.r, star.g, star.b),
                 ));

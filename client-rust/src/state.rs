@@ -103,6 +103,7 @@ pub struct GameState {
     pub boosting: bool,
     pub shift_pressed: bool,
     pub hyperspace_t: f64, // 0.0 = normal stars, 1.0 = full hyperspace
+    pub hyperspace_locked_r: Option<f64>, // rotation locked when shift pressed
 
     // UI state
     pub phase: Phase,
@@ -163,6 +164,7 @@ impl GameState {
             boosting: false,
             shift_pressed: false,
             hyperspace_t: 0.0,
+            hyperspace_locked_r: None,
 
             phase: Phase::Lobby,
             kill_feed: Vec::new(),

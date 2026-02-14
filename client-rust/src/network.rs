@@ -184,12 +184,14 @@ impl Network {
 
         let thresh = s.screen_w.min(s.screen_h) / (8.0 * zoom);
 
-        // During hyperspace (shift), lock steering to current heading
+        // During hyperspace (shift), lock steering to rotation captured at shift press
         if s.shift_pressed {
-            if let Some(my_id) = &s.my_id {
-                if let Some(me) = s.players.get(my_id) {
-                    mx = me.x + me.r.cos() * 1000.0;
-                    my = me.y + me.r.sin() * 1000.0;
+            if let Some(locked_r) = s.hyperspace_locked_r {
+                if let Some(my_id) = &s.my_id {
+                    if let Some(me) = s.players.get(my_id) {
+                        mx = me.x + locked_r.cos() * 1000.0;
+                        my = me.y + locked_r.sin() * 1000.0;
+                    }
                 }
             }
         }
