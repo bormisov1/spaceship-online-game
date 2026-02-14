@@ -9,12 +9,19 @@ import (
 type mockBroadcaster struct {
 	mu       sync.Mutex
 	messages []interface{}
+	rawMsgs  [][]byte
 }
 
 func (m *mockBroadcaster) SendJSON(msg interface{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.messages = append(m.messages, msg)
+}
+
+func (m *mockBroadcaster) SendRaw(data []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.rawMsgs = append(m.rawMsgs, data)
 }
 
 func TestGameAddRemovePlayer(t *testing.T) {

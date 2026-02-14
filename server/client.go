@@ -118,6 +118,11 @@ func (c *Client) SendJSON(msg interface{}) {
 		log.Printf("marshal error: %v", err)
 		return
 	}
+	c.SendRaw(data)
+}
+
+// SendRaw sends pre-marshaled bytes to the client
+func (c *Client) SendRaw(data []byte) {
 	defer func() { recover() }()
 	select {
 	case c.send <- data:

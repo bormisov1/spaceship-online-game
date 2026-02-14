@@ -29,6 +29,7 @@ const (
 // Broadcaster interface for sending messages to clients
 type Broadcaster interface {
 	SendJSON(msg interface{})
+	SendRaw(data []byte)
 }
 
 // Game holds the state for one game session
@@ -498,11 +499,15 @@ func (g *Game) broadcastState() {
 
 // broadcastMsg sends a message to all clients and controllers in the session
 func (g *Game) broadcastMsg(msg Envelope) {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
 	for _, client := range g.clients {
-		client.SendJSON(msg)
+		client.SendRaw(data)
 	}
 	for _, client := range g.controllers {
-		client.SendJSON(msg)
+		client.SendRaw(data)
 	}
 }
 
