@@ -151,8 +151,12 @@ pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotati
     if speed < 15.0 { return; }
 
     let intensity = ((speed - 15.0) / 200.0).min(1.0); // 0..1 based on speed
-    let beam_len = 18.0 + intensity * 22.0; // 18-40px long
-    let beam_width = 3.0 + intensity * 3.0; // 3-6px wide at base
+    // Flicker: random jitter each frame for realistic thruster effect
+    let flicker = 0.85 + js_sys::Math::random() * 0.3; // 0.85-1.15
+    let len_flicker = 0.9 + js_sys::Math::random() * 0.2; // 0.9-1.1
+    let beam_len = (18.0 + intensity * 22.0) * len_flicker;
+    let beam_width = (3.0 + intensity * 3.0) * (0.9 + js_sys::Math::random() * 0.2);
+    let intensity = intensity * flicker;
 
     // Beam points backward from ship
     let bx = -rotation.cos();
