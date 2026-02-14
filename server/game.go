@@ -372,56 +372,126 @@ func (g *Game) checkPlayerCollisions() {
 	}
 }
 
-// broadcastState sends the current game state to all clients
+// broadcastState sends the current game state to all clients with per-client projectile culling
 func (g *Game) broadcastState() {
-	state := GameState{
-		Players:     make([]PlayerState, 0, len(g.players)),
-		Projectiles: make([]ProjectileState, 0, len(g.projectiles)),
-		Mobs:        make([]MobState, 0, len(g.mobs)),
-		Asteroids:   make([]AsteroidState, 0, len(g.asteroids)),
-		Pickups:     make([]PickupState, 0, len(g.pickups)),
-		Tick:        g.tick,
-	}
-
+	// Pre-build common state (shared across all clients)
+	players := make([]PlayerState, 0, len(g.players))
 	for _, p := range g.players {
-		state.Players = append(state.Players, p.ToState())
+		players = append(players, p.ToState())
 	}
-	for _, proj := range g.projectiles {
-		state.Projectiles = append(state.Projectiles, proj.ToState())
-	}
+	mobs := make([]MobState, 0, len(g.mobs))
 	for _, mob := range g.mobs {
 		if mob.Alive {
-			state.Mobs = append(state.Mobs, mob.ToState())
+			mobs = append(mobs, mob.ToState())
 		}
 	}
+	asteroids := make([]AsteroidState, 0, len(g.asteroids))
 	for _, ast := range g.asteroids {
 		if ast.Alive {
-			state.Asteroids = append(state.Asteroids, ast.ToState())
+			asteroids = append(asteroids, ast.ToState())
 		}
 	}
+	pickups := make([]PickupState, 0, len(g.pickups))
 	for _, pk := range g.pickups {
 		if pk.Alive {
-			state.Pickups = append(state.Pickups, pk.ToState())
+			pickups = append(pickups, pk.ToState())
 		}
 	}
 
-	data, err := json.Marshal(Envelope{T: MsgState, Data: state})
-	if err != nil {
-		return
+	// Pre-convert all projectiles to state once
+	type projWithPos struct {
+		state ProjectileState
+		x, y  float64
+	}
+	allProjsWithPos := make([]projWithPos, 0, len(g.projectiles))
+	for _, proj := range g.projectiles {
+		ps := proj.ToState()
+		allProjsWithPos = append(allProjsWithPos, projWithPos{state: ps, x: proj.X, y: proj.Y})
 	}
 
-	// Send to main clients and controllers
-	for _, m := range []map[string]Broadcaster{g.clients, g.controllers} {
-		for _, client := range m {
-			if c, ok := client.(*Client); ok {
-				func() {
-					defer func() { recover() }()
-					select {
-					case c.send <- data:
-					default:
-					}
-				}()
+	// Viewport culling radius (half-viewport + margin)
+	const cullDist = 1200.0
+
+	// Per-client: filter projectiles by distance from player, marshal, send
+	// Cache marshaled data per player to reuse for controllers
+	playerData := make(map[string][]byte, len(g.clients))
+
+	for playerID, client := range g.clients {
+		player, ok := g.players[playerID]
+		if !ok {
+			continue
+		}
+
+		// Filter projectiles near this player
+		filtered := make([]ProjectileState, 0, len(allProjsWithPos))
+		px, py := player.X, player.Y
+		for _, p := range allProjsWithPos {
+			dx := p.x - px
+			dy := p.y - py
+			if dx < 0 { dx = -dx }
+			if dy < 0 { dy = -dy }
+			if dx <= cullDist && dy <= cullDist {
+				filtered = append(filtered, p.state)
 			}
+		}
+
+		state := GameState{
+			Players:     players,
+			Projectiles: filtered,
+			Mobs:        mobs,
+			Asteroids:   asteroids,
+			Pickups:     pickups,
+			Tick:        g.tick,
+		}
+
+		data, err := json.Marshal(Envelope{T: MsgState, Data: state})
+		if err != nil {
+			continue
+		}
+		playerData[playerID] = data
+
+		if c, ok := client.(*Client); ok {
+			func() {
+				defer func() { recover() }()
+				select {
+				case c.send <- data:
+				default:
+				}
+			}()
+		}
+	}
+
+	// Send to controllers using same data as their linked player
+	for playerID, client := range g.controllers {
+		data, ok := playerData[playerID]
+		if !ok {
+			// Fallback: send with all projectiles
+			allProjs := make([]ProjectileState, 0, len(allProjsWithPos))
+			for _, p := range allProjsWithPos {
+				allProjs = append(allProjs, p.state)
+			}
+			state := GameState{
+				Players:     players,
+				Projectiles: allProjs,
+				Mobs:        mobs,
+				Asteroids:   asteroids,
+				Pickups:     pickups,
+				Tick:        g.tick,
+			}
+			var err error
+			data, err = json.Marshal(Envelope{T: MsgState, Data: state})
+			if err != nil {
+				continue
+			}
+		}
+		if c, ok := client.(*Client); ok {
+			func() {
+				defer func() { recover() }()
+				select {
+				case c.send <- data:
+				default:
+				}
+			}()
 		}
 	}
 }

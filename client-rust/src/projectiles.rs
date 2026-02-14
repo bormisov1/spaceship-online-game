@@ -7,6 +7,7 @@ use crate::protocol::ProjectileState;
 
 thread_local! {
     static GLOW_SPRITES: RefCell<HashMap<String, HtmlCanvasElement>> = RefCell::new(HashMap::new());
+    static BOLT_SPRITES: RefCell<HashMap<String, HtmlCanvasElement>> = RefCell::new(HashMap::new());
 }
 
 fn get_glow_sprite(color: &str) -> HtmlCanvasElement {
@@ -41,6 +42,58 @@ fn get_glow_sprite(color: &str) -> HtmlCanvasElement {
     })
 }
 
+fn get_bolt_sprite(color: &str) -> HtmlCanvasElement {
+    BOLT_SPRITES.with(|bs| {
+        let mut sprites = bs.borrow_mut();
+        if let Some(canvas) = sprites.get(color) {
+            return canvas.clone();
+        }
+
+        let document = web_sys::window().unwrap().document().unwrap();
+        let canvas: HtmlCanvasElement = document.create_element("canvas").unwrap().unchecked_into();
+        let w = 40u32;
+        let h = 10u32;
+        canvas.set_width(w);
+        canvas.set_height(h);
+        let ctx: CanvasRenderingContext2d = canvas
+            .get_context("2d").unwrap().unwrap().unchecked_into();
+
+        let cx = w as f64 / 2.0;
+        let cy = h as f64 / 2.0;
+
+        // Outer colored glow
+        ctx.set_global_alpha(0.3);
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(color));
+        ctx.begin_path();
+        let _ = ctx.ellipse(cx, cy, 18.0, 3.5, 0.0, 0.0, std::f64::consts::PI * 2.0);
+        ctx.fill();
+
+        // Mid body glow
+        ctx.set_global_alpha(0.6);
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(color));
+        ctx.begin_path();
+        let _ = ctx.ellipse(cx, cy, 15.0, 2.2, 0.0, 0.0, std::f64::consts::PI * 2.0);
+        ctx.fill();
+
+        // Bright white core
+        ctx.set_global_alpha(0.95);
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        ctx.begin_path();
+        let _ = ctx.ellipse(cx, cy, 12.0, 1.4, 0.0, 0.0, std::f64::consts::PI * 2.0);
+        ctx.fill();
+
+        // Front tip highlight
+        ctx.set_global_alpha(1.0);
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        ctx.begin_path();
+        let _ = ctx.arc(cx + 10.0, cy, 1.8, 0.0, std::f64::consts::PI * 2.0);
+        ctx.fill();
+
+        sprites.insert(color.to_string(), canvas.clone());
+        canvas
+    })
+}
+
 pub fn render_projectiles(
     ctx: &CanvasRenderingContext2d,
     projectiles: &HashMap<String, ProjectileState>,
@@ -67,39 +120,14 @@ pub fn render_projectiles(
         );
         ctx.restore();
 
-        // Star Wars laser bolt: long thin glowing rod
+        // Star Wars laser bolt: pre-rendered sprite
+        let bolt = get_bolt_sprite(color);
         ctx.save();
         ctx.translate(sx, sy).unwrap_or(());
         ctx.rotate(proj.r).unwrap_or(());
-
-        // Outer colored glow (widest, most transparent)
-        ctx.set_global_alpha(0.3);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(color));
-        ctx.begin_path();
-        let _ = ctx.ellipse(0.0, 0.0, 18.0, 3.5, 0.0, 0.0, std::f64::consts::PI * 2.0);
-        ctx.fill();
-
-        // Mid body glow
-        ctx.set_global_alpha(0.6);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(color));
-        ctx.begin_path();
-        let _ = ctx.ellipse(0.0, 0.0, 15.0, 2.2, 0.0, 0.0, std::f64::consts::PI * 2.0);
-        ctx.fill();
-
-        // Bright white core (thinnest, brightest)
-        ctx.set_global_alpha(0.95);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
-        ctx.begin_path();
-        let _ = ctx.ellipse(0.0, 0.0, 12.0, 1.4, 0.0, 0.0, std::f64::consts::PI * 2.0);
-        ctx.fill();
-
-        // Front tip highlight
-        ctx.set_global_alpha(1.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
-        ctx.begin_path();
-        let _ = ctx.arc(10.0, 0.0, 1.8, 0.0, std::f64::consts::PI * 2.0);
-        ctx.fill();
-
+        let _ = ctx.draw_image_with_html_canvas_element_and_dw_and_dh(
+            &bolt, -20.0, -5.0, 40.0, 10.0,
+        );
         ctx.restore();
     }
 }

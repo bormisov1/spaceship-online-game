@@ -1,8 +1,105 @@
-use web_sys::CanvasRenderingContext2d;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use wasm_bindgen::JsCast;
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
 use crate::state::{Particle, ParticleKind, Explosion};
 use crate::constants::SHIP_COLORS;
 
 const MAX_PARTICLES: usize = 200;
+
+thread_local! {
+    static PARTICLE_GLOWS: RefCell<HashMap<String, HtmlCanvasElement>> = RefCell::new(HashMap::new());
+    static FLASH_SPRITE: RefCell<Option<HtmlCanvasElement>> = RefCell::new(None);
+    static FILL_SPRITE: RefCell<Option<HtmlCanvasElement>> = RefCell::new(None);
+}
+
+fn get_particle_glow(color: &str) -> HtmlCanvasElement {
+    PARTICLE_GLOWS.with(|pg| {
+        let mut sprites = pg.borrow_mut();
+        if let Some(canvas) = sprites.get(color) {
+            return canvas.clone();
+        }
+
+        let document = web_sys::window().unwrap().document().unwrap();
+        let canvas: HtmlCanvasElement = document.create_element("canvas").unwrap().unchecked_into();
+        let size = 32u32;
+        canvas.set_width(size);
+        canvas.set_height(size);
+        let ctx: CanvasRenderingContext2d = canvas
+            .get_context("2d").unwrap().unwrap().unchecked_into();
+
+        let c = size as f64 / 2.0;
+        if let Ok(gradient) = ctx.create_radial_gradient(c, c, 0.0, c, c, c) {
+            let _ = gradient.add_color_stop(0.0_f32, color);
+            let inner = format!("{}66", color);
+            let _ = gradient.add_color_stop(0.4_f32, &inner);
+            let _ = gradient.add_color_stop(1.0_f32, "transparent");
+            ctx.set_fill_style(&gradient);
+            ctx.fill_rect(0.0, 0.0, size as f64, size as f64);
+        }
+
+        sprites.insert(color.to_string(), canvas.clone());
+        canvas
+    })
+}
+
+fn get_flash_sprite() -> HtmlCanvasElement {
+    FLASH_SPRITE.with(|fs| {
+        let mut opt = fs.borrow_mut();
+        if let Some(canvas) = opt.as_ref() {
+            return canvas.clone();
+        }
+
+        let document = web_sys::window().unwrap().document().unwrap();
+        let canvas: HtmlCanvasElement = document.create_element("canvas").unwrap().unchecked_into();
+        let size = 64u32;
+        canvas.set_width(size);
+        canvas.set_height(size);
+        let ctx: CanvasRenderingContext2d = canvas
+            .get_context("2d").unwrap().unwrap().unchecked_into();
+
+        let c = size as f64 / 2.0;
+        if let Ok(gradient) = ctx.create_radial_gradient(c, c, 0.0, c, c, c) {
+            let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 255, 220, 0.9)");
+            let _ = gradient.add_color_stop(0.3_f32, "rgba(255, 200, 80, 0.5)");
+            let _ = gradient.add_color_stop(1.0_f32, "transparent");
+            ctx.set_fill_style(&gradient);
+            ctx.fill_rect(0.0, 0.0, size as f64, size as f64);
+        }
+
+        *opt = Some(canvas.clone());
+        canvas
+    })
+}
+
+fn get_fill_sprite() -> HtmlCanvasElement {
+    FILL_SPRITE.with(|fs| {
+        let mut opt = fs.borrow_mut();
+        if let Some(canvas) = opt.as_ref() {
+            return canvas.clone();
+        }
+
+        let document = web_sys::window().unwrap().document().unwrap();
+        let canvas: HtmlCanvasElement = document.create_element("canvas").unwrap().unchecked_into();
+        let size = 64u32;
+        canvas.set_width(size);
+        canvas.set_height(size);
+        let ctx: CanvasRenderingContext2d = canvas
+            .get_context("2d").unwrap().unwrap().unchecked_into();
+
+        let c = size as f64 / 2.0;
+        if let Ok(gradient) = ctx.create_radial_gradient(c, c, 0.0, c, c, c) {
+            let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 150, 50, 0.3)");
+            let _ = gradient.add_color_stop(0.6_f32, "rgba(255, 100, 20, 0.1)");
+            let _ = gradient.add_color_stop(1.0_f32, "transparent");
+            ctx.set_fill_style(&gradient);
+            ctx.fill_rect(0.0, 0.0, size as f64, size as f64);
+        }
+
+        *opt = Some(canvas.clone());
+        canvas
+    })
+}
 
 pub fn add_engine_particles(
     particles: &mut Vec<Particle>,
@@ -41,7 +138,8 @@ pub fn add_explosion(
 ) {
     // Hot core particles - bright white/yellow, fast but short-lived
     let core_colors = ["#ffffff", "#ffffcc", "#ffeeaa"];
-    for _ in 0..8 {
+    for _ in 0..5 {
+        if particles.len() >= MAX_PARTICLES { break; }
         let angle = js_sys::Math::random() * std::f64::consts::PI * 2.0;
         let spd = 40.0 + js_sys::Math::random() * 120.0;
         let life = 0.15 + js_sys::Math::random() * 0.2;
@@ -60,8 +158,9 @@ pub fn add_explosion(
 
     // Fire particles - orange/red, medium speed
     let fire_colors = ["#ff4400", "#ff6600", "#ff8800", "#ffaa00", "#ff2200"];
-    for i in 0..20 {
-        let angle = (std::f64::consts::PI * 2.0 * i as f64) / 20.0
+    for i in 0..12 {
+        if particles.len() >= MAX_PARTICLES { break; }
+        let angle = (std::f64::consts::PI * 2.0 * i as f64) / 12.0
             + (js_sys::Math::random() - 0.5) * 0.8;
         let spd = 80.0 + js_sys::Math::random() * 250.0;
         let life = 0.4 + js_sys::Math::random() * 0.6;
@@ -80,7 +179,8 @@ pub fn add_explosion(
 
     // Smoke/ember particles - dark red/grey, slow, long-lived
     let smoke_colors = ["#882200", "#664422", "#553311", "#aa4400"];
-    for _ in 0..12 {
+    for _ in 0..8 {
+        if particles.len() >= MAX_PARTICLES { break; }
         let angle = js_sys::Math::random() * std::f64::consts::PI * 2.0;
         let spd = 20.0 + js_sys::Math::random() * 80.0;
         let life = 0.8 + js_sys::Math::random() * 1.0;
@@ -197,7 +297,7 @@ pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotati
     ctx.fill();
 
     // Core beam (bright white-blue, narrower)
-    ctx.set_global_alpha(intensity * 0.6);
+    ctx.set_global_alpha(intensity * 0.7);
     ctx.begin_path();
     ctx.move_to(nozzle_x + px * beam_width, nozzle_y + py * beam_width);
     ctx.line_to(nozzle_x - px * beam_width, nozzle_y - py * beam_width);
@@ -211,23 +311,6 @@ pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotati
         _ => "rgba(255, 240, 150, 0.8)",
     };
     ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(core_color));
-    ctx.fill();
-
-    // Inner hot core (white, thinnest)
-    ctx.set_global_alpha(intensity * 0.8);
-    ctx.begin_path();
-    ctx.move_to(nozzle_x + px * beam_width * 0.4, nozzle_y + py * beam_width * 0.4);
-    ctx.line_to(nozzle_x - px * beam_width * 0.4, nozzle_y - py * beam_width * 0.4);
-    ctx.line_to(nozzle_x + bx * beam_len * 0.6, nozzle_y + by * beam_len * 0.6);
-    ctx.close_path();
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.9)"));
-    ctx.fill();
-
-    // Nozzle glow dot
-    ctx.set_global_alpha(intensity * 0.5);
-    ctx.begin_path();
-    let _ = ctx.arc(nozzle_x, nozzle_y, beam_width * 1.2, 0.0, std::f64::consts::PI * 2.0);
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.6)"));
     ctx.fill();
 
     ctx.restore();
@@ -246,18 +329,12 @@ pub fn render_particles(ctx: &CanvasRenderingContext2d, particles: &[Particle], 
             let size = p.size * (1.0 + (1.0 - t) * 1.5);
             let alpha = t * t; // quadratic fade for smoother look
 
-            // Draw soft glow with radial gradient
+            // Draw soft glow with cached sprite
             ctx.set_global_alpha(alpha * 0.9);
-            if let Ok(gradient) = ctx.create_radial_gradient(sx, sy, 0.0, sx, sy, size) {
-                let _ = gradient.add_color_stop(0.0_f32, &p.color);
-                let inner = format!("{}66", &p.color); // semi-transparent
-                let _ = gradient.add_color_stop(0.4_f32, &inner);
-                let _ = gradient.add_color_stop(1.0_f32, "transparent");
-                ctx.set_fill_style(&gradient);
-                ctx.begin_path();
-                let _ = ctx.arc(sx, sy, size, 0.0, std::f64::consts::PI * 2.0);
-                ctx.fill();
-            }
+            let glow = get_particle_glow(&p.color);
+            let _ = ctx.draw_image_with_html_canvas_element_and_dw_and_dh(
+                &glow, sx - size, sy - size, size * 2.0, size * 2.0,
+            );
         } else {
             // Engine particles: simple dots that shrink
             let size = p.size * t;
@@ -287,16 +364,12 @@ pub fn render_explosions(ctx: &CanvasRenderingContext2d, explosions: &[Explosion
         if t > 0.6 {
             let flash_alpha = (t - 0.6) / 0.4; // 1.0 at start, 0.0 at t=0.6
             let flash_r = e.radius * 0.5;
+            let r = flash_r.max(5.0);
             ctx.set_global_alpha(flash_alpha * 0.5);
-            if let Ok(gradient) = ctx.create_radial_gradient(sx, sy, 0.0, sx, sy, flash_r.max(5.0)) {
-                let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 255, 220, 0.9)");
-                let _ = gradient.add_color_stop(0.3_f32, "rgba(255, 200, 80, 0.5)");
-                let _ = gradient.add_color_stop(1.0_f32, "transparent");
-                ctx.set_fill_style(&gradient);
-                ctx.begin_path();
-                let _ = ctx.arc(sx, sy, flash_r.max(5.0), 0.0, std::f64::consts::PI * 2.0);
-                ctx.fill();
-            }
+            let flash = get_flash_sprite();
+            let _ = ctx.draw_image_with_html_canvas_element_and_dw_and_dh(
+                &flash, sx - r, sy - r, r * 2.0, r * 2.0,
+            );
         }
 
         // Shockwave ring with gradient thickness
@@ -313,15 +386,11 @@ pub fn render_explosions(ctx: &CanvasRenderingContext2d, explosions: &[Explosion
         if t > 0.3 {
             let fill_alpha = (t - 0.3) * 0.15;
             ctx.set_global_alpha(fill_alpha);
-            if let Ok(gradient) = ctx.create_radial_gradient(sx, sy, 0.0, sx, sy, e.radius) {
-                let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 150, 50, 0.3)");
-                let _ = gradient.add_color_stop(0.6_f32, "rgba(255, 100, 20, 0.1)");
-                let _ = gradient.add_color_stop(1.0_f32, "transparent");
-                ctx.set_fill_style(&gradient);
-                ctx.begin_path();
-                let _ = ctx.arc(sx, sy, e.radius, 0.0, std::f64::consts::PI * 2.0);
-                ctx.fill();
-            }
+            let fill = get_fill_sprite();
+            let r = e.radius;
+            let _ = ctx.draw_image_with_html_canvas_element_and_dw_and_dh(
+                &fill, sx - r, sy - r, r * 2.0, r * 2.0,
+            );
         }
     }
     ctx.set_global_alpha(1.0);

@@ -40,7 +40,7 @@ func (p *Pickup) Update(dt float64) {
 func (p *Pickup) ToState() PickupState {
 	return PickupState{
 		ID: p.ID,
-		X:  p.X,
-		Y:  p.Y,
+		X:  round1(p.X),
+		Y:  round1(p.Y),
 	}
 }

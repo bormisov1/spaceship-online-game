@@ -77,15 +77,6 @@ pub struct GameState {
     pub pickups: HashMap<String, PickupState>,
     pub tick: u64,
 
-    // Previous state for interpolation
-    pub prev_players: HashMap<String, PlayerState>,
-    pub prev_projectiles: HashMap<String, ProjectileState>,
-    pub prev_mobs: HashMap<String, MobState>,
-    pub prev_asteroids: HashMap<String, AsteroidState>,
-    pub prev_pickups: HashMap<String, PickupState>,
-    pub last_state_time: f64,
-    pub state_interval: f64, // 1000/30
-
     // Screen
     pub screen_w: f64,
     pub screen_h: f64,
@@ -142,14 +133,6 @@ impl GameState {
             asteroids: HashMap::new(),
             pickups: HashMap::new(),
             tick: 0,
-
-            prev_players: HashMap::new(),
-            prev_projectiles: HashMap::new(),
-            prev_mobs: HashMap::new(),
-            prev_asteroids: HashMap::new(),
-            prev_pickups: HashMap::new(),
-            last_state_time: 0.0,
-            state_interval: 1000.0 / 30.0,
 
             screen_w: 0.0,
             screen_h: 0.0,

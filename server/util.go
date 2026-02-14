@@ -52,6 +52,11 @@ func NormalizeAngle(a float64) float64 {
 	return a
 }
 
+// round1 rounds a float64 to 1 decimal place to reduce JSON payload size
+func round1(x float64) float64 {
+	return math.Round(x*10) / 10
+}
+
 // LerpAngle interpolates between two angles taking the short path
 func LerpAngle(from, to, t float64) float64 {
 	diff := NormalizeAngle(to - from)

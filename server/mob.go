@@ -206,11 +206,11 @@ func (m *Mob) TakeDamage(dmg int) bool {
 func (m *Mob) ToState() MobState {
 	return MobState{
 		ID:    m.ID,
-		X:     m.X,
-		Y:     m.Y,
-		R:     m.Rotation,
-		VX:    m.VX,
-		VY:    m.VY,
+		X:     round1(m.X),
+		Y:     round1(m.Y),
+		R:     round1(m.Rotation),
+		VX:    round1(m.VX),
+		VY:    round1(m.VY),
 		HP:    m.HP,
 		MaxHP: m.MaxHP,
 		Alive: m.Alive,

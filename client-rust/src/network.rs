@@ -355,15 +355,6 @@ fn handle_message(
 
 fn handle_state(state: &SharedState, phase_signal: &leptos::prelude::RwSignal<Phase>, gs: GameStateMsg) {
     let mut s = state.borrow_mut();
-    let now = web_sys::window().unwrap().performance().unwrap().now();
-
-    // Store previous state for interpolation
-    s.prev_players = s.players.clone();
-    s.prev_projectiles = s.projectiles.clone();
-    s.prev_mobs = s.mobs.clone();
-    s.prev_asteroids = s.asteroids.clone();
-    s.prev_pickups = s.pickups.clone();
-    s.last_state_time = now;
 
     // Update current state
     s.players.clear();

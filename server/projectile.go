@@ -87,9 +87,9 @@ func (p *Projectile) Update(dt float64) {
 func (p *Projectile) ToState() ProjectileState {
 	return ProjectileState{
 		ID:    p.ID,
-		X:     p.X,
-		Y:     p.Y,
-		R:     p.Rotation,
+		X:     round1(p.X),
+		Y:     round1(p.Y),
+		R:     round1(p.Rotation),
 		Owner: p.OwnerID,
 	}
 }

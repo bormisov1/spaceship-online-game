@@ -101,8 +101,8 @@ func (a *Asteroid) Update(dt float64) {
 func (a *Asteroid) ToState() AsteroidState {
 	return AsteroidState{
 		ID: a.ID,
-		X:  a.X,
-		Y:  a.Y,
-		R:  a.Rotation,
+		X:  round1(a.X),
+		Y:  round1(a.Y),
+		R:  round1(a.Rotation),
 	}
 }
