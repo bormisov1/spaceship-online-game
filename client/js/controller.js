@@ -37,6 +37,7 @@ let firing = false;
 // Boost state
 let boostTouchId = null;
 let boosting = false;
+let boostLockedR = null; // rotation locked at boost start
 
 const BOOST_COLUMN_HALF = 50;
 
@@ -324,6 +325,7 @@ function onTouchStart(e) {
         } else if (cx >= centerLeft && cx <= centerRight && boostTouchId === null) {
             boostTouchId = touch.identifier;
             boosting = true;
+            boostLockedR = playerR; // lock current heading
             const ind = document.getElementById('boostIndicator');
             if (ind) ind.classList.add('active');
         }
@@ -359,6 +361,7 @@ function onTouchEnd(e) {
         if (touch.identifier === boostTouchId) {
             boostTouchId = null;
             boosting = false;
+            boostLockedR = null;
             const ind = document.getElementById('boostIndicator');
             if (ind) ind.classList.remove('active');
         }
@@ -461,6 +464,12 @@ function sendInput() {
         lockTargetId = null;
         mx = playerX;
         my = playerY;
+    }
+
+    // During boost, lock steering to the direction captured at boost start
+    if (boosting && boostLockedR !== null) {
+        mx = playerX + Math.cos(boostLockedR) * 1000;
+        my = playerY + Math.sin(boostLockedR) * 1000;
     }
 
     ws.send(JSON.stringify({
