@@ -17,7 +17,7 @@ pub fn render_mobs(
 
         // Engine beam behind mob
         let speed = (mob.vx * mob.vx + mob.vy * mob.vy).sqrt();
-        effects::draw_engine_beam(ctx, sx, sy, mob.r, speed, 3);
+        effects::draw_engine_beam(ctx, sx, sy, mob.r, speed, 3, false);
 
         // Draw ship type 3 (Destroyer)
         ships::draw_ship(ctx, sx, sy, mob.r, 3);

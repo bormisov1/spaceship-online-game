@@ -146,13 +146,14 @@ pub fn render(state: &SharedState, dt: f64) {
             let sy = py - offset_y;
             if sx < -60.0 || sx > vw + 60.0 || sy < -60.0 || sy > vh + 60.0 { continue; }
 
-            // Engine beam + particles
+            // Engine beam
             let speed = (pvx * pvx + pvy * pvy).sqrt();
-            effects::draw_engine_beam(&ctx, sx, sy, *pr, speed, *ps);
-            {
-                let mut s = state.borrow_mut();
-                effects::add_engine_particles(&mut s.particles, *px, *py, *pr, speed, *ps);
-            }
+            let boosting = {
+                let s = state.borrow();
+                let is_me = s.my_id.as_ref() == Some(id);
+                is_me && s.boosting
+            };
+            effects::draw_engine_beam(&ctx, sx, sy, *pr, speed, *ps, boosting);
 
             ships::draw_ship(&ctx, sx, sy, *pr, *ps);
 

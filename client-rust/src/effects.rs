@@ -146,16 +146,21 @@ pub fn update_particles(particles: &mut Vec<Particle>, explosions: &mut Vec<Expl
     }
 }
 
-/// Draw a glowing engine beam behind a ship (Star Wars style blue thrust)
-pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotation: f64, speed: f64, ship_type: i32) {
-    if speed < 15.0 { return; }
+/// Draw a glowing engine beam behind a ship (Star Wars style thrust)
+pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotation: f64, speed: f64, ship_type: i32, boosting: bool) {
+    if speed < 15.0 && !boosting { return; }
 
-    let intensity = ((speed - 15.0) / 200.0).min(1.0); // 0..1 based on speed
+    let mut intensity = ((speed - 15.0) / 200.0).min(1.0).max(0.0);
+    let boost_mul = if boosting { 2.0 } else { 1.0 };
+    intensity = (intensity * boost_mul).min(1.5);
+
     // Flicker: random jitter each frame for realistic thruster effect
-    let flicker = 0.85 + js_sys::Math::random() * 0.3; // 0.85-1.15
-    let len_flicker = 0.9 + js_sys::Math::random() * 0.2; // 0.9-1.1
-    let beam_len = (18.0 + intensity * 22.0) * len_flicker;
-    let beam_width = (3.0 + intensity * 3.0) * (0.9 + js_sys::Math::random() * 0.2);
+    let flicker = 0.85 + js_sys::Math::random() * 0.3;
+    let len_flicker = 0.9 + js_sys::Math::random() * 0.2;
+    let base_len = if boosting { 30.0 + intensity * 35.0 } else { 18.0 + intensity * 22.0 };
+    let base_width = if boosting { 4.0 + intensity * 4.0 } else { 3.0 + intensity * 3.0 };
+    let beam_len = base_len * len_flicker;
+    let beam_width = base_width * (0.9 + js_sys::Math::random() * 0.2);
     let intensity = intensity * flicker;
 
     // Beam points backward from ship
