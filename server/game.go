@@ -65,12 +65,18 @@ type Game struct {
 	queryBuf []EntityRef
 
 	// Reusable broadcast buffers (reset with [:0] each tick)
-	bcastPlayers   []PlayerState
-	bcastMobs      []MobState
-	bcastAsteroids []AsteroidState
-	bcastPickups   []PickupState
+	bcastPlayers   []playerWithPos
+	bcastMobs      []mobWithPos
+	bcastAsteroids []asteroidWithPos
+	bcastPickups   []pickupWithPos
 	bcastProjs     []projWithPos
-	bcastFiltered  []ProjectileState
+
+	// Per-client filtered entity buffers
+	filtPlayers   []PlayerState
+	filtProjs     []ProjectileState
+	filtMobs      []MobState
+	filtAsteroids []AsteroidState
+	filtPickups   []PickupState
 }
 
 // NewGame creates a new Game
@@ -87,12 +93,16 @@ func NewGame() *Game {
 		mobSpawnCD:      MobSpawnInterval,
 		asteroidSpawnCD: AsteroidSpawnInterval,
 		pickupSpawnCD:   PickupSpawnInterval,
-		bcastPlayers:    make([]PlayerState, 0, maxPlayersPerSession),
-		bcastMobs:       make([]MobState, 0, maxMobsPerSession),
-		bcastAsteroids:  make([]AsteroidState, 0, maxAsteroidsPerSession),
-		bcastPickups:    make([]PickupState, 0, maxPickupsPerSession),
+		bcastPlayers:    make([]playerWithPos, 0, maxPlayersPerSession),
+		bcastMobs:       make([]mobWithPos, 0, maxMobsPerSession),
+		bcastAsteroids:  make([]asteroidWithPos, 0, maxAsteroidsPerSession),
+		bcastPickups:    make([]pickupWithPos, 0, maxPickupsPerSession),
 		bcastProjs:      make([]projWithPos, 0, 64),
-		bcastFiltered:   make([]ProjectileState, 0, 64),
+		filtPlayers:     make([]PlayerState, 0, maxPlayersPerSession),
+		filtProjs:       make([]ProjectileState, 0, 64),
+		filtMobs:        make([]MobState, 0, maxMobsPerSession),
+		filtAsteroids:   make([]AsteroidState, 0, maxAsteroidsPerSession),
+		filtPickups:     make([]PickupState, 0, maxPickupsPerSession),
 	}
 }
 
@@ -453,49 +463,65 @@ func (g *Game) checkPlayerCollisions() {
 	}
 }
 
-// projWithPos holds a converted projectile state with raw position for culling
+// entityWithPos holds a converted entity state with raw position for viewport culling
 type projWithPos struct {
 	state ProjectileState
 	x, y  float64
 }
 
-// broadcastState sends the current game state to all clients with per-client projectile culling
+type playerWithPos struct {
+	state PlayerState
+	x, y  float64
+}
+
+type mobWithPos struct {
+	state MobState
+	x, y  float64
+}
+
+type asteroidWithPos struct {
+	state AsteroidState
+	x, y  float64
+}
+
+type pickupWithPos struct {
+	state PickupState
+	x, y  float64
+}
+
+// broadcastState sends the current game state to all clients with per-client viewport culling
 func (g *Game) broadcastState() {
-	// Reuse slices: reset length to 0 but keep capacity
+	// Pre-convert all entities to state once, keeping raw positions for culling
 	g.bcastPlayers = g.bcastPlayers[:0]
 	for _, p := range g.players {
-		g.bcastPlayers = append(g.bcastPlayers, p.ToState())
+		g.bcastPlayers = append(g.bcastPlayers, playerWithPos{state: p.ToState(), x: p.X, y: p.Y})
 	}
 	g.bcastMobs = g.bcastMobs[:0]
 	for _, mob := range g.mobs {
 		if mob.Alive {
-			g.bcastMobs = append(g.bcastMobs, mob.ToState())
+			g.bcastMobs = append(g.bcastMobs, mobWithPos{state: mob.ToState(), x: mob.X, y: mob.Y})
 		}
 	}
 	g.bcastAsteroids = g.bcastAsteroids[:0]
 	for _, ast := range g.asteroids {
 		if ast.Alive {
-			g.bcastAsteroids = append(g.bcastAsteroids, ast.ToState())
+			g.bcastAsteroids = append(g.bcastAsteroids, asteroidWithPos{state: ast.ToState(), x: ast.X, y: ast.Y})
 		}
 	}
 	g.bcastPickups = g.bcastPickups[:0]
 	for _, pk := range g.pickups {
 		if pk.Alive {
-			g.bcastPickups = append(g.bcastPickups, pk.ToState())
+			g.bcastPickups = append(g.bcastPickups, pickupWithPos{state: pk.ToState(), x: pk.X, y: pk.Y})
 		}
 	}
-
-	// Pre-convert all projectiles to state once
 	g.bcastProjs = g.bcastProjs[:0]
 	for _, proj := range g.projectiles {
-		ps := proj.ToState()
-		g.bcastProjs = append(g.bcastProjs, projWithPos{state: ps, x: proj.X, y: proj.Y})
+		g.bcastProjs = append(g.bcastProjs, projWithPos{state: proj.ToState(), x: proj.X, y: proj.Y})
 	}
 
 	// Viewport culling radius (half-viewport + margin)
 	const cullDist = 1200.0
 
-	// Per-client: filter projectiles by distance from player, marshal, send
 	// Cache marshaled data per player to reuse for controllers
 	playerData := make(map[string][]byte, len(g.clients))
 
@@ -504,61 +530,106 @@ func (g *Game) broadcastState() {
 		if !ok {
 			continue
 		}
-
-		// Filter projectiles near this player (reuse slice)
-		g.bcastFiltered = g.bcastFiltered[:0]
 		px, py := player.X, player.Y
-		for _, p := range g.bcastProjs {
-			dx := p.x - px
-			dy := p.y - py
-			if dx < 0 { dx = -dx }
-			if dy < 0 { dy = -dy }
+
+		// Filter all entity types by viewport distance
+		g.filtPlayers = g.filtPlayers[:0]
+		for _, p := range g.bcastPlayers {
+			dx := p.x - px; if dx < 0 { dx = -dx }
+			dy := p.y - py; if dy < 0 { dy = -dy }
 			if dx <= cullDist && dy <= cullDist {
-				g.bcastFiltered = append(g.bcastFiltered, p.state)
+				g.filtPlayers = append(g.filtPlayers, p.state)
+			}
+		}
+		g.filtProjs = g.filtProjs[:0]
+		for _, p := range g.bcastProjs {
+			dx := p.x - px; if dx < 0 { dx = -dx }
+			dy := p.y - py; if dy < 0 { dy = -dy }
+			if dx <= cullDist && dy <= cullDist {
+				g.filtProjs = append(g.filtProjs, p.state)
+			}
+		}
+		g.filtMobs = g.filtMobs[:0]
+		for _, m := range g.bcastMobs {
+			dx := m.x - px; if dx < 0 { dx = -dx }
+			dy := m.y - py; if dy < 0 { dy = -dy }
+			if dx <= cullDist && dy <= cullDist {
+				g.filtMobs = append(g.filtMobs, m.state)
+			}
+		}
+		g.filtAsteroids = g.filtAsteroids[:0]
+		for _, a := range g.bcastAsteroids {
+			dx := a.x - px; if dx < 0 { dx = -dx }
+			dy := a.y - py; if dy < 0 { dy = -dy }
+			if dx <= cullDist && dy <= cullDist {
+				g.filtAsteroids = append(g.filtAsteroids, a.state)
+			}
+		}
+		g.filtPickups = g.filtPickups[:0]
+		for _, pk := range g.bcastPickups {
+			dx := pk.x - px; if dx < 0 { dx = -dx }
+			dy := pk.y - py; if dy < 0 { dy = -dy }
+			if dx <= cullDist && dy <= cullDist {
+				g.filtPickups = append(g.filtPickups, pk.state)
 			}
 		}
 
 		state := GameState{
-			Players:     g.bcastPlayers,
-			Projectiles: g.bcastFiltered,
-			Mobs:        g.bcastMobs,
-			Asteroids:   g.bcastAsteroids,
-			Pickups:     g.bcastPickups,
+			Players:     g.filtPlayers,
+			Projectiles: g.filtProjs,
+			Mobs:        g.filtMobs,
+			Asteroids:   g.filtAsteroids,
+			Pickups:     g.filtPickups,
 			Tick:        g.tick,
 		}
 
-		// Must marshal before reusing bcastFiltered for the next player
 		data, err := json.Marshal(Envelope{T: MsgState, Data: state})
 		if err != nil {
 			continue
 		}
 		playerData[playerID] = data
-
 		client.SendRaw(data)
 	}
 
 	// Send to controllers using same data as their linked player
+	var fallbackData []byte
 	for playerID, client := range g.controllers {
 		data, ok := playerData[playerID]
 		if !ok {
-			// Fallback: send with all projectiles
-			g.bcastFiltered = g.bcastFiltered[:0]
-			for _, p := range g.bcastProjs {
-				g.bcastFiltered = append(g.bcastFiltered, p.state)
+			// Fallback: send unfiltered state (cached once)
+			if fallbackData == nil {
+				g.filtProjs = g.filtProjs[:0]
+				for _, p := range g.bcastProjs {
+					g.filtProjs = append(g.filtProjs, p.state)
+				}
+				g.filtPlayers = g.filtPlayers[:0]
+				for _, p := range g.bcastPlayers {
+					g.filtPlayers = append(g.filtPlayers, p.state)
+				}
+				g.filtMobs = g.filtMobs[:0]
+				for _, m := range g.bcastMobs {
+					g.filtMobs = append(g.filtMobs, m.state)
+				}
+				g.filtAsteroids = g.filtAsteroids[:0]
+				for _, a := range g.bcastAsteroids {
+					g.filtAsteroids = append(g.filtAsteroids, a.state)
+				}
+				g.filtPickups = g.filtPickups[:0]
+				for _, pk := range g.bcastPickups {
+					g.filtPickups = append(g.filtPickups, pk.state)
+				}
+				st := GameState{
+					Players: g.filtPlayers, Projectiles: g.filtProjs,
+					Mobs: g.filtMobs, Asteroids: g.filtAsteroids,
+					Pickups: g.filtPickups, Tick: g.tick,
+				}
+				var err error
+				fallbackData, err = json.Marshal(Envelope{T: MsgState, Data: st})
+				if err != nil {
+					continue
+				}
 			}
-			state := GameState{
-				Players:     g.bcastPlayers,
-				Projectiles: g.bcastFiltered,
-				Mobs:        g.bcastMobs,
-				Asteroids:   g.bcastAsteroids,
-				Pickups:     g.bcastPickups,
-				Tick:        g.tick,
-			}
-			var err error
-			data, err = json.Marshal(Envelope{T: MsgState, Data: state})
-			if err != nil {
-				continue
-			}
+			data = fallbackData
 		}
 		client.SendRaw(data)
 	}
