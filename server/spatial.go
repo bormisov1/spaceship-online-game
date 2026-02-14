@@ -99,3 +99,30 @@ func (g *SpatialGrid) Query(x, y, radius float64) []EntityRef {
 	}
 	return result
 }
+
+// QueryBuf appends results to buf and returns the extended slice, avoiding per-call allocation
+func (g *SpatialGrid) QueryBuf(x, y, radius float64, buf []EntityRef) []EntityRef {
+	minCX := int((x - radius) / SpatialCellSize)
+	maxCX := int((x + radius) / SpatialCellSize)
+	minCY := int((y - radius) / SpatialCellSize)
+	maxCY := int((y + radius) / SpatialCellSize)
+	if minCX < 0 {
+		minCX = 0
+	}
+	if maxCX >= SpatialCols {
+		maxCX = SpatialCols - 1
+	}
+	if minCY < 0 {
+		minCY = 0
+	}
+	if maxCY >= SpatialRows {
+		maxCY = SpatialRows - 1
+	}
+	for cy := minCY; cy <= maxCY; cy++ {
+		for cx := minCX; cx <= maxCX; cx++ {
+			idx := cy*SpatialCols + cx
+			buf = append(buf, g.cells[idx]...)
+		}
+	}
+	return buf
+}

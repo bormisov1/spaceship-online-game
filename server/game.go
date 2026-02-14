@@ -55,9 +55,14 @@ type Game struct {
 	grid SpatialGrid
 
 	// Flat entity lists for spatial grid indexing (rebuilt each tick)
-	flatPlayers []*Player
-	flatProjs   []*Projectile
-	flatMobs    []*Mob
+	flatPlayers   []*Player
+	flatProjs     []*Projectile
+	flatMobs      []*Mob
+	flatAsteroids []*Asteroid
+	flatPickups   []*Pickup
+
+	// Reusable query buffer for spatial grid lookups
+	queryBuf []EntityRef
 
 	// Reusable broadcast buffers (reset with [:0] each tick)
 	bcastPlayers   []PlayerState
@@ -327,6 +332,23 @@ func (g *Game) buildSpatialGrid() {
 		}
 	}
 
+	g.flatAsteroids = g.flatAsteroids[:0]
+	for _, ast := range g.asteroids {
+		if ast.Alive {
+			idx := len(g.flatAsteroids)
+			g.flatAsteroids = append(g.flatAsteroids, ast)
+			g.grid.InsertCircle(ast.X, ast.Y, AsteroidRadius, EntityRef{Kind: 'a', Idx: idx})
+		}
+	}
+
+	g.flatPickups = g.flatPickups[:0]
+	for _, pk := range g.pickups {
+		if pk.Alive {
+			idx := len(g.flatPickups)
+			g.flatPickups = append(g.flatPickups, pk)
+			g.grid.InsertCircle(pk.X, pk.Y, PickupRadius, EntityRef{Kind: 'k', Idx: idx})
+		}
+	}
 }
 
 // checkCollisions checks projectile-player collisions using spatial grid
@@ -336,7 +358,8 @@ func (g *Game) checkCollisions() {
 		if !proj.Alive {
 			continue
 		}
-		nearby := g.grid.Query(proj.X, proj.Y, queryR)
+		g.queryBuf = g.grid.QueryBuf(proj.X, proj.Y, queryR, g.queryBuf[:0])
+		nearby := g.queryBuf
 		for _, ref := range nearby {
 			if ref.Kind != 'p' {
 				continue
@@ -390,12 +413,7 @@ func (g *Game) checkCollisions() {
 
 // checkPlayerCollisions checks ship-to-ship collisions (both die)
 func (g *Game) checkPlayerCollisions() {
-	players := make([]*Player, 0, len(g.players))
-	for _, p := range g.players {
-		if p.Alive {
-			players = append(players, p)
-		}
-	}
+	players := g.flatPlayers // reuse pre-built alive-player list
 	for i := 0; i < len(players); i++ {
 		for j := i + 1; j < len(players); j++ {
 			a, b := players[i], players[j]
@@ -562,12 +580,14 @@ func (g *Game) broadcastMsg(msg Envelope) {
 
 // checkMobMobCollisions applies soft repulsion between mobs and kills both if relative velocity is high
 func (g *Game) checkMobMobCollisions() {
-	mobs := make([]*Mob, 0, len(g.mobs))
+	// Build a local alive-mob list (can't reuse flatMobs since buildSpatialGrid runs later)
+	mobs := g.flatMobs[:0]
 	for _, m := range g.mobs {
 		if m.Alive {
 			mobs = append(mobs, m)
 		}
 	}
+	g.flatMobs = mobs
 	for i := 0; i < len(mobs); i++ {
 		for j := i + 1; j < len(mobs); j++ {
 			a, b := mobs[i], mobs[j]
@@ -617,7 +637,8 @@ func (g *Game) checkProjectileMobCollisions() {
 		if !proj.Alive {
 			continue
 		}
-		nearby := g.grid.Query(proj.X, proj.Y, queryR)
+		g.queryBuf = g.grid.QueryBuf(proj.X, proj.Y, queryR, g.queryBuf[:0])
+		nearby := g.queryBuf
 		for _, ref := range nearby {
 			if ref.Kind != 'm' {
 				continue
@@ -651,11 +672,17 @@ func (g *Game) checkProjectileMobCollisions() {
 
 // checkAsteroidPlayerCollisions — asteroid kills player on contact
 func (g *Game) checkAsteroidPlayerCollisions() {
-	for _, ast := range g.asteroids {
+	const queryR = AsteroidRadius + PlayerRadius
+	for _, ast := range g.flatAsteroids {
 		if !ast.Alive {
 			continue
 		}
-		for _, p := range g.players {
+		g.queryBuf = g.grid.QueryBuf(ast.X, ast.Y, queryR, g.queryBuf[:0])
+		for _, ref := range g.queryBuf {
+			if ref.Kind != 'p' {
+				continue
+			}
+			p := g.flatPlayers[ref.Idx]
 			if !p.Alive {
 				continue
 			}
@@ -680,11 +707,17 @@ func (g *Game) checkAsteroidPlayerCollisions() {
 
 // checkAsteroidMobCollisions — asteroid instantly kills mob on contact
 func (g *Game) checkAsteroidMobCollisions() {
-	for _, ast := range g.asteroids {
+	const queryR = AsteroidRadius + MobRadius
+	for _, ast := range g.flatAsteroids {
 		if !ast.Alive {
 			continue
 		}
-		for _, mob := range g.mobs {
+		g.queryBuf = g.grid.QueryBuf(ast.X, ast.Y, queryR, g.queryBuf[:0])
+		for _, ref := range g.queryBuf {
+			if ref.Kind != 'm' {
+				continue
+			}
+			mob := g.flatMobs[ref.Idx]
 			if !mob.Alive {
 				continue
 			}
@@ -701,11 +734,17 @@ func (g *Game) checkAsteroidMobCollisions() {
 
 // checkProjectileAsteroidCollisions — projectiles are destroyed by asteroids
 func (g *Game) checkProjectileAsteroidCollisions() {
+	const queryR = ProjectileRadius + AsteroidRadius
 	for _, proj := range g.flatProjs {
 		if !proj.Alive {
 			continue
 		}
-		for _, ast := range g.asteroids {
+		g.queryBuf = g.grid.QueryBuf(proj.X, proj.Y, queryR, g.queryBuf[:0])
+		for _, ref := range g.queryBuf {
+			if ref.Kind != 'a' {
+				continue
+			}
+			ast := g.flatAsteroids[ref.Idx]
 			if !ast.Alive {
 				continue
 			}
@@ -719,11 +758,17 @@ func (g *Game) checkProjectileAsteroidCollisions() {
 
 // checkPlayerPickupCollisions — player picks up health orb
 func (g *Game) checkPlayerPickupCollisions() {
-	for _, pk := range g.pickups {
+	const queryR = PickupRadius + PlayerRadius
+	for _, pk := range g.flatPickups {
 		if !pk.Alive {
 			continue
 		}
-		for _, p := range g.players {
+		g.queryBuf = g.grid.QueryBuf(pk.X, pk.Y, queryR, g.queryBuf[:0])
+		for _, ref := range g.queryBuf {
+			if ref.Kind != 'p' {
+				continue
+			}
+			p := g.flatPlayers[ref.Idx]
 			if !p.Alive {
 				continue
 			}
@@ -741,11 +786,17 @@ func (g *Game) checkPlayerPickupCollisions() {
 
 // checkPlayerMobCollisions — mob dies, player takes damage
 func (g *Game) checkPlayerMobCollisions() {
-	for _, mob := range g.mobs {
+	const queryR = MobRadius + PlayerRadius
+	for _, mob := range g.flatMobs {
 		if !mob.Alive {
 			continue
 		}
-		for _, p := range g.players {
+		g.queryBuf = g.grid.QueryBuf(mob.X, mob.Y, queryR, g.queryBuf[:0])
+		for _, ref := range g.queryBuf {
+			if ref.Kind != 'p' {
+				continue
+			}
+			p := g.flatPlayers[ref.Idx]
 			if !p.Alive {
 				continue
 			}
@@ -775,6 +826,7 @@ func (g *Game) checkPlayerMobCollisions() {
 						}})
 					}
 				}
+				break // mob is dead, no need to check more players
 			}
 		}
 	}
