@@ -162,8 +162,8 @@ impl GameState {
 
             debug_hitboxes: false,
 
-            particles: Vec::new(),
-            explosions: Vec::new(),
+            particles: Vec::with_capacity(200),
+            explosions: Vec::with_capacity(10),
         }
     }
 }

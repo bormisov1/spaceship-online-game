@@ -7,6 +7,33 @@ use crate::constants::SHIP_COLORS;
 
 const MAX_PARTICLES: usize = 200;
 
+// Fast WASM-native xorshift64 RNG (avoids JS interop overhead of Math.random)
+thread_local! {
+    static RNG_STATE: RefCell<u64> = RefCell::new(0);
+}
+
+fn init_rng_if_needed() {
+    RNG_STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        if *state == 0 {
+            // Seed from js_sys::Math::random once
+            let seed = (js_sys::Math::random() * u64::MAX as f64) as u64;
+            *state = if seed == 0 { 1 } else { seed };
+        }
+    });
+}
+
+fn fast_random() -> f64 {
+    RNG_STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        if *state == 0 { *state = 1; }
+        *state ^= *state << 13;
+        *state ^= *state >> 7;
+        *state ^= *state << 17;
+        (*state % 10000) as f64 / 10000.0
+    })
+}
+
 thread_local! {
     static PARTICLE_GLOWS: RefCell<HashMap<String, HtmlCanvasElement>> = RefCell::new(HashMap::new());
     static FLASH_SPRITE: RefCell<Option<HtmlCanvasElement>> = RefCell::new(None);
@@ -106,6 +133,7 @@ pub fn add_engine_particles(
     x: f64, y: f64, rotation: f64, speed: f64, ship_type: i32,
 ) {
     if speed < 20.0 { return; }
+    init_rng_if_needed();
     if particles.len() >= MAX_PARTICLES { return; }
 
     let idx = (ship_type as usize).min(SHIP_COLORS.len() - 1);
@@ -114,17 +142,17 @@ pub fn add_engine_particles(
 
     for _ in 0..count {
         if particles.len() >= MAX_PARTICLES { break; }
-        let angle = rotation + std::f64::consts::PI + (js_sys::Math::random() - 0.5) * 0.6;
-        let spd = speed * 0.3 + js_sys::Math::random() * 80.0;
-        let life = 0.3 + js_sys::Math::random() * 0.3;
+        let angle = rotation + std::f64::consts::PI + (fast_random() - 0.5) * 0.6;
+        let spd = speed * 0.3 + fast_random() * 80.0;
+        let life = 0.3 + fast_random() * 0.3;
         particles.push(Particle {
-            x: x - rotation.cos() * 15.0 + (js_sys::Math::random() - 0.5) * 6.0,
-            y: y - rotation.sin() * 15.0 + (js_sys::Math::random() - 0.5) * 6.0,
+            x: x - rotation.cos() * 15.0 + (fast_random() - 0.5) * 6.0,
+            y: y - rotation.sin() * 15.0 + (fast_random() - 0.5) * 6.0,
             vx: angle.cos() * spd,
             vy: angle.sin() * spd,
             life,
             max_life: life,
-            size: 2.0 + js_sys::Math::random() * 3.0,
+            size: 2.0 + fast_random() * 3.0,
             color: engine_color.clone(),
             kind: ParticleKind::Engine,
         });
@@ -136,21 +164,22 @@ pub fn add_explosion(
     explosions: &mut Vec<Explosion>,
     x: f64, y: f64,
 ) {
+    init_rng_if_needed();
     // Hot core particles - bright white/yellow, fast but short-lived
     let core_colors = ["#ffffff", "#ffffcc", "#ffeeaa"];
     for _ in 0..5 {
         if particles.len() >= MAX_PARTICLES { break; }
-        let angle = js_sys::Math::random() * std::f64::consts::PI * 2.0;
-        let spd = 40.0 + js_sys::Math::random() * 120.0;
-        let life = 0.15 + js_sys::Math::random() * 0.2;
-        let ci = (js_sys::Math::random() * core_colors.len() as f64) as usize;
+        let angle = fast_random() * std::f64::consts::PI * 2.0;
+        let spd = 40.0 + fast_random() * 120.0;
+        let life = 0.15 + fast_random() * 0.2;
+        let ci = (fast_random() * core_colors.len() as f64) as usize;
         particles.push(Particle {
-            x: x + (js_sys::Math::random() - 0.5) * 4.0,
-            y: y + (js_sys::Math::random() - 0.5) * 4.0,
+            x: x + (fast_random() - 0.5) * 4.0,
+            y: y + (fast_random() - 0.5) * 4.0,
             vx: angle.cos() * spd,
             vy: angle.sin() * spd,
             life, max_life: life,
-            size: 4.0 + js_sys::Math::random() * 4.0,
+            size: 4.0 + fast_random() * 4.0,
             color: core_colors[ci % core_colors.len()].to_string(),
             kind: ParticleKind::Explosion,
         });
@@ -161,17 +190,17 @@ pub fn add_explosion(
     for i in 0..12 {
         if particles.len() >= MAX_PARTICLES { break; }
         let angle = (std::f64::consts::PI * 2.0 * i as f64) / 12.0
-            + (js_sys::Math::random() - 0.5) * 0.8;
-        let spd = 80.0 + js_sys::Math::random() * 250.0;
-        let life = 0.4 + js_sys::Math::random() * 0.6;
-        let ci = (js_sys::Math::random() * fire_colors.len() as f64) as usize;
+            + (fast_random() - 0.5) * 0.8;
+        let spd = 80.0 + fast_random() * 250.0;
+        let life = 0.4 + fast_random() * 0.6;
+        let ci = (fast_random() * fire_colors.len() as f64) as usize;
         particles.push(Particle {
-            x: x + (js_sys::Math::random() - 0.5) * 8.0,
-            y: y + (js_sys::Math::random() - 0.5) * 8.0,
+            x: x + (fast_random() - 0.5) * 8.0,
+            y: y + (fast_random() - 0.5) * 8.0,
             vx: angle.cos() * spd,
             vy: angle.sin() * spd,
             life, max_life: life,
-            size: 3.0 + js_sys::Math::random() * 5.0,
+            size: 3.0 + fast_random() * 5.0,
             color: fire_colors[ci % fire_colors.len()].to_string(),
             kind: ParticleKind::Explosion,
         });
@@ -181,17 +210,17 @@ pub fn add_explosion(
     let smoke_colors = ["#882200", "#664422", "#553311", "#aa4400"];
     for _ in 0..8 {
         if particles.len() >= MAX_PARTICLES { break; }
-        let angle = js_sys::Math::random() * std::f64::consts::PI * 2.0;
-        let spd = 20.0 + js_sys::Math::random() * 80.0;
-        let life = 0.8 + js_sys::Math::random() * 1.0;
-        let ci = (js_sys::Math::random() * smoke_colors.len() as f64) as usize;
+        let angle = fast_random() * std::f64::consts::PI * 2.0;
+        let spd = 20.0 + fast_random() * 80.0;
+        let life = 0.8 + fast_random() * 1.0;
+        let ci = (fast_random() * smoke_colors.len() as f64) as usize;
         particles.push(Particle {
-            x: x + (js_sys::Math::random() - 0.5) * 12.0,
-            y: y + (js_sys::Math::random() - 0.5) * 12.0,
+            x: x + (fast_random() - 0.5) * 12.0,
+            y: y + (fast_random() - 0.5) * 12.0,
             vx: angle.cos() * spd,
             vy: angle.sin() * spd,
             life, max_life: life,
-            size: 4.0 + js_sys::Math::random() * 6.0,
+            size: 4.0 + fast_random() * 6.0,
             color: smoke_colors[ci % smoke_colors.len()].to_string(),
             kind: ParticleKind::Explosion,
         });
@@ -249,18 +278,19 @@ pub fn update_particles(particles: &mut Vec<Particle>, explosions: &mut Vec<Expl
 /// Draw a glowing engine beam behind a ship (Star Wars style thrust)
 pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotation: f64, speed: f64, ship_type: i32, boosting: bool) {
     if speed < 15.0 && !boosting { return; }
+    init_rng_if_needed();
 
     let mut intensity = ((speed - 15.0) / 200.0).min(1.0).max(0.0);
     let boost_mul = if boosting { 2.0 } else { 1.0 };
     intensity = (intensity * boost_mul).min(1.5);
 
     // Flicker: random jitter each frame for realistic thruster effect
-    let flicker = 0.85 + js_sys::Math::random() * 0.3;
-    let len_flicker = 0.9 + js_sys::Math::random() * 0.2;
+    let flicker = 0.85 + fast_random() * 0.3;
+    let len_flicker = 0.9 + fast_random() * 0.2;
     let base_len = if boosting { 30.0 + intensity * 35.0 } else { 18.0 + intensity * 22.0 };
     let base_width = if boosting { 4.0 + intensity * 4.0 } else { 3.0 + intensity * 3.0 };
     let beam_len = base_len * len_flicker;
-    let beam_width = base_width * (0.9 + js_sys::Math::random() * 0.2);
+    let beam_width = base_width * (0.9 + fast_random() * 0.2);
     let intensity = intensity * flicker;
 
     // Beam points backward from ship
