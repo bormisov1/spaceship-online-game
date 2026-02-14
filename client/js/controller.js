@@ -404,61 +404,63 @@ function sendInput() {
         aimAngle = Math.atan2(joystickDY, joystickDX);
     }
 
-    // Orbit position in world coords
-    const orbitX = playerX + Math.cos(aimAngle) * AIM_ORBIT_R;
-    const orbitY = playerY + Math.sin(aimAngle) * AIM_ORBIT_R;
-
-    // Sticky lock: check if current target still within detection range
-    let locked = false;
-    if (lockTargetId !== null) {
-        const t = enemies.find(e => e.id === lockTargetId);
-        if (t) {
-            const dx = t.x - orbitX;
-            const dy = t.y - orbitY;
-            if (dx * dx + dy * dy <= AIM_DETECT_R * AIM_DETECT_R) {
-                locked = true;
-            }
-        }
-        if (!locked) lockTargetId = null;
-    }
-
-    // If not locked, find closest enemy in range
-    if (!locked) {
-        let bestDist = AIM_DETECT_R * AIM_DETECT_R;
-        for (const e of enemies) {
-            const dx = e.x - orbitX;
-            const dy = e.y - orbitY;
-            const d2 = dx * dx + dy * dy;
-            if (d2 <= bestDist) {
-                bestDist = d2;
-                lockTargetId = e.id;
-                locked = true;
-            }
-        }
-    }
-
     let mx, my;
-    if (locked) {
-        // Auto-aim: send target position
-        const t = enemies.find(e => e.id === lockTargetId);
-        if (t) {
-            mx = t.x;
-            my = t.y;
-        } else {
-            // Target disappeared, fallback to normal
-            lockTargetId = null;
-            locked = false;
-        }
-    }
+    let locked = false;
 
-    if (!locked) {
-        if (dist > DEAD_ZONE) {
+    // Only run auto-aim when joystick is actively being used
+    if (dist > DEAD_ZONE) {
+        // Orbit position in world coords
+        const orbitX = playerX + Math.cos(aimAngle) * AIM_ORBIT_R;
+        const orbitY = playerY + Math.sin(aimAngle) * AIM_ORBIT_R;
+
+        // Sticky lock: check if current target still within detection range
+        if (lockTargetId !== null) {
+            const t = enemies.find(e => e.id === lockTargetId);
+            if (t) {
+                const dx = t.x - orbitX;
+                const dy = t.y - orbitY;
+                if (dx * dx + dy * dy <= AIM_DETECT_R * AIM_DETECT_R) {
+                    locked = true;
+                }
+            }
+            if (!locked) lockTargetId = null;
+        }
+
+        // If not locked, find closest enemy in range
+        if (!locked) {
+            let bestDist = AIM_DETECT_R * AIM_DETECT_R;
+            for (const e of enemies) {
+                const dx = e.x - orbitX;
+                const dy = e.y - orbitY;
+                const d2 = dx * dx + dy * dy;
+                if (d2 <= bestDist) {
+                    bestDist = d2;
+                    lockTargetId = e.id;
+                    locked = true;
+                }
+            }
+        }
+
+        if (locked) {
+            const t = enemies.find(e => e.id === lockTargetId);
+            if (t) {
+                mx = t.x;
+                my = t.y;
+            } else {
+                lockTargetId = null;
+                locked = false;
+            }
+        }
+
+        if (!locked) {
             mx = playerX + joystickDX * JOYSTICK_SCALE;
             my = playerY + joystickDY * JOYSTICK_SCALE;
-        } else {
-            mx = playerX;
-            my = playerY;
         }
+    } else {
+        // Joystick idle: maintain current heading, clear lock
+        lockTargetId = null;
+        mx = playerX;
+        my = playerY;
     }
 
     ws.send(JSON.stringify({

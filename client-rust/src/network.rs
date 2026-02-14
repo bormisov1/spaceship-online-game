@@ -365,15 +365,22 @@ fn handle_state(state: &SharedState, phase_signal: &leptos::prelude::RwSignal<Ph
 
     s.tick = gs.tick;
 
-    // Update camera
+    // Update camera + sync controller boost state
     if let Some(my_id) = &s.my_id {
         if let Some(me) = s.players.get(my_id) {
             let me_x = me.x;
             let me_y = me.y;
             let me_alive = me.a;
+            let me_boosting = me.b;
             drop(me);
             s.cam_x = me_x;
             s.cam_y = me_y;
+
+            // When controller is attached, sync boost visual from server state
+            if s.controller_attached {
+                s.boosting = me_boosting;
+                s.shift_pressed = me_boosting;
+            }
 
             if !me_alive && s.phase == Phase::Playing {
                 s.phase = Phase::Dead;

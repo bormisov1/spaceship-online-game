@@ -52,6 +52,8 @@ pub struct PlayerState {
     pub s: i32,
     pub sc: i32,
     pub a: bool,
+    #[serde(default)]
+    pub b: bool,
 }
 
 // Server -> Client: projectile state

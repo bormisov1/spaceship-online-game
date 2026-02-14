@@ -191,6 +191,7 @@ func (p *Player) ToState() PlayerState {
 		Ship:  p.ShipType,
 		Score: p.Score,
 		Alive: p.Alive,
+		Boost: p.Boosting,
 	}
 }
 

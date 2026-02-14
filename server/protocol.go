@@ -68,6 +68,7 @@ type PlayerState struct {
 	Ship int     `json:"s"`  // ship type 0-3
 	Score int    `json:"sc"`
 	Alive bool   `json:"a"`
+	Boost bool   `json:"b,omitempty"`
 }
 
 // ProjectileState is broadcast per projectile
