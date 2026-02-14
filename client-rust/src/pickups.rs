@@ -18,6 +18,7 @@ pub fn render_pickups(
 
         let pulse = 0.5 + 0.5 * (time * 3.0).sin();
         let glow_size = size * (0.85 + 0.15 * pulse);
+        let circle_r = glow_size * 0.45;
 
         // Outer radial glow (sun-like halo)
         ctx.set_global_alpha(0.12 + 0.08 * pulse);
@@ -31,39 +32,45 @@ pub fn render_pickups(
             ctx.fill();
         }
 
-        // Inner bright glow
-        ctx.set_global_alpha(0.2 + 0.15 * pulse);
-        if let Ok(gradient) = ctx.create_radial_gradient(sx, sy, 0.0, sx, sy, glow_size * 0.6) {
-            let _ = gradient.add_color_stop(0.0_f32, "rgba(200, 255, 220, 0.8)");
-            let _ = gradient.add_color_stop(0.5_f32, "rgba(0, 255, 100, 0.3)");
-            let _ = gradient.add_color_stop(1.0_f32, "transparent");
+        // Green filled circle
+        ctx.set_global_alpha(0.5 + 0.2 * pulse);
+        if let Ok(gradient) = ctx.create_radial_gradient(sx, sy, 0.0, sx, sy, circle_r) {
+            let _ = gradient.add_color_stop(0.0_f32, "rgba(80, 255, 140, 0.9)");
+            let _ = gradient.add_color_stop(0.7_f32, "rgba(40, 200, 100, 0.7)");
+            let _ = gradient.add_color_stop(1.0_f32, "rgba(20, 160, 80, 0.5)");
             ctx.set_fill_style(&gradient);
-            ctx.begin_path();
-            let _ = ctx.arc(sx, sy, glow_size * 0.6, 0.0, std::f64::consts::PI * 2.0);
-            ctx.fill();
         }
+        ctx.begin_path();
+        let _ = ctx.arc(sx, sy, circle_r, 0.0, std::f64::consts::PI * 2.0);
+        ctx.fill();
 
-        // Sharp-edged aesthetic plus sign (diamond-shaped arms that widen toward center)
-        // Each arm is a triangle: sharp point at the tip, widening to the center
-        let arm_len = glow_size * 0.55; // length from center to tip
-        let arm_width = glow_size * 0.22; // half-width at the base (center intersection)
-
+        // Green circle border
         ctx.set_global_alpha(0.6 + 0.3 * pulse);
+        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(100, 255, 160, 0.8)"));
+        ctx.set_line_width(1.5);
+        ctx.begin_path();
+        let _ = ctx.arc(sx, sy, circle_r, 0.0, std::f64::consts::PI * 2.0);
+        ctx.stroke();
 
-        // Gradient fill for the plus
+        // White sharp-edged cross inside the green circle
+        let arm_len = circle_r * 0.75;
+        let arm_width = circle_r * 0.3;
+
+        ctx.set_global_alpha(0.7 + 0.25 * pulse);
+
+        // White gradient fill for the cross
         if let Ok(gradient) = ctx.create_radial_gradient(sx, sy, 0.0, sx, sy, arm_len) {
             let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 255, 255, 0.95)");
-            let _ = gradient.add_color_stop(0.3_f32, "rgba(150, 255, 200, 0.8)");
-            let _ = gradient.add_color_stop(0.7_f32, "rgba(0, 255, 100, 0.5)");
-            let _ = gradient.add_color_stop(1.0_f32, "rgba(0, 200, 80, 0.1)");
+            let _ = gradient.add_color_stop(0.5_f32, "rgba(240, 255, 245, 0.85)");
+            let _ = gradient.add_color_stop(1.0_f32, "rgba(220, 255, 235, 0.6)");
             ctx.set_fill_style(&gradient);
         }
 
         ctx.begin_path();
-        // Right arm: sharp tip at right, widens to center
-        ctx.move_to(sx + arm_len, sy);              // tip (sharp point)
-        ctx.line_to(sx + arm_width * 0.3, sy - arm_width); // top-left of base
-        ctx.line_to(sx + arm_width * 0.3, sy + arm_width); // bottom-left of base
+        // Right arm
+        ctx.move_to(sx + arm_len, sy);
+        ctx.line_to(sx + arm_width * 0.3, sy - arm_width);
+        ctx.line_to(sx + arm_width * 0.3, sy + arm_width);
         ctx.close_path();
 
         // Left arm
@@ -86,9 +93,9 @@ pub fn render_pickups(
 
         ctx.fill();
 
-        // Center diamond (fills the intersection)
-        ctx.set_global_alpha(0.7 + 0.25 * pulse);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(220, 255, 240, 0.9)"));
+        // White center diamond
+        ctx.set_global_alpha(0.85 + 0.15 * pulse);
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.9)"));
         ctx.begin_path();
         ctx.move_to(sx, sy - arm_width);
         ctx.line_to(sx + arm_width, sy);
@@ -98,10 +105,10 @@ pub fn render_pickups(
         ctx.fill();
 
         // White hot core dot
-        ctx.set_global_alpha(0.8 + 0.2 * pulse);
+        ctx.set_global_alpha(0.9 + 0.1 * pulse);
         ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
         ctx.begin_path();
-        let _ = ctx.arc(sx, sy, 3.0, 0.0, std::f64::consts::PI * 2.0);
+        let _ = ctx.arc(sx, sy, 2.5, 0.0, std::f64::consts::PI * 2.0);
         ctx.fill();
 
         ctx.set_global_alpha(1.0);

@@ -152,22 +152,37 @@ pub fn render_particles(ctx: &CanvasRenderingContext2d, particles: &[Particle], 
         let sy = p.y - offset_y;
         if sx < -20.0 || sx > vw + 20.0 || sy < -20.0 || sy > vh + 20.0 { continue; }
 
-        let alpha = (p.life / p.max_life).max(0.0);
-        let size = p.size * if p.kind == ParticleKind::Explosion {
-            1.0 + (1.0 - alpha) * 0.5
-        } else {
-            alpha
-        };
+        let t = (p.life / p.max_life).max(0.0); // 1.0 = just born, 0.0 = dead
 
-        ctx.set_global_alpha(alpha);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(&p.color));
+        if p.kind == ParticleKind::Explosion {
+            // Explosion particles: soft glow that expands and fades
+            let size = p.size * (1.0 + (1.0 - t) * 1.5);
+            let alpha = t * t; // quadratic fade for smoother look
 
-        if size < 3.0 {
-            ctx.fill_rect(sx - size, sy - size, size * 2.0, size * 2.0);
+            // Draw soft glow with radial gradient
+            ctx.set_global_alpha(alpha * 0.9);
+            if let Ok(gradient) = ctx.create_radial_gradient(sx, sy, 0.0, sx, sy, size) {
+                let _ = gradient.add_color_stop(0.0_f32, &p.color);
+                let inner = format!("{}66", &p.color); // semi-transparent
+                let _ = gradient.add_color_stop(0.4_f32, &inner);
+                let _ = gradient.add_color_stop(1.0_f32, "transparent");
+                ctx.set_fill_style(&gradient);
+                ctx.begin_path();
+                let _ = ctx.arc(sx, sy, size, 0.0, std::f64::consts::PI * 2.0);
+                ctx.fill();
+            }
         } else {
-            ctx.begin_path();
-            let _ = ctx.arc(sx, sy, size, 0.0, std::f64::consts::PI * 2.0);
-            ctx.fill();
+            // Engine particles: simple dots that shrink
+            let size = p.size * t;
+            ctx.set_global_alpha(t);
+            ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(&p.color));
+            if size < 3.0 {
+                ctx.fill_rect(sx - size, sy - size, size * 2.0, size * 2.0);
+            } else {
+                ctx.begin_path();
+                let _ = ctx.arc(sx, sy, size, 0.0, std::f64::consts::PI * 2.0);
+                ctx.fill();
+            }
         }
     }
     ctx.set_global_alpha(1.0);
@@ -179,11 +194,48 @@ pub fn render_explosions(ctx: &CanvasRenderingContext2d, explosions: &[Explosion
         let sy = e.y - offset_y;
         if sx < -100.0 || sx > vw + 100.0 || sy < -100.0 || sy > vh + 100.0 { continue; }
 
-        let alpha = (e.life / e.max_life) * 0.4;
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str(&format!("rgba(255, 200, 50, {})", alpha)));
-        ctx.set_line_width(3.0);
+        let t = (e.life / e.max_life).max(0.0); // 1.0 = just started, 0.0 = done
+
+        // Bright flash at center (early phase)
+        if t > 0.6 {
+            let flash_alpha = (t - 0.6) / 0.4; // 1.0 at start, 0.0 at t=0.6
+            let flash_r = e.radius * 0.5;
+            ctx.set_global_alpha(flash_alpha * 0.5);
+            if let Ok(gradient) = ctx.create_radial_gradient(sx, sy, 0.0, sx, sy, flash_r.max(5.0)) {
+                let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 255, 220, 0.9)");
+                let _ = gradient.add_color_stop(0.3_f32, "rgba(255, 200, 80, 0.5)");
+                let _ = gradient.add_color_stop(1.0_f32, "transparent");
+                ctx.set_fill_style(&gradient);
+                ctx.begin_path();
+                let _ = ctx.arc(sx, sy, flash_r.max(5.0), 0.0, std::f64::consts::PI * 2.0);
+                ctx.fill();
+            }
+        }
+
+        // Shockwave ring with gradient thickness
+        let ring_alpha = t * 0.6;
+        let ring_width = 4.0 + (1.0 - t) * 2.0; // thins as it expands
+        ctx.set_global_alpha(ring_alpha);
+        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 180, 50, 0.8)"));
+        ctx.set_line_width(ring_width);
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, e.radius, 0.0, std::f64::consts::PI * 2.0);
         ctx.stroke();
+
+        // Inner faint fill (hot gas)
+        if t > 0.3 {
+            let fill_alpha = (t - 0.3) * 0.15;
+            ctx.set_global_alpha(fill_alpha);
+            if let Ok(gradient) = ctx.create_radial_gradient(sx, sy, 0.0, sx, sy, e.radius) {
+                let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 150, 50, 0.3)");
+                let _ = gradient.add_color_stop(0.6_f32, "rgba(255, 100, 20, 0.1)");
+                let _ = gradient.add_color_stop(1.0_f32, "transparent");
+                ctx.set_fill_style(&gradient);
+                ctx.begin_path();
+                let _ = ctx.arc(sx, sy, e.radius, 0.0, std::f64::consts::PI * 2.0);
+                ctx.fill();
+            }
+        }
     }
+    ctx.set_global_alpha(1.0);
 }
