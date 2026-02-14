@@ -1,1 +1,4 @@
 .claude/
+client-rust/target/
+client-rust/dist/
+server/spaceship-server
