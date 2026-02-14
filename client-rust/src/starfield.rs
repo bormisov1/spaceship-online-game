@@ -159,47 +159,46 @@ pub fn render_starfield(ctx: &CanvasRenderingContext2d, cx: f64, cy: f64, w: f64
             }
         });
     } else {
-        // Hyperspace mode: parallel streaks opposite to ship heading, max 5px
-        // Streak direction = opposite of where the ship is flying (trail behind)
+        // Hyperspace mode: batch streaks by layer to minimize canvas API calls
         let trail_nx = -(player_rotation.cos());
         let trail_ny = -(player_rotation.sin());
 
         STAR_DATA.with(|sd| {
             let stars = sd.borrow();
-            for star in stars.iter() {
-                let factor = LAYER_FACTORS[star.layer];
+
+            // Batch by layer: one beginPath/stroke per layer for streaks, one for dots
+            for layer in 0..3 {
+                let factor = LAYER_FACTORS[layer];
                 let ox = ((cx * factor) % w + w) % w;
                 let oy = ((cy * factor) % h + h) % h;
 
-                let sx = ((star.x - ox) % w + w) % w;
-                let sy = ((star.y - oy) % h + h) % h;
+                // Most stars are white (255,255,255), batch them together
+                // Set a representative style for the layer
+                ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgb(255,255,255)"));
+                ctx.set_global_alpha((LAYER_ALPHAS[layer].1 * (1.0 + hyperspace_t * 0.3)).min(1.0));
+                ctx.set_line_width(LAYER_SIZES[layer].1 * 0.7);
 
-                // All streaks parallel, 5px max length
-                let streak = hyperspace_t * 12.5;
-                let x2 = sx + trail_nx * streak;
-                let y2 = sy + trail_ny * streak;
-
-                let alpha = star.alpha * (1.0 + hyperspace_t * 0.3);
-                let width = star.size;
-
-                ctx.set_global_alpha(alpha.min(1.0));
-                ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str(
-                    &format!("rgb({},{},{})", star.r, star.g, star.b),
-                ));
-                ctx.set_line_width(width);
+                // Batch all streak lines in this layer
                 ctx.begin_path();
-                ctx.move_to(sx, sy);
-                ctx.line_to(x2, y2);
+                for star in stars.iter().filter(|s| s.layer == layer) {
+                    let sx = ((star.x - ox) % w + w) % w;
+                    let sy = ((star.y - oy) % h + h) % h;
+                    let streak = hyperspace_t * 12.5;
+                    let x2 = sx + trail_nx * streak;
+                    let y2 = sy + trail_ny * streak;
+                    ctx.move_to(sx, sy);
+                    ctx.line_to(x2, y2);
+                }
                 ctx.stroke();
 
-                // Dot at leading edge
-                let dot_size = star.size * (1.0 - hyperspace_t * 0.3).max(0.3);
-                ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(
-                    &format!("rgb({},{},{})", star.r, star.g, star.b),
-                ));
-                ctx.begin_path();
-                let _ = ctx.arc(sx, sy, dot_size, 0.0, std::f64::consts::PI * 2.0);
-                ctx.fill();
+                // Batch dots as fill_rect (tiny squares, visually identical to arcs)
+                ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgb(255,255,255)"));
+                for star in stars.iter().filter(|s| s.layer == layer) {
+                    let sx = ((star.x - ox) % w + w) % w;
+                    let sy = ((star.y - oy) % h + h) % h;
+                    let dot_size = star.size * (1.0 - hyperspace_t * 0.3).max(0.3);
+                    ctx.fill_rect(sx - dot_size, sy - dot_size, dot_size * 2.0, dot_size * 2.0);
+                }
             }
         });
 
