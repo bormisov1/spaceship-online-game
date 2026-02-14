@@ -82,17 +82,18 @@ func (p *Player) Update(dt float64) {
 	}
 
 	// Distance-based speed modulation: slow down as pointer approaches ship
-	dist := math.Sqrt((p.TargetX-p.X)*(p.TargetX-p.X) + (p.TargetY-p.Y)*(p.TargetY-p.Y))
+	dist2 := (p.TargetX-p.X)*(p.TargetX-p.X) + (p.TargetY-p.Y)*(p.TargetY-p.Y)
 	thresh := p.SlowThresh
 	if thresh < 20 {
 		thresh = 20
 	}
 	const deadZone = 50.0
 	var speedFactor float64 = 1.0
-	if dist <= deadZone {
+	if dist2 <= deadZone*deadZone {
 		accel = 0
 		speedFactor = 0
-	} else if dist < thresh {
+	} else if dist2 < thresh*thresh {
+		dist := math.Sqrt(dist2)
 		speedFactor = (dist - deadZone) / (thresh - deadZone)
 		accel *= speedFactor
 	}

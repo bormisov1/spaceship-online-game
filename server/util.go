@@ -41,6 +41,13 @@ func Distance(x1, y1, x2, y2 float64) float64 {
 	return math.Sqrt(dx*dx + dy*dy)
 }
 
+// DistanceSq returns the squared distance between two points (avoids sqrt)
+func DistanceSq(x1, y1, x2, y2 float64) float64 {
+	dx := x2 - x1
+	dy := y2 - y1
+	return dx*dx + dy*dy
+}
+
 // NormalizeAngle wraps angle to [-PI, PI]
 func NormalizeAngle(a float64) float64 {
 	for a > math.Pi {

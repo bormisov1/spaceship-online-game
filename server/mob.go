@@ -8,6 +8,8 @@ const (
 	MobSpeed          = 180.0
 	MobDetectRange    = 655.0
 	MobShootRange     = 900.0  // start shooting when this close
+	MobDetectRangeSq  = MobDetectRange * MobDetectRange
+	MobShootRangeSq   = MobShootRange * MobShootRange
 	MobRepelRadius    = 50.0
 	MobRepelForce     = 120.0 // gentle nudge, allows head-on collisions
 	MobExplodeRelV    = 250.0
@@ -96,9 +98,9 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 		if !p.Alive {
 			continue
 		}
-		d := Distance(m.X, m.Y, p.X, p.Y)
-		if d < MobDetectRange && d < bestDist {
-			bestDist = d
+		d2 := DistanceSq(m.X, m.Y, p.X, p.Y)
+		if d2 < MobDetectRangeSq && d2 < bestDist {
+			bestDist = d2
 			targetX = p.X
 			targetY = p.Y
 			found = true
@@ -164,7 +166,7 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 
 	// Burst fire logic
 	wantFire := false
-	if found && bestDist < MobShootRange {
+	if found && bestDist < MobShootRangeSq {
 		if m.BurstLeft > 0 && m.FireCD <= 0 {
 			// Continue burst
 			wantFire = true
