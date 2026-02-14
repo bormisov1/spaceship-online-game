@@ -10,6 +10,8 @@ const DEAD_ZONE: f64 = 8.0;
 const AIM_ORBIT_R: f64 = 360.0;
 const AIM_DETECT_R: f64 = 150.0;
 
+const BOOST_COLUMN_HALF: f64 = 50.0;
+
 struct ControllerState {
     ws: Option<WebSocket>,
     sid: String,
@@ -26,6 +28,7 @@ struct ControllerState {
     joystick_dx: f64,
     joystick_dy: f64,
     firing: bool,
+    boosting: bool,
     // Store closures
     _on_open: Option<Closure<dyn FnMut()>>,
     _on_message: Option<Closure<dyn FnMut(MessageEvent)>>,
@@ -58,6 +61,7 @@ pub fn init_controller(session_id: &str, player_id: &str) {
         joystick_dx: 0.0,
         joystick_dy: 0.0,
         firing: false,
+        boosting: false,
         _on_open: None,
         _on_message: None,
         _on_close: None,
@@ -230,6 +234,8 @@ fn setup_touch_handlers(ctrl: &SharedCtrl) {
                 e.prevent_default();
                 let c = ctrl_ts.borrow();
                 let half_w = c.screen_w / 2.0;
+                let center_left = half_w - BOOST_COLUMN_HALF;
+                let center_right = half_w + BOOST_COLUMN_HALF;
                 drop(c);
 
                 let changed = e.changed_touches();
@@ -237,12 +243,15 @@ fn setup_touch_handlers(ctrl: &SharedCtrl) {
                     if let Some(touch) = changed.get(i) {
                         let cx = touch.client_x() as f64;
                         let mut c = ctrl_ts.borrow_mut();
-                        if cx < half_w {
+                        if cx < center_left {
                             c.joystick_dx = 0.0;
                             c.joystick_dy = 0.0;
-                        } else {
+                        } else if cx > center_right {
                             c.firing = true;
                             update_fire_indicator(true);
+                        } else {
+                            c.boosting = true;
+                            update_boost_indicator(true);
                         }
                     }
                 }
@@ -262,10 +271,11 @@ fn setup_touch_handlers(ctrl: &SharedCtrl) {
                         let cx = touch.client_x() as f64;
                         let c = ctrl_tm.borrow();
                         let half_w = c.screen_w / 2.0;
+                        let center_left = half_w - BOOST_COLUMN_HALF;
                         drop(c);
-                        if cx < half_w {
-                            // Approximate: use center of left half as start
-                            let center_x = half_w / 2.0;
+                        if cx < center_left {
+                            // Approximate: use center of left zone as start
+                            let center_x = center_left / 2.0;
                             let center_y = ctrl_tm.borrow().screen_h / 2.0;
                             let mut c = ctrl_tm.borrow_mut();
                             c.joystick_dx = cx - center_x;
@@ -290,15 +300,20 @@ fn setup_touch_handlers(ctrl: &SharedCtrl) {
                         let cx = touch.client_x() as f64;
                         let c = ctrl_te.borrow();
                         let half_w = c.screen_w / 2.0;
+                        let center_left = half_w - BOOST_COLUMN_HALF;
+                        let center_right = half_w + BOOST_COLUMN_HALF;
                         drop(c);
-                        if cx < half_w {
+                        if cx < center_left {
                             let mut c = ctrl_te.borrow_mut();
                             c.joystick_dx = 0.0;
                             c.joystick_dy = 0.0;
                             update_knob(0.0, 0.0);
-                        } else {
+                        } else if cx > center_right {
                             ctrl_te.borrow_mut().firing = false;
                             update_fire_indicator(false);
+                        } else {
+                            ctrl_te.borrow_mut().boosting = false;
+                            update_boost_indicator(false);
                         }
                     }
                 }
@@ -339,6 +354,17 @@ fn update_knob(dx: f64, dy: f64) {
 fn update_fire_indicator(active: bool) {
     let document = web_sys::window().unwrap().document().unwrap();
     if let Some(ind) = document.get_element_by_id("fireIndicator") {
+        if active {
+            let _ = ind.class_list().add_1("active");
+        } else {
+            let _ = ind.class_list().remove_1("active");
+        }
+    }
+}
+
+fn update_boost_indicator(active: bool) {
+    let document = web_sys::window().unwrap().document().unwrap();
+    if let Some(ind) = document.get_element_by_id("boostIndicator") {
         if active {
             let _ = ind.class_list().add_1("active");
         } else {
@@ -413,6 +439,7 @@ fn send_input(ctrl: &SharedCtrl) {
     };
 
     let firing = c.firing;
+    let boosting = c.boosting;
     let ws = c.ws.clone();
     drop(c);
 
@@ -423,7 +450,7 @@ fn send_input(ctrl: &SharedCtrl) {
         if ws.ready_state() == 1 {
             let msg = serde_json::json!({
                 "t": "input",
-                "d": { "mx": mx, "my": my, "fire": firing, "boost": false, "thresh": 50 }
+                "d": { "mx": mx, "my": my, "fire": firing, "boost": boosting, "thresh": 50 }
             });
             let _ = ws.send_with_str(&msg.to_string());
         }

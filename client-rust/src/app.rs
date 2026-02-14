@@ -241,7 +241,12 @@ fn ControllerMode(sid: String, pid: String) -> impl IntoView {
             </div>
             <div id="ctrlPad" style="display:none;">
                 <div id="ctrlStatus">"Connecting..."</div>
-                <div class="ctrl-divider"></div>
+                <div class="ctrl-divider-left"></div>
+                <div class="ctrl-divider-right"></div>
+                <div class="ctrl-center">
+                    <div class="ctrl-boost-indicator" id="boostIndicator"></div>
+                    <div class="ctrl-label">"BOOST"</div>
+                </div>
                 <div class="ctrl-left">
                     <div class="ctrl-label">"Drag to navigate"</div>
                     <div class="ctrl-joystick-ring" id="joystickRing">

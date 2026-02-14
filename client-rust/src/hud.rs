@@ -39,13 +39,11 @@ pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
         draw_crosshair(ctx, s.mouse_x, s.mouse_y);
     }
 
-    // Mobile controls overlay
+    // Mobile controls overlay (joystick only, no visual markers for fire/boost zones)
     if s.is_mobile && (s.phase == Phase::Playing || s.phase == Phase::Dead) {
         if let Some(ref tj) = s.touch_joystick {
             draw_mobile_joystick(ctx, tj.start_x, tj.start_y, tj.current_x, tj.current_y);
         }
-        draw_mobile_fire_indicator(ctx, screen_w, screen_h, s.firing);
-        draw_mobile_boost_button(ctx, screen_w, screen_h, s.shift_pressed);
     }
 
     // Connection status
@@ -321,70 +319,3 @@ pub fn draw_player_health_bar(ctx: &CanvasRenderingContext2d, x: f64, y: f64, hp
     ctx.fill_rect(x - bar_w / 2.0, bar_y, bar_w * ratio, bar_h);
 }
 
-const FIRE_INDICATOR_RADIUS: f64 = 50.0;
-
-fn fire_indicator_center(screen_w: f64, screen_h: f64) -> (f64, f64) {
-    (screen_w * 0.75, screen_h * 0.5)
-}
-
-fn draw_mobile_fire_indicator(ctx: &CanvasRenderingContext2d, screen_w: f64, screen_h: f64, firing: bool) {
-    let (cx, cy) = fire_indicator_center(screen_w, screen_h);
-    let r = FIRE_INDICATOR_RADIUS;
-
-    let (fill, stroke) = if firing {
-        ("rgba(255, 68, 68, 0.3)", "rgba(255, 68, 68, 0.6)")
-    } else {
-        ("rgba(255, 68, 68, 0.05)", "rgba(255, 68, 68, 0.2)")
-    };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(fill));
-    ctx.begin_path();
-    let _ = ctx.arc(cx, cy, r, 0.0, std::f64::consts::PI * 2.0);
-    ctx.fill();
-    ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str(stroke));
-    ctx.set_line_width(2.0);
-    ctx.stroke();
-
-    let label_color = if firing { "#ff8888" } else { "#ff444444" };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(label_color));
-    ctx.set_font("11px monospace");
-    ctx.set_text_align("center");
-    let _ = ctx.fill_text("TAP TO FIRE", cx, cy + r + 16.0);
-}
-
-pub const BOOST_BTN_RADIUS: f64 = 32.0;
-
-pub fn boost_btn_center(screen_w: f64, screen_h: f64) -> (f64, f64) {
-    let (fire_cx, fire_cy) = fire_indicator_center(screen_w, screen_h);
-    // Just below and to the right of the fire circle
-    (fire_cx + FIRE_INDICATOR_RADIUS + BOOST_BTN_RADIUS + 15.0,
-     fire_cy + FIRE_INDICATOR_RADIUS + BOOST_BTN_RADIUS + 15.0)
-}
-
-fn draw_mobile_boost_button(ctx: &CanvasRenderingContext2d, screen_w: f64, screen_h: f64, active: bool) {
-    let (cx, cy) = boost_btn_center(screen_w, screen_h);
-    let r = BOOST_BTN_RADIUS;
-
-    let (fill, stroke) = if active {
-        ("rgba(80, 160, 255, 0.4)", "rgba(100, 200, 255, 0.8)")
-    } else {
-        ("rgba(255, 255, 255, 0.08)", "rgba(255, 255, 255, 0.25)")
-    };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(fill));
-    ctx.begin_path();
-    let _ = ctx.arc(cx, cy, r, 0.0, std::f64::consts::PI * 2.0);
-    ctx.fill();
-    ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str(stroke));
-    ctx.set_line_width(2.0);
-    ctx.stroke();
-
-    let icon_color = if active { "#aaddff" } else { "#ffffff66" };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(icon_color));
-    ctx.set_font("bold 16px monospace");
-    ctx.set_text_align("center");
-    let _ = ctx.fill_text(">>", cx, cy + 5.0);
-
-    let label_color = if active { "#88ccff" } else { "#ffffff44" };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(label_color));
-    ctx.set_font("9px monospace");
-    let _ = ctx.fill_text("BOOST", cx, cy + r + 12.0);
-}

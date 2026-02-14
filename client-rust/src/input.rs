@@ -3,7 +3,8 @@ use wasm_bindgen::JsCast;
 use web_sys::{MouseEvent, KeyboardEvent, TouchEvent, HtmlCanvasElement};
 use crate::state::{SharedState, Phase, TouchJoystick};
 use crate::network::SharedNetwork;
-use crate::hud;
+
+const BOOST_COLUMN_HALF: f64 = 50.0;
 
 pub fn setup_input(state: SharedState, _net: SharedNetwork) {
     let window = web_sys::window().unwrap();
@@ -144,21 +145,20 @@ fn setup_touch_input(state: SharedState, canvas: &web_sys::Element) {
         let s = state_ts.borrow();
         if s.phase != Phase::Playing { return; }
         let screen_w = s.screen_w;
-        let screen_h = s.screen_h;
         drop(s);
+
+        let half_w = screen_w / 2.0;
+        let center_left = half_w - BOOST_COLUMN_HALF;
+        let center_right = half_w + BOOST_COLUMN_HALF;
 
         let changed = e.changed_touches();
         for i in 0..changed.length() {
             if let Some(touch) = changed.get(i) {
-                let half_w = screen_w / 2.0;
                 let cx = touch.client_x() as f64;
                 let cy = touch.client_y() as f64;
 
-                // Check if touch is on boost button
-                let (bcx, bcy) = hud::boost_btn_center(screen_w, screen_h);
-                let bdx = cx - bcx;
-                let bdy = cy - bcy;
-                if bdx * bdx + bdy * bdy <= hud::BOOST_BTN_RADIUS * hud::BOOST_BTN_RADIUS * 1.5 {
+                // Center column = boost (invisible)
+                if cx >= center_left && cx <= center_right {
                     let mut s = state_ts.borrow_mut();
                     s.boosting = true;
                     s.shift_pressed = true;
@@ -172,7 +172,7 @@ fn setup_touch_input(state: SharedState, canvas: &web_sys::Element) {
                 }
 
                 let mut s = state_ts.borrow_mut();
-                if cx < half_w && s.touch_joystick.is_none() {
+                if cx < center_left && s.touch_joystick.is_none() {
                     s.touch_joystick = Some(TouchJoystick {
                         start_x: cx,
                         start_y: cy,
@@ -181,7 +181,7 @@ fn setup_touch_input(state: SharedState, canvas: &web_sys::Element) {
                     });
                     s.mouse_x = s.screen_w / 2.0;
                     s.mouse_y = s.screen_h / 2.0;
-                } else if cx >= half_w && !s.firing {
+                } else if cx > center_right && !s.firing {
                     s.firing = true;
                 }
             }
@@ -230,34 +230,35 @@ fn setup_touch_input(state: SharedState, canvas: &web_sys::Element) {
         for i in 0..changed.length() {
             if let Some(_touch) = changed.get(i) {
                 let cx = _touch.client_x() as f64;
-                let cy = _touch.client_y() as f64;
 
                 let mut s = state_te.borrow_mut();
+                let half_w = s.screen_w / 2.0;
+                let center_left = half_w - BOOST_COLUMN_HALF;
+                let center_right = half_w + BOOST_COLUMN_HALF;
 
-                // Check if this touch end is from the boost button area
-                let (bcx, bcy) = hud::boost_btn_center(s.screen_w, s.screen_h);
-                let bdx = cx - bcx;
-                let bdy = cy - bcy;
-                if bdx * bdx + bdy * bdy <= hud::BOOST_BTN_RADIUS * hud::BOOST_BTN_RADIUS * 2.0 {
+                // Center column = release boost
+                if cx >= center_left && cx <= center_right {
                     s.boosting = false;
                     s.shift_pressed = false;
                     s.hyperspace_locked_r = None;
                     continue;
                 }
 
-                // Simple: just reset both
-                if s.touch_joystick.is_some() {
-                    if let Some(ref tj) = s.touch_joystick {
-                        // Only release joystick if this touch started on left
-                        if (cx - tj.start_x).abs() < 200.0 {
-                            s.touch_joystick = None;
-                            s.mouse_x = s.screen_w / 2.0;
-                            s.mouse_y = s.screen_h / 2.0;
+                // Left zone: release joystick
+                if cx < center_left {
+                    if s.touch_joystick.is_some() {
+                        if let Some(ref tj) = s.touch_joystick {
+                            if (cx - tj.start_x).abs() < 200.0 {
+                                s.touch_joystick = None;
+                                s.mouse_x = s.screen_w / 2.0;
+                                s.mouse_y = s.screen_h / 2.0;
+                            }
                         }
                     }
                 }
-                // Release fire if touch was on right half
-                if cx >= s.screen_w / 2.0 {
+
+                // Right zone: release fire
+                if cx > center_right {
                     s.firing = false;
                 }
             }
