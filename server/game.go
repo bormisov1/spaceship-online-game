@@ -64,6 +64,10 @@ type Game struct {
 	// Reusable query buffer for spatial grid lookups
 	queryBuf []EntityRef
 
+	// Delta compression: last-sent velocity per entity
+	lastVX map[string]float64
+	lastVY map[string]float64
+
 	// Reusable broadcast buffers (reset with [:0] each tick)
 	bcastPlayers   []playerWithPos
 	bcastMobs      []mobWithPos
@@ -93,6 +97,8 @@ func NewGame() *Game {
 		mobSpawnCD:      MobSpawnInterval,
 		asteroidSpawnCD: AsteroidSpawnInterval,
 		pickupSpawnCD:   PickupSpawnInterval,
+		lastVX:          make(map[string]float64, maxPlayersPerSession+maxMobsPerSession),
+		lastVY:          make(map[string]float64, maxPlayersPerSession+maxMobsPerSession),
 		bcastPlayers:    make([]playerWithPos, 0, maxPlayersPerSession),
 		bcastMobs:       make([]mobWithPos, 0, maxMobsPerSession),
 		bcastAsteroids:  make([]asteroidWithPos, 0, maxAsteroidsPerSession),
@@ -491,15 +497,45 @@ type pickupWithPos struct {
 
 // broadcastState sends the current game state to all clients with per-client viewport culling
 func (g *Game) broadcastState() {
+	// Delta compression threshold — skip velocity when change is tiny
+	const velDelta = 5.0
+
 	// Pre-convert all entities to state once, keeping raw positions for culling
 	g.bcastPlayers = g.bcastPlayers[:0]
 	for _, p := range g.players {
-		g.bcastPlayers = append(g.bcastPlayers, playerWithPos{state: p.ToState(), x: p.X, y: p.Y})
+		ps := p.ToState()
+		// Omit velocity if unchanged since last broadcast
+		vx := *ps.VX
+		vy := *ps.VY
+		prevVX, prevVY := g.lastVX[p.ID], g.lastVY[p.ID]
+		dx := vx - prevVX; if dx < 0 { dx = -dx }
+		dy := vy - prevVY; if dy < 0 { dy = -dy }
+		if dx < velDelta && dy < velDelta {
+			ps.VX = nil
+			ps.VY = nil
+		} else {
+			g.lastVX[p.ID] = vx
+			g.lastVY[p.ID] = vy
+		}
+		g.bcastPlayers = append(g.bcastPlayers, playerWithPos{state: ps, x: p.X, y: p.Y})
 	}
 	g.bcastMobs = g.bcastMobs[:0]
 	for _, mob := range g.mobs {
 		if mob.Alive {
-			g.bcastMobs = append(g.bcastMobs, mobWithPos{state: mob.ToState(), x: mob.X, y: mob.Y})
+			ms := mob.ToState()
+			vx := *ms.VX
+			vy := *ms.VY
+			prevVX, prevVY := g.lastVX[mob.ID], g.lastVY[mob.ID]
+			dx := vx - prevVX; if dx < 0 { dx = -dx }
+			dy := vy - prevVY; if dy < 0 { dy = -dy }
+			if dx < velDelta && dy < velDelta {
+				ms.VX = nil
+				ms.VY = nil
+			} else {
+				g.lastVX[mob.ID] = vx
+				g.lastVY[mob.ID] = vy
+			}
+			g.bcastMobs = append(g.bcastMobs, mobWithPos{state: ms, x: mob.X, y: mob.Y})
 		}
 	}
 	g.bcastAsteroids = g.bcastAsteroids[:0]

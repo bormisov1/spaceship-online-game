@@ -206,13 +206,15 @@ func (m *Mob) TakeDamage(dmg int) bool {
 
 // ToState converts to protocol state
 func (m *Mob) ToState() MobState {
+	vx := round1(m.VX)
+	vy := round1(m.VY)
 	return MobState{
 		ID:    m.ID,
 		X:     round1(m.X),
 		Y:     round1(m.Y),
 		R:     round1(m.Rotation),
-		VX:    round1(m.VX),
-		VY:    round1(m.VY),
+		VX:    &vx,
+		VY:    &vy,
 		HP:    m.HP,
 		MaxHP: m.MaxHP,
 		Alive: m.Alive,

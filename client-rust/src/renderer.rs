@@ -164,7 +164,9 @@ pub fn render(state: &SharedState, dt: f64) {
             if sx < -60.0 || sx > vw + 60.0 || sy < -60.0 || sy > vh + 60.0 { continue; }
 
             let is_me = my_id == Some(id.as_str());
-            let speed = (p.vx * p.vx + p.vy * p.vy).sqrt();
+            let pvx = p.vx.unwrap_or(0.0);
+            let pvy = p.vy.unwrap_or(0.0);
+            let speed = (pvx * pvx + pvy * pvy).sqrt();
             let boosting = is_me && my_boosting;
 
             effects::draw_engine_beam(&ctx, sx, sy, pr, speed, p.s, boosting);
@@ -185,7 +187,7 @@ pub fn render(state: &SharedState, dt: f64) {
             } else {
                 (mob.x, mob.y, mob.r)
             };
-            mobs::render_mob(&ctx, mx, my, mr, mob.vx, mob.vy, mob.hp, mob.mhp, offset_x, offset_y, vw, vh);
+            mobs::render_mob(&ctx, mx, my, mr, mob.vx.unwrap_or(0.0), mob.vy.unwrap_or(0.0), mob.hp, mob.mhp, offset_x, offset_y, vw, vh);
         }
     }
 

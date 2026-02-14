@@ -381,9 +381,16 @@ fn handle_state(state: &SharedState, phase_signal: &leptos::prelude::RwSignal<Ph
     }
     s.interp_last_update = now;
 
-    // Update current state
+    // Update current state, merging delta-compressed velocity
     s.players.clear();
-    for p in gs.p {
+    for mut p in gs.p {
+        // If velocity was omitted (delta compression), carry forward from prev
+        if p.vx.is_none() || p.vy.is_none() {
+            if let Some(prev) = s.prev_players.get(&p.id) {
+                if p.vx.is_none() { p.vx = prev.vx; }
+                if p.vy.is_none() { p.vy = prev.vy; }
+            }
+        }
         s.players.insert(p.id.clone(), p);
     }
 
@@ -393,7 +400,13 @@ fn handle_state(state: &SharedState, phase_signal: &leptos::prelude::RwSignal<Ph
     }
 
     s.mobs.clear();
-    for m in gs.m {
+    for mut m in gs.m {
+        if m.vx.is_none() || m.vy.is_none() {
+            if let Some(prev) = s.prev_mobs.get(&m.id) {
+                if m.vx.is_none() { m.vx = prev.vx; }
+                if m.vy.is_none() { m.vy = prev.vy; }
+            }
+        }
         s.mobs.insert(m.id.clone(), m);
     }
 

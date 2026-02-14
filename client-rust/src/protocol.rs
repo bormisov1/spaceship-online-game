@@ -37,7 +37,7 @@ pub struct CreatedMsg {
     pub sid: String,
 }
 
-// Server -> Client: player state
+// Server -> Client: player state (vx/vy omitted when unchanged via delta compression)
 #[derive(Deserialize, Debug, Clone)]
 pub struct PlayerState {
     pub id: String,
@@ -45,8 +45,8 @@ pub struct PlayerState {
     pub x: f64,
     pub y: f64,
     pub r: f64,
-    pub vx: f64,
-    pub vy: f64,
+    pub vx: Option<f64>,
+    pub vy: Option<f64>,
     pub hp: i32,
     pub mhp: i32,
     pub s: i32,
@@ -66,15 +66,15 @@ pub struct ProjectileState {
     pub o: String,
 }
 
-// Server -> Client: mob state
+// Server -> Client: mob state (vx/vy omitted when unchanged via delta compression)
 #[derive(Deserialize, Debug, Clone)]
 pub struct MobState {
     pub id: String,
     pub x: f64,
     pub y: f64,
     pub r: f64,
-    pub vx: f64,
-    pub vy: f64,
+    pub vx: Option<f64>,
+    pub vy: Option<f64>,
     pub hp: i32,
     pub mhp: i32,
     pub a: bool,

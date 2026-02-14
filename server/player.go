@@ -179,14 +179,16 @@ func (p *Player) CanFire() bool {
 
 // ToState converts to protocol state
 func (p *Player) ToState() PlayerState {
+	vx := round1(p.VX)
+	vy := round1(p.VY)
 	return PlayerState{
 		ID:    p.ID,
 		Name:  p.Name,
 		X:     round1(p.X),
 		Y:     round1(p.Y),
 		R:     round1(p.Rotation),
-		VX:    round1(p.VX),
-		VY:    round1(p.VY),
+		VX:    &vx,
+		VY:    &vy,
 		HP:    p.HP,
 		MaxHP: p.MaxHP,
 		Ship:  p.ShipType,

@@ -68,9 +68,9 @@ type PlayerState struct {
 	Name string  `json:"n"`
 	X    float64 `json:"x"`
 	Y    float64 `json:"y"`
-	R    float64 `json:"r"`  // rotation radians
-	VX   float64 `json:"vx"` // velocity X
-	VY   float64 `json:"vy"` // velocity Y
+	R    float64 `json:"r"`           // rotation radians
+	VX   *float64 `json:"vx,omitempty"` // velocity X (omitted when unchanged)
+	VY   *float64 `json:"vy,omitempty"` // velocity Y (omitted when unchanged)
 	HP   int     `json:"hp"`
 	MaxHP int    `json:"mhp"`
 	Ship int     `json:"s"`  // ship type 0-3
@@ -90,15 +90,15 @@ type ProjectileState struct {
 
 // MobState is broadcast per mob
 type MobState struct {
-	ID    string  `json:"id"`
-	X     float64 `json:"x"`
-	Y     float64 `json:"y"`
-	R     float64 `json:"r"`
-	VX    float64 `json:"vx"`
-	VY    float64 `json:"vy"`
-	HP    int     `json:"hp"`
-	MaxHP int     `json:"mhp"`
-	Alive bool    `json:"a"`
+	ID    string   `json:"id"`
+	X     float64  `json:"x"`
+	Y     float64  `json:"y"`
+	R     float64  `json:"r"`
+	VX    *float64 `json:"vx,omitempty"`
+	VY    *float64 `json:"vy,omitempty"`
+	HP    int      `json:"hp"`
+	MaxHP int      `json:"mhp"`
+	Alive bool     `json:"a"`
 }
 
 // AsteroidState is broadcast per asteroid
