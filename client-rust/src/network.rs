@@ -356,6 +356,31 @@ fn handle_message(
 fn handle_state(state: &SharedState, phase_signal: &leptos::prelude::RwSignal<Phase>, gs: GameStateMsg) {
     let mut s = state.borrow_mut();
 
+    // Save current→prev for interpolation (swap reuses allocations)
+    let mut tmp_players = std::mem::take(&mut s.prev_players);
+    tmp_players.clear();
+    std::mem::swap(&mut tmp_players, &mut s.players);
+    s.prev_players = tmp_players;
+
+    let mut tmp_mobs = std::mem::take(&mut s.prev_mobs);
+    tmp_mobs.clear();
+    std::mem::swap(&mut tmp_mobs, &mut s.mobs);
+    s.prev_mobs = tmp_mobs;
+
+    s.prev_cam_x = s.cam_x;
+    s.prev_cam_y = s.cam_y;
+
+    // Record timing for interpolation
+    let now = web_sys::window().unwrap().performance().unwrap().now();
+    if s.interp_last_update > 0.0 {
+        let elapsed = now - s.interp_last_update;
+        // Smooth the interval estimate
+        if elapsed > 10.0 && elapsed < 200.0 {
+            s.interp_interval = s.interp_interval * 0.8 + elapsed * 0.2;
+        }
+    }
+    s.interp_last_update = now;
+
     // Update current state
     s.players.clear();
     for p in gs.p {

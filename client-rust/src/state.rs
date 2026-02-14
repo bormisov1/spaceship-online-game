@@ -115,6 +115,14 @@ pub struct GameState {
     // Effects
     pub particles: Vec<Particle>,
     pub explosions: Vec<Explosion>,
+
+    // Interpolation: previous state for lerping between server updates
+    pub prev_players: HashMap<String, PlayerState>,
+    pub prev_mobs: HashMap<String, MobState>,
+    pub prev_cam_x: f64,
+    pub prev_cam_y: f64,
+    pub interp_last_update: f64, // timestamp of last state update (ms)
+    pub interp_interval: f64,    // estimated interval between updates (ms)
 }
 
 impl GameState {
@@ -164,6 +172,13 @@ impl GameState {
 
             particles: Vec::with_capacity(200),
             explosions: Vec::with_capacity(10),
+
+            prev_players: HashMap::new(),
+            prev_mobs: HashMap::new(),
+            prev_cam_x: 0.0,
+            prev_cam_y: 0.0,
+            interp_last_update: 0.0,
+            interp_interval: 33.33, // ~30 Hz default
         }
     }
 }
