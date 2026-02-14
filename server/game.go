@@ -51,6 +51,14 @@ type Game struct {
 	asteroidSpawnCD float64
 	pickupSpawnCD   float64
 
+	// Spatial hash grid for broad-phase collision detection
+	grid SpatialGrid
+
+	// Flat entity lists for spatial grid indexing (rebuilt each tick)
+	flatPlayers []*Player
+	flatProjs   []*Projectile
+	flatMobs    []*Mob
+
 	// Reusable broadcast buffers (reset with [:0] each tick)
 	bcastPlayers   []PlayerState
 	bcastMobs      []MobState
@@ -265,6 +273,9 @@ func (g *Game) update() {
 		}
 	}
 
+	// Build spatial grid for broad-phase collision
+	g.buildSpatialGrid()
+
 	// Check collisions
 	g.checkCollisions()
 	g.checkPlayerCollisions()
@@ -284,13 +295,53 @@ func (g *Game) update() {
 	}
 }
 
-// checkCollisions checks projectile-player collisions
-func (g *Game) checkCollisions() {
+// buildSpatialGrid populates the spatial hash with all alive entities
+func (g *Game) buildSpatialGrid() {
+	g.grid.Clear()
+
+	// Build flat lists for indexed lookup
+	g.flatPlayers = g.flatPlayers[:0]
+	for _, p := range g.players {
+		if p.Alive {
+			idx := len(g.flatPlayers)
+			g.flatPlayers = append(g.flatPlayers, p)
+			g.grid.InsertCircle(p.X, p.Y, PlayerRadius, EntityRef{Kind: 'p', Idx: idx})
+		}
+	}
+
+	g.flatProjs = g.flatProjs[:0]
 	for _, proj := range g.projectiles {
+		if proj.Alive {
+			idx := len(g.flatProjs)
+			g.flatProjs = append(g.flatProjs, proj)
+			g.grid.Insert(proj.X, proj.Y, EntityRef{Kind: 'r', Idx: idx})
+		}
+	}
+
+	g.flatMobs = g.flatMobs[:0]
+	for _, mob := range g.mobs {
+		if mob.Alive {
+			idx := len(g.flatMobs)
+			g.flatMobs = append(g.flatMobs, mob)
+			g.grid.InsertCircle(mob.X, mob.Y, MobRadius, EntityRef{Kind: 'm', Idx: idx})
+		}
+	}
+
+}
+
+// checkCollisions checks projectile-player collisions using spatial grid
+func (g *Game) checkCollisions() {
+	const queryR = ProjectileRadius + PlayerRadius
+	for _, proj := range g.flatProjs {
 		if !proj.Alive {
 			continue
 		}
-		for _, p := range g.players {
+		nearby := g.grid.Query(proj.X, proj.Y, queryR)
+		for _, ref := range nearby {
+			if ref.Kind != 'p' {
+				continue
+			}
+			p := g.flatPlayers[ref.Idx]
 			if !p.Alive || p.ID == proj.OwnerID {
 				continue
 			}
@@ -303,7 +354,6 @@ func (g *Game) checkCollisions() {
 					// Award kill to shooter
 					if killer, ok := g.players[proj.OwnerID]; ok {
 						killer.Score++
-						// Notify all clients of the kill
 						killMsg := Envelope{T: MsgKill, Data: KillMsg{
 							KillerID:   killer.ID,
 							KillerName: killer.Name,
@@ -312,7 +362,6 @@ func (g *Game) checkCollisions() {
 						}}
 						g.broadcastMsg(killMsg)
 
-						// Notify victim
 						if client, ok := g.clients[p.ID]; ok {
 							client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
 								KillerID:   killer.ID,
@@ -561,18 +610,20 @@ func (g *Game) checkMobMobCollisions() {
 	}
 }
 
-// checkProjectileMobCollisions checks projectile hits on mobs
+// checkProjectileMobCollisions checks projectile hits on mobs using spatial grid
 func (g *Game) checkProjectileMobCollisions() {
-	for _, proj := range g.projectiles {
+	const queryR = ProjectileRadius + MobRadius
+	for _, proj := range g.flatProjs {
 		if !proj.Alive {
 			continue
 		}
-		for _, mob := range g.mobs {
-			if !mob.Alive {
+		nearby := g.grid.Query(proj.X, proj.Y, queryR)
+		for _, ref := range nearby {
+			if ref.Kind != 'm' {
 				continue
 			}
-			// Don't let a mob hit itself
-			if proj.OwnerID == mob.ID {
+			mob := g.flatMobs[ref.Idx]
+			if !mob.Alive || proj.OwnerID == mob.ID {
 				continue
 			}
 			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, MobRadius) {
@@ -650,7 +701,7 @@ func (g *Game) checkAsteroidMobCollisions() {
 
 // checkProjectileAsteroidCollisions — projectiles are destroyed by asteroids
 func (g *Game) checkProjectileAsteroidCollisions() {
-	for _, proj := range g.projectiles {
+	for _, proj := range g.flatProjs {
 		if !proj.Alive {
 			continue
 		}
