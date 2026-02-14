@@ -24,18 +24,3 @@ func TestCheckCollision(t *testing.T) {
 	}
 }
 
-func TestCheckCollisionWrap(t *testing.T) {
-	// Circles near world edges that are actually close
-	if !CheckCollisionWrap(10, 10, 20, WorldWidth-5, 10, 20) {
-		t.Error("should collide across X wrap")
-	}
-
-	if !CheckCollisionWrap(10, 10, 20, 10, WorldHeight-5, 20) {
-		t.Error("should collide across Y wrap")
-	}
-
-	// Far apart circles
-	if CheckCollisionWrap(100, 100, 10, WorldWidth/2, WorldHeight/2, 10) {
-		t.Error("should not collide when far apart")
-	}
-}

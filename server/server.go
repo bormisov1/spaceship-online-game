@@ -19,7 +19,7 @@ var rustUuidPathRe = regexp.MustCompile(`^/rust/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
-	WriteBufferSize: 16384,
+	WriteBufferSize: 8192,
 	CheckOrigin: func(r *http.Request) bool {
 		origin := r.Header.Get("Origin")
 		if origin == "" {
