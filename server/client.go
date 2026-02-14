@@ -131,9 +131,9 @@ func (c *Client) SendRaw(data []byte) {
 	}
 }
 
-// handleMessage routes incoming messages
+// handleMessage routes incoming messages (single-pass decode via InEnvelope)
 func (c *Client) handleMessage(raw []byte) {
-	var env Envelope
+	var env InEnvelope
 	if err := json.Unmarshal(raw, &env); err != nil {
 		log.Printf("unmarshal error: %v", err)
 		return
@@ -143,17 +143,17 @@ func (c *Client) handleMessage(raw []byte) {
 	case MsgList:
 		c.handleList()
 	case MsgCreate:
-		c.handleCreate(raw)
+		c.handleCreate(env.D)
 	case MsgJoin:
-		c.handleJoin(raw)
+		c.handleJoin(env.D)
 	case MsgInput:
-		c.handleInput(raw)
+		c.handleInput(env.D)
 	case MsgLeave:
 		c.handleLeave()
 	case MsgCheck:
-		c.handleCheck(raw)
+		c.handleCheck(env.D)
 	case MsgControl:
-		c.handleControl(raw)
+		c.handleControl(env.D)
 	}
 }
 
@@ -162,22 +162,19 @@ func (c *Client) handleList() {
 	c.SendJSON(Envelope{T: MsgSessions, Data: sessions})
 }
 
-func (c *Client) handleCreate(raw []byte) {
-	var msg struct {
-		T string    `json:"t"`
-		D CreateMsg `json:"d"`
-	}
-	if err := json.Unmarshal(raw, &msg); err != nil {
+func (c *Client) handleCreate(data json.RawMessage) {
+	var msg CreateMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
 		return
 	}
-	name := msg.D.Name
+	name := msg.Name
 	if name == "" {
 		name = "Pilot"
 	}
 	if len(name) > maxNameLen {
 		name = name[:maxNameLen]
 	}
-	sname := msg.D.SessionName
+	sname := msg.SessionName
 	if sname == "" {
 		sname = "Battle Arena"
 	}
@@ -195,15 +192,12 @@ func (c *Client) handleCreate(raw []byte) {
 	c.SendJSON(Envelope{T: MsgCreated, Data: map[string]string{"sid": sess.ID}})
 }
 
-func (c *Client) handleJoin(raw []byte) {
-	var msg struct {
-		T string  `json:"t"`
-		D JoinMsg `json:"d"`
-	}
-	if err := json.Unmarshal(raw, &msg); err != nil {
+func (c *Client) handleJoin(data json.RawMessage) {
+	var msg JoinMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
 		return
 	}
-	name := msg.D.Name
+	name := msg.Name
 	if name == "" {
 		name = "Pilot"
 	}
@@ -211,7 +205,7 @@ func (c *Client) handleJoin(raw []byte) {
 		name = name[:maxNameLen]
 	}
 
-	sess := c.hub.sessions.GetSession(msg.D.SessionID)
+	sess := c.hub.sessions.GetSession(msg.SessionID)
 	if sess == nil {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "session not found"}})
 		return
@@ -232,39 +226,33 @@ func (c *Client) handleJoin(raw []byte) {
 	c.SendJSON(Envelope{T: MsgWelcome, Data: WelcomeMsg{ID: player.ID, Ship: player.ShipType}})
 }
 
-func (c *Client) handleInput(raw []byte) {
+func (c *Client) handleInput(data json.RawMessage) {
 	if c.sessionID == "" || c.playerID == "" {
 		return
 	}
-	var msg struct {
-		T string      `json:"t"`
-		D ClientInput `json:"d"`
-	}
-	if err := json.Unmarshal(raw, &msg); err != nil {
+	var input ClientInput
+	if err := json.Unmarshal(data, &input); err != nil {
 		return
 	}
 	sess := c.hub.sessions.GetSession(c.sessionID)
 	if sess == nil {
 		return
 	}
-	sess.Game.HandleInput(c.playerID, msg.D)
+	sess.Game.HandleInput(c.playerID, input)
 }
 
-func (c *Client) handleCheck(raw []byte) {
-	var msg struct {
-		T string   `json:"t"`
-		D CheckMsg `json:"d"`
-	}
-	if err := json.Unmarshal(raw, &msg); err != nil {
+func (c *Client) handleCheck(data json.RawMessage) {
+	var msg CheckMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
 		return
 	}
-	sess := c.hub.sessions.GetSession(msg.D.SID)
+	sess := c.hub.sessions.GetSession(msg.SID)
 	if sess == nil {
-		c.SendJSON(Envelope{T: MsgChecked, Data: CheckedMsg{SID: msg.D.SID, Exists: false}})
+		c.SendJSON(Envelope{T: MsgChecked, Data: CheckedMsg{SID: msg.SID, Exists: false}})
 		return
 	}
 	c.SendJSON(Envelope{T: MsgChecked, Data: CheckedMsg{
-		SID:     msg.D.SID,
+		SID:     msg.SID,
 		Exists:  true,
 		Name:    sess.Name,
 		Players: sess.Game.PlayerCount(),
@@ -287,28 +275,25 @@ func (c *Client) handleLeave() {
 	}
 }
 
-func (c *Client) handleControl(raw []byte) {
-	var msg struct {
-		T string     `json:"t"`
-		D ControlMsg `json:"d"`
-	}
-	if err := json.Unmarshal(raw, &msg); err != nil {
+func (c *Client) handleControl(data json.RawMessage) {
+	var msg ControlMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
 		return
 	}
-	sess := c.hub.sessions.GetSession(msg.D.SID)
+	sess := c.hub.sessions.GetSession(msg.SID)
 	if sess == nil {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "session not found"}})
 		return
 	}
-	if !sess.Game.HasPlayer(msg.D.PlayerID) {
+	if !sess.Game.HasPlayer(msg.PlayerID) {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "player not found"}})
 		return
 	}
 
-	c.sessionID = msg.D.SID
-	c.playerID = msg.D.PlayerID
+	c.sessionID = msg.SID
+	c.playerID = msg.PlayerID
 	c.isController = true
 
-	sess.Game.SetController(msg.D.PlayerID, c)
-	c.SendJSON(Envelope{T: MsgControlOK, Data: map[string]string{"pid": msg.D.PlayerID}})
+	sess.Game.SetController(msg.PlayerID, c)
+	c.SendJSON(Envelope{T: MsgControlOK, Data: map[string]string{"pid": msg.PlayerID}})
 }

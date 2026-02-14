@@ -1,5 +1,7 @@
 package main
 
+import "encoding/json"
+
 // Client -> Server message types
 const (
 	MsgJoin    = "join"
@@ -27,10 +29,16 @@ const (
 	MsgCtrlOff    = "ctrl_off"    // notify desktop: controller detached
 )
 
-// Envelope wraps all messages with a type field
+// Envelope wraps all outgoing messages with a type field
 type Envelope struct {
 	T    string      `json:"t"`
 	Data interface{} `json:"d,omitempty"`
+}
+
+// InEnvelope is used for incoming messages — json.RawMessage avoids double-unmarshal
+type InEnvelope struct {
+	T string          `json:"t"`
+	D json.RawMessage `json:"d,omitempty"`
 }
 
 // ClientInput is sent by the client at 20Hz
