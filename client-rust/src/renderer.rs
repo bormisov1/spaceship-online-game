@@ -131,33 +131,33 @@ pub fn render(state: &SharedState, dt: f64) {
 
     // Players
     {
-        // Collect player data first to avoid borrow conflicts
-        let player_data: Vec<_> = {
+        // Extract my_id and boosting once before the loop
+        let (my_id, my_boosting) = {
+            let s = state.borrow();
+            (s.my_id.clone(), s.boosting)
+        };
+
+        // Collect player data with cloned strings to avoid borrow conflicts
+        // Only clone id+name (small strings), copy all numeric fields
+        let player_data: Vec<(String, f64, f64, f64, f64, f64, i32, i32, i32, String)> = {
             let s = state.borrow();
             s.players.iter()
                 .filter(|(_, p)| p.a)
                 .map(|(id, p)| (id.clone(), p.x, p.y, p.r, p.vx, p.vy, p.s, p.hp, p.mhp, p.n.clone()))
                 .collect()
         };
-        let my_id = state.borrow().my_id.clone();
 
-        for (id, px, py, pr, pvx, pvy, ps, php, pmhp, pn) in &player_data {
+        for (ref id, px, py, pr, pvx, pvy, ps, php, pmhp, ref pn) in &player_data {
             let sx = px - offset_x;
             let sy = py - offset_y;
             if sx < -60.0 || sx > vw + 60.0 || sy < -60.0 || sy > vh + 60.0 { continue; }
 
-            // Engine beam
+            let is_me = my_id.as_deref() == Some(id.as_str());
             let speed = (pvx * pvx + pvy * pvy).sqrt();
-            let boosting = {
-                let s = state.borrow();
-                let is_me = s.my_id.as_ref() == Some(id);
-                is_me && s.boosting
-            };
+            let boosting = is_me && my_boosting;
+
             effects::draw_engine_beam(&ctx, sx, sy, *pr, speed, *ps, boosting);
-
             ships::draw_ship(&ctx, sx, sy, *pr, *ps);
-
-            let is_me = my_id.as_ref() == Some(id);
             hud::draw_player_health_bar(&ctx, sx, sy, *php, *pmhp, pn, is_me);
         }
     }
