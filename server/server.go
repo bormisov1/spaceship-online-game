@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"regexp"
+	"runtime"
 
 	"github.com/gorilla/websocket"
 	qrcode "github.com/skip2/go-qrcode"
@@ -85,6 +87,22 @@ func SetupRoutes(hub *Hub, clientDir string, clientRustDir string) *http.ServeMu
 		w.Header().Set("Content-Type", "image/png")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 		w.Write(png)
+	})
+
+	// Debug endpoint
+	mux.HandleFunc("/api/debug", func(w http.ResponseWriter, r *http.Request) {
+		sessions := hub.sessions.ListSessions()
+		var memStats runtime.MemStats
+		runtime.ReadMemStats(&memStats)
+		info := map[string]interface{}{
+			"goroutines":  runtime.NumGoroutine(),
+			"ws_clients":  hub.ClientCount(),
+			"sessions":    sessions,
+			"heap_mb":     float64(memStats.HeapAlloc) / 1024 / 1024,
+			"total_conns": hub.TotalConns(),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(info)
 	})
 
 	// WebSocket endpoint

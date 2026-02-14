@@ -43,12 +43,14 @@ pub fn App() -> impl IntoView {
     let phase_signal = RwSignal::new(Phase::Lobby);
     let sessions_signal = RwSignal::new(Vec::<SessionInfo>::new());
     let checked_signal = RwSignal::new(None::<CheckedMsg>);
+    let expired_signal = RwSignal::new(false);
 
     let net = Network::new(
         game_state.clone(),
         phase_signal,
         sessions_signal,
         checked_signal,
+        expired_signal,
     );
 
     Network::connect(&net);
@@ -81,6 +83,7 @@ pub fn App() -> impl IntoView {
             phase=phase_signal
             sessions=sessions_signal
             checked=checked_signal
+            expired=expired_signal
         />
     }.into_any()
 }
@@ -92,6 +95,7 @@ fn GameView(
     phase: RwSignal<Phase>,
     sessions: RwSignal<Vec<SessionInfo>>,
     checked: RwSignal<Option<CheckedMsg>>,
+    expired: RwSignal<bool>,
 ) -> impl IntoView {
     let state_clone = send_wrapper::SendWrapper::new(state.clone());
     let net_clone = send_wrapper::SendWrapper::new(net.clone());
@@ -158,6 +162,8 @@ fn GameView(
 
         {move || {
             let p = phase.get();
+            // Subscribe to expired signal to re-render when session expires
+            let _expired = expired.get();
             if p == Phase::Lobby {
                 let has_url_session = state_clone.borrow().url_session_id.is_some();
                 if has_url_session {
@@ -174,6 +180,7 @@ fn GameView(
                             state=(*state_clone).clone()
                             net=(*net_clone).clone()
                             sessions=sessions
+                            expired=expired
                         />
                     }.into_any()
                 }

@@ -98,3 +98,10 @@ func (h *Hub) ClientCount() int {
 	defer h.mu.RUnlock()
 	return len(h.clients)
 }
+
+// TotalConns returns the tracked connection count
+func (h *Hub) TotalConns() int {
+	h.connMu.Lock()
+	defer h.connMu.Unlock()
+	return h.totalConns
+}

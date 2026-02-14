@@ -74,29 +74,36 @@ export function checkURLSession() {
 export function handleSessionCheck(data) {
     if (!state.urlSessionID) return;
 
+    if (!data.exists) {
+        // Session expired — redirect to normal lobby with a banner
+        state.urlSessionID = null;
+        history.replaceState({}, '', '/');
+        renderNormalLobby();
+        startRefresh();
+        // Inject expired banner at the top of the panel
+        const panel = lobbyEl.querySelector('.lobby-panel');
+        if (panel) {
+            const banner = document.createElement('div');
+            banner.className = 'expired-banner';
+            banner.innerHTML = 'Session does not exist or has ended.';
+            panel.insertBefore(banner, panel.firstChild);
+            setTimeout(() => banner.remove(), 6000);
+        }
+        return;
+    }
+
     const panel = lobbyEl.querySelector('.lobby-panel');
     if (!panel) return;
-
     const statusEl = panel.querySelector('.join-status');
     const btnJoin = panel.querySelector('#btnJoin');
 
-    if (!data.exists) {
-        if (statusEl) {
-            statusEl.innerHTML = `
-                <p class="error-msg">Session does not exist or has ended.</p>
-                <a href="/" class="btn btn-primary" style="text-decoration:none;display:inline-block;margin-top:12px;">Go to Lobby</a>
-            `;
-        }
-        if (btnJoin) btnJoin.style.display = 'none';
-    } else {
-        if (statusEl) {
-            const players = Number.isFinite(data.players) ? data.players : 0;
-            statusEl.innerHTML = `<p class="session-info">Battle: <strong>${escapeHtml(data.name)}</strong> — ${players} pilot${players !== 1 ? 's' : ''}</p>`;
-        }
-        if (btnJoin) {
-            btnJoin.disabled = false;
-            btnJoin.textContent = 'Join Battle';
-        }
+    if (statusEl) {
+        const players = Number.isFinite(data.players) ? data.players : 0;
+        statusEl.innerHTML = `<p class="session-info">Battle: <strong>${escapeHtml(data.name)}</strong> — ${players} pilot${players !== 1 ? 's' : ''}</p>`;
+    }
+    if (btnJoin) {
+        btnJoin.disabled = false;
+        btnJoin.textContent = 'Join Battle';
     }
 }
 

@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { connect, setMessageHandler, onConnect, send } from './network.js';
+import { connect, setMessageHandler, onConnect, send, joinSession } from './network.js';
 import { setupInput } from './input.js';
 import { initLobby, hideLobby, showLobby, updateSessions, updateURL, checkURLSession, handleSessionCheck } from './lobby.js';
 import { render } from './renderer.js';
@@ -209,6 +209,8 @@ function handleMessage(msg) {
         case 'ctrl_on':
             state.controllerAttached = true;
             if (state.canvas) state.canvas.style.cursor = 'default';
+            { const ov = document.getElementById('controllerOverlay');
+              if (ov) ov.classList.remove('visible'); }
             break;
         case 'ctrl_off':
             state.controllerAttached = false;
@@ -293,13 +295,13 @@ function handleJoined(data) {
 }
 
 function handleCreated(data) {
-    // Save pilot name so it's preserved across the navigation
+    // Get pilot name before lobby DOM is hidden
     const nameEl = document.getElementById('playerName');
-    if (nameEl && nameEl.value) {
-        sessionStorage.setItem('pilotName', nameEl.value.trim());
-    }
-    // Real navigation to the session URL
-    window.location.href = '/' + data.sid;
+    const name = (nameEl && nameEl.value.trim()) || 'Pilot';
+    // Update URL without full page reload, then auto-join
+    state.urlSessionID = data.sid;
+    history.pushState({}, '', '/' + data.sid);
+    joinSession(name, data.sid);
 }
 
 function handleKill(data) {

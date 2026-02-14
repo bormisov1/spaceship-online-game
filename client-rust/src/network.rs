@@ -14,6 +14,7 @@ pub struct Network {
     phase_signal: leptos::prelude::RwSignal<Phase>,
     sessions_signal: leptos::prelude::RwSignal<Vec<SessionInfo>>,
     checked_signal: leptos::prelude::RwSignal<Option<CheckedMsg>>,
+    expired_signal: leptos::prelude::RwSignal<bool>,
     // Store closures to prevent them from being dropped
     _on_open: Option<Closure<dyn FnMut()>>,
     _on_message: Option<Closure<dyn FnMut(MessageEvent)>>,
@@ -29,6 +30,7 @@ impl Network {
         phase_signal: leptos::prelude::RwSignal<Phase>,
         sessions_signal: leptos::prelude::RwSignal<Vec<SessionInfo>>,
         checked_signal: leptos::prelude::RwSignal<Option<CheckedMsg>>,
+        expired_signal: leptos::prelude::RwSignal<bool>,
     ) -> SharedNetwork {
         let net = Rc::new(RefCell::new(Network {
             ws: None,
@@ -36,6 +38,7 @@ impl Network {
             phase_signal,
             sessions_signal,
             checked_signal,
+            expired_signal,
             _on_open: None,
             _on_message: None,
             _on_close: None,
@@ -72,10 +75,12 @@ impl Network {
         let phase_signal = net.borrow().phase_signal;
         let sessions_signal = net.borrow().sessions_signal;
         let checked_signal = net.borrow().checked_signal;
+        let expired_signal = net.borrow().expired_signal;
+        let net_for_msg = net.clone();
         let on_message = Closure::wrap(Box::new(move |e: MessageEvent| {
             if let Some(text) = e.data().as_string() {
                 if let Ok(env) = serde_json::from_str::<Envelope>(&text) {
-                    handle_message(&state_clone, phase_signal, sessions_signal, checked_signal, env);
+                    handle_message(&state_clone, &net_for_msg, phase_signal, sessions_signal, checked_signal, expired_signal, env);
                 }
             }
         }) as Box<dyn FnMut(MessageEvent)>);
@@ -227,9 +232,11 @@ impl Network {
 
 fn handle_message(
     state: &SharedState,
+    net: &SharedNetwork,
     phase_signal: leptos::prelude::RwSignal<Phase>,
     sessions_signal: leptos::prelude::RwSignal<Vec<SessionInfo>>,
     checked_signal: leptos::prelude::RwSignal<Option<CheckedMsg>>,
+    expired_signal: leptos::prelude::RwSignal<bool>,
     env: Envelope,
 ) {
     let data = env.d.unwrap_or(serde_json::Value::Null);
@@ -263,9 +270,15 @@ fn handle_message(
         }
         "created" => {
             if let Ok(c) = serde_json::from_value::<CreatedMsg>(data) {
-                // Navigate to session URL
+                // Update URL without full reload, then auto-join
                 let window = web_sys::window().unwrap();
-                let _ = window.location().set_href(&format!("/rust/{}", c.sid));
+                let _ = window.history().unwrap().push_state_with_url(
+                    &wasm_bindgen::JsValue::NULL, "", Some(&format!("/rust/{}", c.sid)),
+                );
+                let name = state.borrow_mut().pending_name.take()
+                    .unwrap_or_else(|| "Pilot".to_string());
+                state.borrow_mut().url_session_id = Some(c.sid.clone());
+                Network::join_session(net, &name, &c.sid);
             }
         }
         "sessions" => {
@@ -307,11 +320,26 @@ fn handle_message(
         }
         "checked" => {
             if let Ok(c) = serde_json::from_value::<CheckedMsg>(data) {
-                checked_signal.set(Some(c));
+                if !c.exists {
+                    // Session expired — clear URL session and redirect to lobby
+                    state.borrow_mut().url_session_id = None;
+                    let window = web_sys::window().unwrap();
+                    let _ = window.history().unwrap().replace_state_with_url(
+                        &wasm_bindgen::JsValue::NULL, "", Some("/rust/"),
+                    );
+                    expired_signal.set(true);
+                } else {
+                    checked_signal.set(Some(c));
+                }
             }
         }
         "ctrl_on" => {
             state.borrow_mut().controller_attached = true;
+            // Dismiss QR overlay on desktop
+            if let Some(overlay) = web_sys::window().unwrap().document().unwrap()
+                .get_element_by_id("controllerOverlay") {
+                let _ = overlay.class_list().remove_1("visible");
+            }
         }
         "ctrl_off" => {
             state.borrow_mut().controller_attached = false;

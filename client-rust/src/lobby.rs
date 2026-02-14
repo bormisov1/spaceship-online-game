@@ -9,10 +9,12 @@ pub fn NormalLobby(
     state: SharedState,
     net: SharedNetwork,
     sessions: RwSignal<Vec<SessionInfo>>,
+    expired: RwSignal<bool>,
 ) -> impl IntoView {
     let net_create = net.clone();
     let net_join = send_wrapper::SendWrapper::new(net.clone());
 
+    let state_for_create = state.clone();
     let on_create = move |_| {
         let document = web_sys::window().unwrap().document().unwrap();
         let name = document
@@ -21,12 +23,22 @@ pub fn NormalLobby(
             .map(|i: web_sys::HtmlInputElement| i.value())
             .unwrap_or_else(|| "Pilot".to_string());
         let name = if name.trim().is_empty() { "Pilot".to_string() } else { name.trim().to_string() };
+        state_for_create.borrow_mut().pending_name = Some(name.clone());
         Network::create_session(&net_create, &name, "Battle Arena");
     };
 
     view! {
         <div id="lobby">
             <div class="lobby-panel">
+                {move || {
+                    if expired.get() {
+                        view! {
+                            <div class="expired-banner">"Session does not exist or has ended."</div>
+                        }.into_any()
+                    } else {
+                        view! { <span></span> }.into_any()
+                    }
+                }}
                 <h1 class="title">"STAR WARS"</h1>
                 <h2 class="subtitle">"Space Battle"</h2>
                 <div class="name-input-group">

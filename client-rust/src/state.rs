@@ -67,6 +67,7 @@ pub struct GameState {
     pub my_ship: i32,
     pub session_id: Option<String>,
     pub url_session_id: Option<String>,
+    pub pending_name: Option<String>, // name saved before create, for auto-join
 
     // Game state from server
     pub players: HashMap<String, PlayerState>,
@@ -133,6 +134,7 @@ impl GameState {
             my_ship: 0,
             session_id: None,
             url_session_id: None,
+            pending_name: None,
 
             players: HashMap::new(),
             projectiles: HashMap::new(),
