@@ -286,7 +286,7 @@ func (g *Game) update() {
 
 // checkCollisions checks projectile-player collisions
 func (g *Game) checkCollisions() {
-	for projID, proj := range g.projectiles {
+	for _, proj := range g.projectiles {
 		if !proj.Alive {
 			continue
 		}
@@ -297,7 +297,6 @@ func (g *Game) checkCollisions() {
 			if CheckCollision(proj.X, proj.Y, ProjectileRadius, p.X, p.Y, PlayerRadius) {
 				died := p.TakeDamage(ProjectileDamage)
 				proj.Alive = false
-				delete(g.projectiles, projID)
 
 				if died {
 					p.Score -= DeathScorePenalty
@@ -564,7 +563,7 @@ func (g *Game) checkMobMobCollisions() {
 
 // checkProjectileMobCollisions checks projectile hits on mobs
 func (g *Game) checkProjectileMobCollisions() {
-	for projID, proj := range g.projectiles {
+	for _, proj := range g.projectiles {
 		if !proj.Alive {
 			continue
 		}
@@ -579,7 +578,6 @@ func (g *Game) checkProjectileMobCollisions() {
 			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, MobRadius) {
 				died := mob.TakeDamage(ProjectileDamage)
 				proj.Alive = false
-				delete(g.projectiles, projID)
 
 				if died {
 					if killer, ok := g.players[proj.OwnerID]; ok {
@@ -652,7 +650,7 @@ func (g *Game) checkAsteroidMobCollisions() {
 
 // checkProjectileAsteroidCollisions — projectiles are destroyed by asteroids
 func (g *Game) checkProjectileAsteroidCollisions() {
-	for projID, proj := range g.projectiles {
+	for _, proj := range g.projectiles {
 		if !proj.Alive {
 			continue
 		}
@@ -662,7 +660,6 @@ func (g *Game) checkProjectileAsteroidCollisions() {
 			}
 			if CheckCollision(proj.X, proj.Y, ProjectileRadius, ast.X, ast.Y, AsteroidRadius) {
 				proj.Alive = false
-				delete(g.projectiles, projID)
 				break
 			}
 		}
@@ -671,7 +668,7 @@ func (g *Game) checkProjectileAsteroidCollisions() {
 
 // checkPlayerPickupCollisions — player picks up health orb
 func (g *Game) checkPlayerPickupCollisions() {
-	for pkID, pk := range g.pickups {
+	for _, pk := range g.pickups {
 		if !pk.Alive {
 			continue
 		}
@@ -681,7 +678,6 @@ func (g *Game) checkPlayerPickupCollisions() {
 			}
 			if CheckCollision(pk.X, pk.Y, PickupRadius, p.X, p.Y, PlayerRadius) {
 				pk.Alive = false
-				delete(g.pickups, pkID)
 				p.HP += PickupHeal
 				if p.HP > p.MaxHP {
 					p.HP = p.MaxHP
