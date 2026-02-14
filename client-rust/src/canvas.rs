@@ -108,7 +108,7 @@ pub fn setup_controller_btn(state: SharedState) {
         if let (Some(my_id), Some(session_id)) = (my_id, session_id) {
             let window = web_sys::window().unwrap();
             let origin = window.location().origin().unwrap_or_default();
-            let controller_url = format!("{}/{}?c={}", origin, session_id, my_id);
+            let controller_url = format!("{}/rust/{}?c={}", origin, session_id, my_id);
 
             let document = window.document().unwrap();
             if let Some(qr_img) = document.get_element_by_id("qrImg") {

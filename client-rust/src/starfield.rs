@@ -9,6 +9,7 @@ thread_local! {
     static CACHED_W: RefCell<f64> = RefCell::new(0.0);
     static CACHED_H: RefCell<f64> = RefCell::new(0.0);
     static STAR_DATA: RefCell<Vec<StarInfo>> = RefCell::new(Vec::new());
+    static IS_MOBILE: RefCell<bool> = RefCell::new(false);
 }
 
 const LAYER_COUNTS: [usize; 3] = [120, 100, 80];
@@ -37,6 +38,7 @@ fn build_offscreen_canvases(w: f64, h: f64) {
     let document = web_sys::window().unwrap().document().unwrap();
     let mut layers = Vec::new();
     let mut star_data = Vec::new();
+    let size_scale = IS_MOBILE.with(|m| if *m.borrow() { 1.0 / 3.0 } else { 1.0 });
 
     for layer in 0..3 {
         let canvas: HtmlCanvasElement = document.create_element("canvas").unwrap().unchecked_into();
@@ -46,7 +48,7 @@ fn build_offscreen_canvases(w: f64, h: f64) {
             .get_context("2d").unwrap().unwrap().unchecked_into();
 
         let count = LAYER_COUNTS[layer];
-        let (min_size, max_size) = LAYER_SIZES[layer];
+        let (min_size, max_size) = (LAYER_SIZES[layer].0 * size_scale, LAYER_SIZES[layer].1 * size_scale);
         let (min_alpha, max_alpha) = LAYER_ALPHAS[layer];
 
         for _ in 0..count {
@@ -115,6 +117,7 @@ fn build_offscreen_canvases(w: f64, h: f64) {
 
 pub fn init_starfield(state: &SharedState) {
     let s = state.borrow();
+    IS_MOBILE.with(|m| *m.borrow_mut() = s.is_mobile);
     if s.screen_w > 0.0 && s.screen_h > 0.0 {
         build_offscreen_canvases(s.screen_w, s.screen_h);
     }
