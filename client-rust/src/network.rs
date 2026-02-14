@@ -134,48 +134,51 @@ impl Network {
         let mut mx = (s.mouse_x - s.screen_w / 2.0) / zoom + s.cam_x;
         let mut my = (s.mouse_y - s.screen_h / 2.0) / zoom + s.cam_y;
 
-        // Mobile auto-aim
+        // Mobile auto-aim (only when joystick is actively being used)
         if s.is_mobile {
-            if let Some(my_id) = &s.my_id {
-                if let Some(me) = s.players.get(my_id) {
-                    if me.a {
-                        let jdx = s.mouse_x - s.screen_w / 2.0;
-                        let jdy = s.mouse_y - s.screen_h / 2.0;
-                        let jdist = (jdx * jdx + jdy * jdy).sqrt();
-                        let aim_angle = if jdist > 5.0 { jdy.atan2(jdx) } else { me.r };
+            let jdx = s.mouse_x - s.screen_w / 2.0;
+            let jdy = s.mouse_y - s.screen_h / 2.0;
+            let jdist = (jdx * jdx + jdy * jdy).sqrt();
 
-                        let orbit_r: f64 = 360.0;
-                        let detect_r: f64 = 150.0;
-                        let orbit_x = me.x + aim_angle.cos() * orbit_r;
-                        let orbit_y = me.y + aim_angle.sin() * orbit_r;
+            if jdist > 5.0 {
+                if let Some(my_id) = &s.my_id {
+                    if let Some(me) = s.players.get(my_id) {
+                        if me.a {
+                            let aim_angle = jdy.atan2(jdx);
 
-                        let mut best_dist = detect_r * detect_r;
-                        let mut best_target: Option<(f64, f64)> = None;
+                            let orbit_r: f64 = 360.0;
+                            let detect_r: f64 = 150.0;
+                            let orbit_x = me.x + aim_angle.cos() * orbit_r;
+                            let orbit_y = me.y + aim_angle.sin() * orbit_r;
 
-                        for (id, p) in &s.players {
-                            if Some(id) == s.my_id.as_ref() || !p.a { continue; }
-                            let dx = p.x - orbit_x;
-                            let dy = p.y - orbit_y;
-                            let d2 = dx * dx + dy * dy;
-                            if d2 <= best_dist {
-                                best_dist = d2;
-                                best_target = Some((p.x, p.y));
+                            let mut best_dist = detect_r * detect_r;
+                            let mut best_target: Option<(f64, f64)> = None;
+
+                            for (id, p) in &s.players {
+                                if Some(id) == s.my_id.as_ref() || !p.a { continue; }
+                                let dx = p.x - orbit_x;
+                                let dy = p.y - orbit_y;
+                                let d2 = dx * dx + dy * dy;
+                                if d2 <= best_dist {
+                                    best_dist = d2;
+                                    best_target = Some((p.x, p.y));
+                                }
                             }
-                        }
-                        for (_, m) in &s.mobs {
-                            if !m.a { continue; }
-                            let dx = m.x - orbit_x;
-                            let dy = m.y - orbit_y;
-                            let d2 = dx * dx + dy * dy;
-                            if d2 <= best_dist {
-                                best_dist = d2;
-                                best_target = Some((m.x, m.y));
+                            for (_, m) in &s.mobs {
+                                if !m.a { continue; }
+                                let dx = m.x - orbit_x;
+                                let dy = m.y - orbit_y;
+                                let d2 = dx * dx + dy * dy;
+                                if d2 <= best_dist {
+                                    best_dist = d2;
+                                    best_target = Some((m.x, m.y));
+                                }
                             }
-                        }
 
-                        if let Some((tx, ty)) = best_target {
-                            mx = tx;
-                            my = ty;
+                            if let Some((tx, ty)) = best_target {
+                                mx = tx;
+                                my = ty;
+                            }
                         }
                     }
                 }
