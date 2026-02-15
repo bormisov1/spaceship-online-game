@@ -318,7 +318,6 @@ fn ControllerMode(sid: String, pid: String) -> impl IntoView {
             </div>
             <div id="ctrlPad" style="display:none;">
                 <div id="ctrlStatus">"Connecting..."</div>
-                <div id="ctrlDebug"></div>
                 <div class="ctrl-divider-left"></div>
                 <div class="ctrl-divider-right"></div>
                 <div class="ctrl-center">

@@ -11,23 +11,6 @@ const AIM_ORBIT_R: f64 = 360.0;
 const AIM_DETECT_R: f64 = 150.0;
 
 const BOOST_COLUMN_HALF: f64 = 50.0;
-const DEBUG_MAX_LINES: usize = 30;
-
-fn debug_log(msg: &str) {
-    let document = web_sys::window().unwrap().document().unwrap();
-    if let Some(el) = document.get_element_by_id("ctrlDebug") {
-        let prev = el.text_content().unwrap_or_default();
-        let mut lines: Vec<&str> = prev.lines().collect();
-        lines.push(msg);
-        if lines.len() > DEBUG_MAX_LINES {
-            lines.drain(0..lines.len() - DEBUG_MAX_LINES);
-        }
-        el.set_text_content(Some(&lines.join("\n")));
-        // Auto-scroll to bottom
-        let html_el: &web_sys::HtmlElement = el.unchecked_ref();
-        html_el.set_scroll_top(html_el.scroll_height());
-    }
-}
 
 struct ControllerState {
     ws: Option<WebSocket>,
@@ -68,9 +51,6 @@ struct Enemy {
 type SharedCtrl = Rc<RefCell<ControllerState>>;
 
 pub fn init_controller(session_id: &str, player_id: &str) {
-    // Debug log will work after DOM is ready, log to web_sys console for init
-    web_sys::console::log_1(&format!("init_controller sid={} pid={}", session_id, player_id).into());
-
     let ctrl = Rc::new(RefCell::new(ControllerState {
         ws: None,
         sid: session_id.to_string(),
@@ -147,8 +127,6 @@ fn connect_ws(ctrl: &SharedCtrl) {
     let ws_proto = if protocol == "https:" { "wss:" } else { "ws:" };
     let url = format!("{}//{}/ws", ws_proto, host);
 
-    debug_log(&format!("WS connecting to {}", url));
-
     let ws = WebSocket::new(&url).unwrap();
     ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
 
@@ -160,7 +138,6 @@ fn connect_ws(ctrl: &SharedCtrl) {
         update_status("Attaching...");
         let sid = c.sid.clone();
         let pid = c.pid.clone();
-        debug_log(&format!("WS open, sending control sid={} pid={}", sid, pid));
         if let Some(ref ws) = c.ws {
             let msg = serde_json::json!({"t": "control", "d": {"sid": sid, "pid": pid}});
             let _ = ws.send_with_str(&msg.to_string());
@@ -169,44 +146,24 @@ fn connect_ws(ctrl: &SharedCtrl) {
 
     // on message — handle both binary (msgpack state) and text (JSON control messages)
     let ctrl_msg = ctrl.clone();
-    let msg_count: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
     let on_message = Closure::wrap(Box::new(move |e: MessageEvent| {
         let data = e.data();
         if let Some(ab) = data.dyn_ref::<js_sys::ArrayBuffer>() {
             let arr = js_sys::Uint8Array::new(ab);
             let bytes = arr.to_vec();
-            let mut cnt = msg_count.borrow_mut();
-            *cnt += 1;
-            if *cnt <= 3 {
-                debug_log(&format!("bin msg #{} len={}", *cnt, bytes.len()));
-            }
-            match rmp_serde::from_slice::<crate::protocol::GameStateMsg>(&bytes) {
-                Ok(gs) => {
-                    if *cnt <= 3 {
-                        let c = ctrl_msg.borrow();
-                        debug_log(&format!("  state: {} players, pid match={}", gs.p.len(),
-                            gs.p.iter().any(|p| p.id == c.pid)));
-                    }
-                    handle_state(&ctrl_msg, gs);
-                }
-                Err(err) => {
-                    debug_log(&format!("  msgpack ERR: {}", err));
-                }
+            if let Ok(gs) = rmp_serde::from_slice::<crate::protocol::GameStateMsg>(&bytes) {
+                handle_state(&ctrl_msg, gs);
             }
         } else if let Some(text) = data.as_string() {
-            debug_log(&format!("txt msg: {}", &text[..text.len().min(120)]));
             if let Ok(env) = serde_json::from_str::<crate::protocol::Envelope>(&text) {
                 handle_message(&ctrl_msg, env);
             }
-        } else {
-            debug_log("msg: unknown type (not arraybuffer, not string)");
         }
     }) as Box<dyn FnMut(MessageEvent)>);
 
     // on close
     let ctrl_close = ctrl.clone();
-    let on_close = Closure::wrap(Box::new(move |e: CloseEvent| {
-        debug_log(&format!("WS closed code={} reason={}", e.code(), e.reason()));
+    let on_close = Closure::wrap(Box::new(move |_: CloseEvent| {
         {
             let mut c = ctrl_close.borrow_mut();
             c.connected = false;
@@ -219,9 +176,7 @@ fn connect_ws(ctrl: &SharedCtrl) {
         }).forget();
     }) as Box<dyn FnMut(CloseEvent)>);
 
-    let on_error = Closure::wrap(Box::new(move |_: ErrorEvent| {
-        debug_log("WS error event");
-    }) as Box<dyn FnMut(ErrorEvent)>);
+    let on_error = Closure::wrap(Box::new(move |_: ErrorEvent| {}) as Box<dyn FnMut(ErrorEvent)>);
 
     ws.set_onopen(Some(on_open.as_ref().unchecked_ref()));
     ws.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
@@ -259,24 +214,19 @@ fn handle_state(ctrl: &SharedCtrl, gs: crate::protocol::GameStateMsg) {
 }
 
 fn handle_message(ctrl: &SharedCtrl, env: crate::protocol::Envelope) {
-    debug_log(&format!("handle_message t={}", env.t));
     let data = env.d.unwrap_or(serde_json::Value::Null);
     match env.t.as_str() {
         "control_ok" => {
-            debug_log("ATTACHED - starting input loop");
             ctrl.borrow_mut().attached = true;
             update_status("Connected");
             start_input_loop(ctrl);
         }
         "error" => {
             if let Ok(e) = serde_json::from_value::<crate::protocol::ErrorMsg>(data) {
-                debug_log(&format!("server error: {}", e.msg));
                 update_status(&format!("Error: {}", e.msg));
             }
         }
-        _ => {
-            debug_log(&format!("unhandled msg type: {}", env.t));
-        }
+        _ => {}
     }
 }
 
@@ -292,8 +242,6 @@ fn setup_touch_handlers(ctrl: &SharedCtrl) {
     let ctrl_clone = ctrl.clone();
     gloo_timers::callback::Timeout::new(100, move || {
         let document = web_sys::window().unwrap().document().unwrap();
-        let has_pad = document.get_element_by_id("ctrlPad").is_some();
-        debug_log(&format!("setup_touch: ctrlPad found={}", has_pad));
         if let Some(pad) = document.get_element_by_id("ctrlPad") {
             let opts = web_sys::AddEventListenerOptions::new();
             opts.set_passive(false);
@@ -318,8 +266,6 @@ fn setup_touch_handlers(ctrl: &SharedCtrl) {
                         let cx = touch.client_x() as f64;
                         let cy = touch.client_y() as f64;
                         let tid = touch.identifier();
-                        let zone = if cx < center_left { "LEFT" } else if cx > center_right { "RIGHT" } else { "CENTER" };
-                        debug_log(&format!("tstart id={} x={:.0} zone={} cl={:.0} cr={:.0}", tid, cx, zone, center_left, center_right));
                         let mut c = ctrl_ts.borrow_mut();
                         if cx < center_left && !has_joystick {
                             c.joystick_touch_id = Some(tid);
@@ -459,23 +405,15 @@ fn update_boost_indicator(active: bool) {
 
 fn start_input_loop(ctrl: &SharedCtrl) {
     let ctrl_clone = ctrl.clone();
-    let send_count: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
     let interval = gloo_timers::callback::Interval::new(1000 / INPUT_RATE, move || {
-        let mut cnt = send_count.borrow_mut();
-        *cnt += 1;
-        let log_this = *cnt <= 3 || *cnt % 40 == 0; // log first 3, then every 2s
-        drop(cnt);
-        send_input(&ctrl_clone, log_this);
+        send_input(&ctrl_clone);
     });
     std::mem::forget(interval);
 }
 
-fn send_input(ctrl: &SharedCtrl, log: bool) {
+fn send_input(ctrl: &SharedCtrl) {
     let c = ctrl.borrow();
-    if !c.connected || !c.attached {
-        if log { debug_log(&format!("send_input skip: conn={} att={}", c.connected, c.attached)); }
-        return;
-    }
+    if !c.connected || !c.attached { return; }
 
     let dist = (c.joystick_dx * c.joystick_dx + c.joystick_dy * c.joystick_dy).sqrt();
 
@@ -549,17 +487,8 @@ fn send_input(ctrl: &SharedCtrl, log: bool) {
 
     let firing = c.firing;
     let boosting = c.boosting;
-    let player_x = c.player_x;
-    let player_y = c.player_y;
-    let jdx = c.joystick_dx;
-    let jdy = c.joystick_dy;
     let ws = c.ws.clone();
     drop(c);
-
-    if log {
-        debug_log(&format!("input: pos=({:.0},{:.0}) joy=({:.0},{:.0}) mx/my=({:.0},{:.0}) fire={} boost={}",
-            player_x, player_y, jdx, jdy, mx, my, firing, boosting));
-    }
 
     // Update lock target
     ctrl.borrow_mut().lock_target_id = lock_id;
