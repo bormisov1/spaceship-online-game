@@ -16,10 +16,11 @@ const (
 	MsgReady    = "ready"      // player ready toggle
 	MsgTeamPick = "team_pick"  // player picks team
 	MsgRematch  = "rematch"    // request rematch
-	MsgRegister = "register"   // create account
-	MsgLogin    = "login"      // login
-	MsgAuth     = "auth"       // auth with token
-	MsgProfile  = "profile"    // request profile
+	MsgRegister    = "register"    // create account
+	MsgLogin       = "login"       // login
+	MsgAuth        = "auth"        // auth with token
+	MsgProfile     = "profile"     // request profile
+	MsgLeaderboard = "leaderboard" // request leaderboard
 )
 
 // Server -> Client message types
@@ -38,9 +39,11 @@ const (
 	MsgCtrlOff     = "ctrl_off"     // notify desktop: controller detached
 	MsgHit         = "hit"          // damage dealt to an entity
 	MsgMobSay      = "mob_say"      // mob speech bubble
-	MsgAuthOK      = "auth_ok"     // auth success
-	MsgProfileData = "profile_data" // profile/stats response
-	MsgMatchPhase  = "match_phase"  // match phase changed
+	MsgAuthOK         = "auth_ok"         // auth success
+	MsgProfileData    = "profile_data"    // profile/stats response
+	MsgXPUpdate       = "xp_update"       // XP gained after match
+	MsgLeaderboardRes = "leaderboard_res" // leaderboard response
+	MsgMatchPhase     = "match_phase"     // match phase changed
 	MsgMatchResult = "match_result" // match ended, results
 	MsgTeamUpdate  = "team_update"  // team roster/score update
 )
@@ -303,12 +306,28 @@ type AuthOKMsg struct {
 
 // ProfileDataMsg is sent to client with profile/stats info
 type ProfileDataMsg struct {
-	Username string `json:"username"`
-	Level    int    `json:"level"`
-	XP       int    `json:"xp"`
-	Kills    int    `json:"kills"`
-	Deaths   int    `json:"deaths"`
-	Wins     int    `json:"wins"`
-	Losses   int    `json:"losses"`
+	Username string  `json:"username"`
+	Level    int     `json:"level"`
+	XP       int     `json:"xp"`
+	XPNext   int     `json:"xp_next"` // XP needed for next level
+	Kills    int     `json:"kills"`
+	Deaths   int     `json:"deaths"`
+	Wins     int     `json:"wins"`
+	Losses   int     `json:"losses"`
 	Playtime float64 `json:"playtime"`
+}
+
+// XPUpdateMsg is sent to a player after a match with XP gain details
+type XPUpdateMsg struct {
+	XPGained  int  `json:"xp_gained"`
+	TotalXP   int  `json:"total_xp"`
+	Level     int  `json:"level"`
+	PrevLevel int  `json:"prev_level"`
+	XPNext    int  `json:"xp_next"` // XP needed for next level
+	LeveledUp bool `json:"leveled_up,omitempty"`
+}
+
+// LeaderboardMsg is sent to client with leaderboard data
+type LeaderboardMsg struct {
+	Entries []LeaderboardEntry `json:"entries"`
 }

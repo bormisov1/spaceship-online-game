@@ -195,6 +195,8 @@ func (c *Client) handleMessage(raw []byte) {
 		c.handleAuth(env.D)
 	case MsgProfile:
 		c.handleProfile()
+	case MsgLeaderboard:
+		c.handleLeaderboard()
 	}
 }
 
@@ -489,10 +491,23 @@ func (c *Client) handleProfile() {
 		Username: c.authUsername,
 		Level:    stats.Level,
 		XP:       stats.XP,
+		XPNext:   XPToNextLevel(stats.Level),
 		Kills:    stats.Kills,
 		Deaths:   stats.Deaths,
 		Wins:     stats.Wins,
 		Losses:   stats.Losses,
 		Playtime: stats.Playtime,
 	}})
+}
+
+func (c *Client) handleLeaderboard() {
+	if c.hub.db == nil {
+		return
+	}
+	entries, err := c.hub.db.GetLeaderboard("xp", 10)
+	if err != nil {
+		log.Printf("leaderboard error: %v", err)
+		return
+	}
+	c.SendJSON(Envelope{T: MsgLeaderboardRes, Data: LeaderboardMsg{Entries: entries}})
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"math"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -215,8 +216,43 @@ func (db *DB) GetStats(playerID int64) (*StatsRow, error) {
 	return s, err
 }
 
-// UpdateStatsAfterMatch updates player stats after a match ends
-func (db *DB) UpdateStatsAfterMatch(playerID int64, kills, deaths, assists int, won bool, duration float64, xpEarned int) error {
+// XPForLevel returns the total XP required to reach a given level.
+// Level 1 requires 0 XP, level 2 requires 100, etc.
+// Formula: sum of 100 * i^1.5 for i in 1..level-1
+func XPForLevel(level int) int {
+	if level <= 1 {
+		return 0
+	}
+	total := 0.0
+	for i := 1; i < level; i++ {
+		total += 100.0 * math.Pow(float64(i), 1.5)
+	}
+	return int(total)
+}
+
+// XPToNextLevel returns XP needed from current level to reach the next level
+func XPToNextLevel(level int) int {
+	return XPForLevel(level+1) - XPForLevel(level)
+}
+
+// CalculateLevel returns the level for a given total XP amount
+func CalculateLevel(totalXP int) int {
+	level := 1
+	for {
+		needed := XPForLevel(level + 1)
+		if totalXP < needed {
+			return level
+		}
+		level++
+		if level > 100 { // cap at 100
+			return 100
+		}
+	}
+}
+
+// UpdateStatsAfterMatch updates player stats after a match ends.
+// Returns (newXP, newLevel) for client notification.
+func (db *DB) UpdateStatsAfterMatch(playerID int64, kills, deaths, assists int, won bool, duration float64, xpEarned int) (int, int, error) {
 	winInc := 0
 	lossInc := 0
 	if won {
@@ -224,6 +260,8 @@ func (db *DB) UpdateStatsAfterMatch(playerID int64, kills, deaths, assists int, 
 	} else {
 		lossInc = 1
 	}
+
+	// First update kills/deaths/wins/losses/playtime/xp
 	_, err := db.conn.Exec(`
 		UPDATE stats SET
 			kills = kills + ?,
@@ -231,12 +269,74 @@ func (db *DB) UpdateStatsAfterMatch(playerID int64, kills, deaths, assists int, 
 			wins = wins + ?,
 			losses = losses + ?,
 			playtime = playtime + ?,
-			xp = xp + ?,
-			level = CASE WHEN xp + ? >= CAST(100 * pow(level, 1.5) AS INTEGER) THEN level + 1 ELSE level END
+			xp = xp + ?
 		WHERE player_id = ?`,
-		kills, deaths, winInc, lossInc, duration, xpEarned, xpEarned, playerID,
+		kills, deaths, winInc, lossInc, duration, xpEarned, playerID,
 	)
-	return err
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Read back total XP and calculate proper level
+	var totalXP int
+	err = db.conn.QueryRow("SELECT xp FROM stats WHERE player_id = ?", playerID).Scan(&totalXP)
+	if err != nil {
+		return 0, 0, err
+	}
+	newLevel := CalculateLevel(totalXP)
+
+	// Update level
+	_, err = db.conn.Exec("UPDATE stats SET level = ? WHERE player_id = ?", newLevel, playerID)
+	return totalXP, newLevel, err
+}
+
+// GetLeaderboard returns top players sorted by the given field
+func (db *DB) GetLeaderboard(orderBy string, limit int) ([]LeaderboardEntry, error) {
+	// Whitelist valid order columns
+	validCols := map[string]string{
+		"kills": "s.kills", "wins": "s.wins", "level": "s.level",
+		"xp": "s.xp", "kd": "CASE WHEN s.deaths > 0 THEN CAST(s.kills AS REAL)/s.deaths ELSE s.kills END",
+	}
+	col, ok := validCols[orderBy]
+	if !ok {
+		col = "s.xp"
+	}
+
+	query := `SELECT p.username, s.level, s.xp, s.kills, s.deaths, s.wins, s.losses
+		FROM stats s JOIN players p ON p.id = s.player_id
+		WHERE p.is_guest = 0
+		ORDER BY ` + col + ` DESC LIMIT ?`
+
+	rows, err := db.conn.Query(query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []LeaderboardEntry
+	rank := 1
+	for rows.Next() {
+		var e LeaderboardEntry
+		if err := rows.Scan(&e.Username, &e.Level, &e.XP, &e.Kills, &e.Deaths, &e.Wins, &e.Losses); err != nil {
+			return nil, err
+		}
+		e.Rank = rank
+		rank++
+		result = append(result, e)
+	}
+	return result, rows.Err()
+}
+
+// LeaderboardEntry represents one row in the leaderboard
+type LeaderboardEntry struct {
+	Rank     int    `json:"rank"`
+	Username string `json:"username"`
+	Level    int    `json:"level"`
+	XP       int    `json:"xp"`
+	Kills    int    `json:"kills"`
+	Deaths   int    `json:"deaths"`
+	Wins     int    `json:"wins"`
+	Losses   int    `json:"losses"`
 }
 
 // RecordMatch records a completed match and returns its ID

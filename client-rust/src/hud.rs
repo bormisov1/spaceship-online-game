@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use web_sys::CanvasRenderingContext2d;
-use crate::state::{SharedState, Phase, GameMode};
+use crate::state::{SharedState, Phase, GameMode, XPNotification};
 use crate::constants::{SHIP_COLORS, WORLD_W, WORLD_H, TEAM_RED_COLOR, TEAM_BLUE_COLOR};
 
 thread_local! {
@@ -104,6 +104,28 @@ pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
     if s.is_mobile && (s.phase == Phase::Playing || s.phase == Phase::Dead) {
         if let Some(ref tj) = s.touch_joystick {
             draw_mobile_joystick(ctx, tj.start_x, tj.start_y, tj.current_x, tj.current_y);
+        }
+    }
+
+    // XP bar (below health bar, only when authenticated)
+    if s.auth_player_id > 0 {
+        if let Some(my_id) = &s.my_id {
+            if let Some(me) = s.players.get(my_id) {
+                if me.a {
+                    let min_dim = screen_w.min(screen_h);
+                    let bar_w = (min_dim * 0.28).max(120.0).min(200.0);
+                    draw_xp_bar(ctx, screen_w / 2.0, screen_h - 18.0, bar_w, 6.0,
+                        s.auth_xp, s.auth_level, s.auth_xp_next);
+                }
+            }
+        }
+    }
+
+    // XP notification popup (after match)
+    if s.xp_notification.is_some() {
+        let elapsed = web_sys::window().unwrap().performance().unwrap().now() - s.xp_notification_time;
+        if elapsed < 5000.0 {
+            draw_xp_notification(ctx, screen_w, screen_h, &s.xp_notification.as_ref().unwrap(), elapsed);
         }
     }
 
@@ -587,5 +609,62 @@ fn draw_result_screen(
     ctx.set_fill_style_str("#aaaaaa");
     ctx.set_font("14px monospace");
     let _ = ctx.fill_text("Returning to lobby...", screen_w / 2.0, screen_h * 0.85);
+}
+
+/// Calculate total XP needed from level start to next level (mirrors server formula)
+fn xp_for_level(level: i32) -> i32 {
+    if level <= 1 { return 0; }
+    let mut total = 0.0;
+    for i in 1..level {
+        total += 100.0 * (i as f64).powf(1.5);
+    }
+    total as i32
+}
+
+fn draw_xp_bar(ctx: &CanvasRenderingContext2d, x: f64, y: f64, w: f64, h: f64, total_xp: i32, level: i32, xp_next: i32) {
+    let level_start_xp = xp_for_level(level);
+    let xp_in_level = total_xp - level_start_xp;
+    let ratio = if xp_next > 0 { (xp_in_level as f64 / xp_next as f64).min(1.0).max(0.0) } else { 1.0 };
+
+    // Background
+    ctx.set_fill_style_str("rgba(0, 0, 0, 0.4)");
+    ctx.fill_rect(x - w / 2.0 - 1.0, y - 1.0, w + 2.0, h + 2.0);
+
+    // XP fill - cyan/blue gradient feel
+    ctx.set_fill_style_str("#44aaff");
+    ctx.fill_rect(x - w / 2.0, y, w * ratio, h);
+
+    // Level text
+    ctx.set_fill_style_str("#aaddff");
+    ctx.set_font("bold 9px monospace");
+    ctx.set_text_align("center");
+    let _ = ctx.fill_text(&format!("Lv.{}", level), x, y + h + 10.0);
+}
+
+fn draw_xp_notification(ctx: &CanvasRenderingContext2d, screen_w: f64, screen_h: f64, notif: &XPNotification, elapsed: f64) {
+    // Animate: slide up and fade out
+    let progress = (elapsed / 5000.0).min(1.0);
+    let alpha = if progress > 0.7 { (1.0 - progress) / 0.3 } else { 1.0 };
+    let offset_y = progress * 40.0;
+
+    let cx = screen_w / 2.0;
+    let base_y = screen_h * 0.65 - offset_y;
+
+    ctx.set_global_alpha(alpha);
+    ctx.set_text_align("center");
+
+    // XP gained
+    ctx.set_fill_style_str("#44aaff");
+    ctx.set_font("bold 20px monospace");
+    let _ = ctx.fill_text(&format!("+{} XP", notif.xp_gained), cx, base_y);
+
+    // Level up announcement
+    if notif.leveled_up {
+        ctx.set_fill_style_str("#ffcc00");
+        ctx.set_font("bold 24px monospace");
+        let _ = ctx.fill_text(&format!("LEVEL UP! {}", notif.level), cx, base_y - 30.0);
+    }
+
+    ctx.set_global_alpha(1.0);
 }
 

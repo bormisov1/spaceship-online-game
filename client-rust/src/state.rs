@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::protocol::{PlayerState, ProjectileState, MobState, AsteroidState, PickupState, HealZoneState, PlayerMatchResult, TeamPlayerInfo};
+use crate::protocol::{PlayerState, ProjectileState, MobState, AsteroidState, PickupState, HealZoneState, PlayerMatchResult, TeamPlayerInfo, LeaderboardEntry};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Phase {
@@ -115,6 +115,14 @@ pub struct TouchJoystick {
     pub current_y: f64,
 }
 
+#[derive(Debug, Clone)]
+pub struct XPNotification {
+    pub xp_gained: i32,
+    pub level: i32,
+    pub prev_level: i32,
+    pub leveled_up: bool,
+}
+
 pub struct GameState {
     // Connection
     pub connected: bool,
@@ -176,10 +184,18 @@ pub struct GameState {
     pub auth_player_id: i64,
     pub auth_level: i32,
     pub auth_xp: i32,
+    pub auth_xp_next: i32,     // XP needed for next level
     pub auth_kills: i32,
     pub auth_deaths: i32,
     pub auth_wins: i32,
     pub auth_losses: i32,
+
+    // XP notification (after match)
+    pub xp_notification: Option<XPNotification>,
+    pub xp_notification_time: f64,
+
+    // Leaderboard
+    pub leaderboard: Vec<LeaderboardEntry>,
 
     // Controller
     pub controller_attached: bool,
@@ -274,10 +290,16 @@ impl GameState {
             auth_player_id: 0,
             auth_level: 1,
             auth_xp: 0,
+            auth_xp_next: 100,
             auth_kills: 0,
             auth_deaths: 0,
             auth_wins: 0,
             auth_losses: 0,
+
+            xp_notification: None,
+            xp_notification_time: 0.0,
+
+            leaderboard: Vec::new(),
 
             controller_attached: false,
 

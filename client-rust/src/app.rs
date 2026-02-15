@@ -98,8 +98,9 @@ pub fn App() -> impl IntoView {
     });
     std::mem::forget(_refresh_interval);
 
-    // Initial session list fetch
+    // Initial session list + leaderboard fetch
     Network::list_sessions(&net);
+    Network::send_leaderboard_request(&net);
 
     view! {
         <GameView

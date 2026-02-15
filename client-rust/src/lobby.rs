@@ -2,7 +2,7 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 use crate::state::SharedState;
 use crate::network::{Network, SharedNetwork};
-use crate::protocol::{SessionInfo, CheckedMsg};
+use crate::protocol::{SessionInfo, CheckedMsg, LeaderboardEntry};
 
 #[component]
 pub fn AuthPanel(
@@ -129,6 +129,7 @@ pub fn NormalLobby(
     };
 
     let state_auth = state.clone();
+    let state_lb = send_wrapper::SendWrapper::new(state.clone());
     let net_auth = net.clone();
     let default_name = state.borrow().auth_username.clone().unwrap_or_else(|| "Pilot".to_string());
 
@@ -216,6 +217,44 @@ pub fn NormalLobby(
                                             }
                                         }
                                     </For>
+                                }.into_any()
+                            }
+                        }}
+                    </div>
+                </div>
+                <div class="leaderboard-container">
+                    <h3>"Leaderboard"</h3>
+                    <div class="leaderboard">
+                        {move || {
+                            let lb = state_lb.borrow().leaderboard.clone();
+                            if lb.is_empty() {
+                                view! { <p class="no-sessions">"No rankings yet"</p> }.into_any()
+                            } else {
+                                view! {
+                                    <table class="leaderboard-table">
+                                        <thead><tr>
+                                            <th>"#"</th><th>"Pilot"</th><th>"Lv"</th><th>"K"</th><th>"D"</th><th>"W"</th>
+                                        </tr></thead>
+                                        <tbody>
+                                            {lb.iter().map(|e| {
+                                                let kd = if e.deaths > 0 {
+                                                    format!("{:.1}", e.kills as f64 / e.deaths as f64)
+                                                } else {
+                                                    format!("{}", e.kills)
+                                                };
+                                                view! {
+                                                    <tr>
+                                                        <td class="lb-rank">{e.rank}</td>
+                                                        <td class="lb-name">{e.username.clone()}</td>
+                                                        <td class="lb-level">{e.level}</td>
+                                                        <td>{e.kills}</td>
+                                                        <td>{e.deaths}</td>
+                                                        <td>{e.wins}</td>
+                                                    </tr>
+                                                }
+                                            }).collect::<Vec<_>>()}
+                                        </tbody>
+                                    </table>
                                 }.into_any()
                             }
                         }}

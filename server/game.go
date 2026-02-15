@@ -717,6 +717,13 @@ func (g *Game) persistMatchResults(mode int, duration float64, winnerTeam int, r
 			continue // skip guests/disconnected
 		}
 
+		// Get current level before update
+		prevStats, _ := g.db.GetStats(p.AuthPlayerID)
+		prevLevel := 1
+		if prevStats != nil {
+			prevLevel = prevStats.Level
+		}
+
 		// Calculate XP: 10 per kill + 5 per assist + 50 win bonus
 		xp := r.Kills*10 + r.Assists*5
 		won := false
@@ -731,8 +738,22 @@ func (g *Game) persistMatchResults(mode int, duration float64, winnerTeam int, r
 		if err := g.db.RecordMatchPlayer(matchID, p.AuthPlayerID, r.Team, r.Kills, r.Deaths, r.Assists, r.Score, xp); err != nil {
 			log.Printf("DB: failed to record match player: %v", err)
 		}
-		if err := g.db.UpdateStatsAfterMatch(p.AuthPlayerID, r.Kills, r.Deaths, r.Assists, won, duration, xp); err != nil {
+		totalXP, newLevel, err := g.db.UpdateStatsAfterMatch(p.AuthPlayerID, r.Kills, r.Deaths, r.Assists, won, duration, xp)
+		if err != nil {
 			log.Printf("DB: failed to update player stats: %v", err)
+			continue
+		}
+
+		// Send XP update to the player's client
+		if client, ok := g.clients[r.ID]; ok {
+			client.SendJSON(Envelope{T: MsgXPUpdate, Data: XPUpdateMsg{
+				XPGained:  xp,
+				TotalXP:   totalXP,
+				Level:     newLevel,
+				PrevLevel: prevLevel,
+				XPNext:    XPToNextLevel(newLevel),
+				LeveledUp: newLevel > prevLevel,
+			}})
 		}
 	}
 }

@@ -306,6 +306,10 @@ impl Network {
     pub fn send_profile_request(net: &SharedNetwork) {
         Network::send_raw(net, "profile", &serde_json::json!({}));
     }
+
+    pub fn send_leaderboard_request(net: &SharedNetwork) {
+        Network::send_raw(net, "leaderboard", &serde_json::json!({}));
+    }
 }
 
 fn handle_message(
@@ -534,10 +538,31 @@ fn handle_message(
                 let mut s = state.borrow_mut();
                 s.auth_level = p.level;
                 s.auth_xp = p.xp;
+                s.auth_xp_next = p.xp_next;
                 s.auth_kills = p.kills;
                 s.auth_deaths = p.deaths;
                 s.auth_wins = p.wins;
                 s.auth_losses = p.losses;
+            }
+        }
+        "xp_update" => {
+            if let Ok(xu) = serde_json::from_value::<XPUpdateMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.auth_xp = xu.total_xp;
+                s.auth_level = xu.level;
+                s.auth_xp_next = xu.xp_next;
+                s.xp_notification = Some(crate::state::XPNotification {
+                    xp_gained: xu.xp_gained,
+                    level: xu.level,
+                    prev_level: xu.prev_level,
+                    leveled_up: xu.leveled_up,
+                });
+                s.xp_notification_time = web_sys::window().unwrap().performance().unwrap().now();
+            }
+        }
+        "leaderboard_res" => {
+            if let Ok(lb) = serde_json::from_value::<LeaderboardMsg>(data) {
+                state.borrow_mut().leaderboard = lb.entries;
             }
         }
         "error" => {

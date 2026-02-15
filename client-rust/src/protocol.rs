@@ -258,9 +258,42 @@ pub struct ProfileDataMsg {
     pub username: String,
     pub level: i32,
     pub xp: i32,
+    #[serde(default)]
+    pub xp_next: i32,
     pub kills: i32,
     pub deaths: i32,
     pub wins: i32,
     pub losses: i32,
     pub playtime: f64,
+}
+
+// Server -> Client: XP gained after match
+#[derive(Deserialize, Debug, Clone)]
+pub struct XPUpdateMsg {
+    pub xp_gained: i32,
+    pub total_xp: i32,
+    pub level: i32,
+    pub prev_level: i32,
+    pub xp_next: i32,
+    #[serde(default)]
+    pub leveled_up: bool,
+}
+
+// Server -> Client: leaderboard data
+#[derive(Deserialize, Debug, Clone)]
+pub struct LeaderboardMsg {
+    pub entries: Vec<LeaderboardEntry>,
+}
+
+// Leaderboard entry
+#[derive(Deserialize, Debug, Clone)]
+pub struct LeaderboardEntry {
+    pub rank: i32,
+    pub username: String,
+    pub level: i32,
+    pub xp: i32,
+    pub kills: i32,
+    pub deaths: i32,
+    pub wins: i32,
+    pub losses: i32,
 }
