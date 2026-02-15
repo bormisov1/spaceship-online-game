@@ -37,7 +37,7 @@ func startTestServer(t *testing.T) (*httptest.Server, string, func()) {
 	hub := NewHub()
 	go hub.Run()
 
-	mux := SetupRoutes(hub, tmpDir, tmpDir)
+	mux := SetupRoutes(hub, tmpDir)
 	srv := httptest.NewServer(mux)
 
 	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws"

@@ -18,7 +18,7 @@ if $BUILD_RUST; then
 fi
 
 echo ">> Copying files..."
-scp -rq client server "$REMOTE:$REMOTE_DIR/"
+scp -rq server "$REMOTE:$REMOTE_DIR/"
 
 if $BUILD_RUST; then
     echo ">> Copying Rust client dist..."

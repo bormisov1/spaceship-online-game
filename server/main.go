@@ -12,18 +12,8 @@ import (
 
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
-	clientDir := flag.String("client", "", "Path to client directory (default: ../client)")
 	clientRustDir := flag.String("client-rust", "", "Path to Rust client dist directory (default: ../client-rust/dist)")
 	flag.Parse()
-
-	if *clientDir == "" {
-		exe, _ := os.Executable()
-		*clientDir = filepath.Join(filepath.Dir(exe), "..", "client")
-		// Fallback for development
-		if _, err := os.Stat(*clientDir); os.IsNotExist(err) {
-			*clientDir = "../client"
-		}
-	}
 
 	if *clientRustDir == "" {
 		exe, _ := os.Executable()
@@ -41,7 +31,7 @@ func main() {
 	hub := NewHub()
 	go hub.Run()
 
-	mux := SetupRoutes(hub, *clientDir, *clientRustDir)
+	mux := SetupRoutes(hub, *clientRustDir)
 
 	// Graceful shutdown
 	stop := make(chan os.Signal, 1)
@@ -52,11 +42,10 @@ func main() {
 	go func() {
 		log.Printf("Server starting on %s", *addr)
 		if *clientRustDir != "" {
-			log.Printf("Serving Rust client from %s at / and /rust/", *clientRustDir)
+			log.Printf("Serving Rust client from %s", *clientRustDir)
 		} else {
-			log.Printf("Serving JS client from %s at / (no Rust dist found)", *clientDir)
+			log.Printf("WARNING: No Rust client dist found")
 		}
-		log.Printf("Serving legacy JS client from %s at /legacy-js-client/", *clientDir)
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("ListenAndServe: %v", err)
 		}

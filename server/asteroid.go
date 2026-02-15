@@ -103,6 +103,6 @@ func (a *Asteroid) ToState() AsteroidState {
 		ID: a.ID,
 		X:  round1(a.X),
 		Y:  round1(a.Y),
-		R:  round1(a.Rotation),
+		R:  math.Round(a.Rotation*100) / 100,
 	}
 }

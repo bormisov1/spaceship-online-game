@@ -20,6 +20,9 @@ pub fn load_ship_images() {
     IMAGES_LOADED.with(|il| *il.borrow_mut() = true);
 }
 
+// Ship type 3 (Star Destroyer) renders 5x larger
+const SHIP_SCALE: [f64; 6] = [1.0, 1.0, 1.0, 5.0, 1.0, 1.0];
+
 pub fn draw_ship(ctx: &CanvasRenderingContext2d, x: f64, y: f64, rotation: f64, ship_type: i32) {
     SHIP_IMAGES.with(|si| {
         let images = si.borrow();
@@ -29,13 +32,16 @@ pub fn draw_ship(ctx: &CanvasRenderingContext2d, x: f64, y: f64, rotation: f64, 
 
         if img.natural_width() == 0 { return; } // Not loaded yet
 
+        let scale = SHIP_SCALE.get(idx).copied().unwrap_or(1.0);
+        let size = SHIP_SIZE * scale;
+        let half = size / 2.0;
+
         ctx.save();
         ctx.translate(x, y).unwrap_or(());
         ctx.rotate(rotation + std::f64::consts::FRAC_PI_2).unwrap_or(());
 
-        let half = SHIP_SIZE / 2.0;
         let _ = ctx.draw_image_with_html_image_element_and_dw_and_dh(
-            img, -half, -half, SHIP_SIZE, SHIP_SIZE,
+            img, -half, -half, size, size,
         );
 
         ctx.restore();

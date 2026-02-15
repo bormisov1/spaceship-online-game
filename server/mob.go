@@ -15,7 +15,8 @@ const (
 	MobRepelForce     = 120.0 // gentle nudge, allows head-on collisions
 	MobExplodeRelV    = 250.0
 	MobFriction       = 0.96
-	MobTurnSpeed      = 4.0
+	TieTurnSpeed      = 4.0
+	SDTurnSpeed       = 1.3
 	MobKillScore      = 5
 	MobBurstFireRate  = 0.15  // seconds between shots in a burst
 	MobBurstCooldown  = 5.0   // seconds between bursts
@@ -50,8 +51,8 @@ const (
 	SDProjDamage   = 60
 	SDBurstSize    = 8
 
-	// Spawn chance: 30% Star Destroyer, 70% TIE
-	SDSpawnChance = 0.3
+	// Spawn chance: 1/15 Star Destroyer, 14/15 TIE
+	SDSpawnChance = 1.0 / 15.0
 )
 
 // Mob phrase pools keyed by situation
@@ -116,6 +117,7 @@ type Mob struct {
 	MaxHP     int
 	ShipType    int
 	MaxSpeed    float64
+	TurnSpeed   float64
 	Accel       float64
 	CollisionDmg int
 	ProjDamage  int
@@ -173,6 +175,7 @@ func NewTieMob() *Mob {
 	m.MaxHP = TieMaxHP
 	m.ShipType = 4 + rand.Intn(2) // type 4 or 5
 	m.MaxSpeed = TieSpeed
+	m.TurnSpeed = TieTurnSpeed
 	m.Accel = TieAccel
 	m.CollisionDmg = TieCollisionDmg
 	m.ProjDamage = TieProjDamage
@@ -187,6 +190,7 @@ func NewStarDestroyerMob() *Mob {
 	m.MaxHP = SDMaxHP
 	m.ShipType = 3
 	m.MaxSpeed = SDSpeed
+	m.TurnSpeed = SDTurnSpeed
 	m.Accel = SDAccel
 	m.CollisionDmg = SDCollisionDmg
 	m.ProjDamage = SDProjDamage
@@ -290,7 +294,7 @@ func (m *Mob) Update(dt float64, players map[string]*Player, projectiles map[str
 		// Rotate toward lead position (for aiming/shooting)
 		desiredR := math.Atan2(leadY-m.Y, leadX-m.X)
 		diff := NormalizeAngle(desiredR - m.Rotation)
-		maxTurn := MobTurnSpeed * dt
+		maxTurn := m.TurnSpeed * dt
 		if diff > maxTurn {
 			diff = maxTurn
 		} else if diff < -maxTurn {
