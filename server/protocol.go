@@ -16,6 +16,10 @@ const (
 	MsgReady    = "ready"      // player ready toggle
 	MsgTeamPick = "team_pick"  // player picks team
 	MsgRematch  = "rematch"    // request rematch
+	MsgRegister = "register"   // create account
+	MsgLogin    = "login"      // login
+	MsgAuth     = "auth"       // auth with token
+	MsgProfile  = "profile"    // request profile
 )
 
 // Server -> Client message types
@@ -34,6 +38,8 @@ const (
 	MsgCtrlOff     = "ctrl_off"     // notify desktop: controller detached
 	MsgHit         = "hit"          // damage dealt to an entity
 	MsgMobSay      = "mob_say"      // mob speech bubble
+	MsgAuthOK      = "auth_ok"     // auth success
+	MsgProfileData = "profile_data" // profile/stats response
 	MsgMatchPhase  = "match_phase"  // match phase changed
 	MsgMatchResult = "match_result" // match ended, results
 	MsgTeamUpdate  = "team_update"  // team roster/score update
@@ -268,4 +274,41 @@ type TeamPlayerInfo struct {
 	ID    string `json:"id"`
 	Name  string `json:"n"`
 	Ready bool   `json:"ready"`
+}
+
+// RegisterMsg is sent by client to create an account
+type RegisterMsg struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// LoginMsg is sent by client to log in
+type LoginMsg struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// AuthMsg is sent by client to authenticate with a stored token
+type AuthMsg struct {
+	Token string `json:"token"`
+}
+
+// AuthOKMsg is sent to client on successful auth
+type AuthOKMsg struct {
+	Token    string `json:"token"`
+	Username string `json:"username"`
+	PlayerID int64  `json:"pid"`
+	IsGuest  bool   `json:"guest,omitempty"`
+}
+
+// ProfileDataMsg is sent to client with profile/stats info
+type ProfileDataMsg struct {
+	Username string `json:"username"`
+	Level    int    `json:"level"`
+	XP       int    `json:"xp"`
+	Kills    int    `json:"kills"`
+	Deaths   int    `json:"deaths"`
+	Wins     int    `json:"wins"`
+	Losses   int    `json:"losses"`
+	Playtime float64 `json:"playtime"`
 }

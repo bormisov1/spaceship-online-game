@@ -34,7 +34,7 @@ func startTestServer(t *testing.T) (*httptest.Server, string, func()) {
 	os.WriteFile(filepath.Join(tmpDir, "index.html"), []byte("<html>test</html>"), 0o644)
 	os.WriteFile(filepath.Join(jsDir, "main.js"), []byte("// test"), 0o644)
 
-	hub := NewHub()
+	hub := NewHub(nil)
 	go hub.Run()
 
 	mux := SetupRoutes(hub, tmpDir)
@@ -145,7 +145,7 @@ func TestGenerateUUIDUniqueness(t *testing.T) {
 
 func TestSessionIDIsUUID(t *testing.T) {
 	sm := NewSessionManager()
-	sess := sm.CreateSession("TestArena")
+	sess := sm.CreateSession("TestArena", ModeFFA, nil)
 	if !uuidRegex.MatchString(sess.ID) {
 		t.Errorf("session ID %q is not a valid UUID v4", sess.ID)
 	}
@@ -585,7 +585,7 @@ func TestWSEndpoint(t *testing.T) {
 // ---------- Hub client tracking ----------
 
 func TestHubClientCount(t *testing.T) {
-	hub := NewHub()
+	hub := NewHub(nil)
 	go hub.Run()
 
 	if hub.ClientCount() != 0 {
@@ -597,7 +597,7 @@ func TestHubClientCount(t *testing.T) {
 
 func TestSessionManagerCreateAndGet(t *testing.T) {
 	sm := NewSessionManager()
-	sess := sm.CreateSession("Battle")
+	sess := sm.CreateSession("Battle", ModeFFA, nil)
 
 	got := sm.GetSession(sess.ID)
 	if got == nil {
@@ -618,8 +618,8 @@ func TestSessionManagerGetNonExistent(t *testing.T) {
 
 func TestSessionManagerListSessions(t *testing.T) {
 	sm := NewSessionManager()
-	sm.CreateSession("Arena1")
-	sm.CreateSession("Arena2")
+	sm.CreateSession("Arena1", ModeFFA, nil)
+	sm.CreateSession("Arena2", ModeFFA, nil)
 
 	list := sm.ListSessions()
 	if len(list) != 2 {
@@ -635,7 +635,7 @@ func TestSessionManagerRemovePlayer(t *testing.T) {
 	}()
 
 	sm := NewSessionManager()
-	sess := sm.CreateSession("TempArena")
+	sess := sm.CreateSession("TempArena", ModeFFA, nil)
 	player := sess.Game.AddPlayer("TestPlayer")
 
 	sm.RemovePlayer(sess.ID, player.ID)

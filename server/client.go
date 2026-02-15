@@ -29,6 +29,9 @@ type Client struct {
 	isController bool
 	msgCount     int
 	msgResetAt   time.Time
+	// Auth state
+	authPlayerID int64  // 0 = unauthenticated/guest
+	authUsername  string // "" = unauthenticated
 }
 
 // NewClient creates a new Client
@@ -184,6 +187,14 @@ func (c *Client) handleMessage(raw []byte) {
 		c.handleTeamPick(env.D)
 	case MsgRematch:
 		c.handleRematch()
+	case MsgRegister:
+		c.handleRegister(env.D)
+	case MsgLogin:
+		c.handleLogin(env.D)
+	case MsgAuth:
+		c.handleAuth(env.D)
+	case MsgProfile:
+		c.handleProfile()
 	}
 }
 
@@ -216,7 +227,7 @@ func (c *Client) handleCreate(data json.RawMessage) {
 	if mode < ModeFFA || mode > ModeWaveSurvival {
 		mode = ModeFFA
 	}
-	sess := c.hub.sessions.CreateSession(sname, mode)
+	sess := c.hub.sessions.CreateSession(sname, mode, c.hub.db)
 	if sess == nil {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "too many active sessions"}})
 		return
@@ -253,6 +264,9 @@ func (c *Client) handleJoin(data json.RawMessage) {
 	c.hub.sessions.MarkActive(sess.ID)
 	c.playerID = player.ID
 	c.sessionID = sess.ID
+
+	// Link auth to in-game player
+	player.AuthPlayerID = c.authPlayerID
 
 	sess.Game.SetClient(player.ID, c)
 
@@ -393,4 +407,92 @@ func (c *Client) handleRematch() {
 		return
 	}
 	sess.Game.HandleRematch(c.playerID)
+}
+
+func (c *Client) handleRegister(data json.RawMessage) {
+	if c.hub.auth == nil {
+		return
+	}
+	var msg RegisterMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	id, token, err := c.hub.auth.Register(msg.Username, msg.Password)
+	if err != nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: err.Error()}})
+		return
+	}
+	c.authPlayerID = id
+	c.authUsername = msg.Username
+	c.SendJSON(Envelope{T: MsgAuthOK, Data: AuthOKMsg{
+		Token:    token,
+		Username: msg.Username,
+		PlayerID: id,
+	}})
+}
+
+func (c *Client) handleLogin(data json.RawMessage) {
+	if c.hub.auth == nil {
+		return
+	}
+	var msg LoginMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	id, token, err := c.hub.auth.Login(msg.Username, msg.Password, c.remoteAddr)
+	if err != nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: err.Error()}})
+		return
+	}
+	c.authPlayerID = id
+	c.authUsername = msg.Username
+	c.SendJSON(Envelope{T: MsgAuthOK, Data: AuthOKMsg{
+		Token:    token,
+		Username: msg.Username,
+		PlayerID: id,
+	}})
+}
+
+func (c *Client) handleAuth(data json.RawMessage) {
+	if c.hub.auth == nil {
+		return
+	}
+	var msg AuthMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	id, username, err := c.hub.auth.ValidateToken(msg.Token)
+	if err != nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "invalid token"}})
+		return
+	}
+	c.authPlayerID = id
+	c.authUsername = username
+	c.SendJSON(Envelope{T: MsgAuthOK, Data: AuthOKMsg{
+		Token:    msg.Token,
+		Username: username,
+		PlayerID: id,
+	}})
+}
+
+func (c *Client) handleProfile() {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "not authenticated"}})
+		return
+	}
+	stats, err := c.hub.db.GetStats(c.authPlayerID)
+	if err != nil || stats == nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "profile not found"}})
+		return
+	}
+	c.SendJSON(Envelope{T: MsgProfileData, Data: ProfileDataMsg{
+		Username: c.authUsername,
+		Level:    stats.Level,
+		XP:       stats.XP,
+		Kills:    stats.Kills,
+		Deaths:   stats.Deaths,
+		Wins:     stats.Wins,
+		Losses:   stats.Losses,
+		Playtime: stats.Playtime,
+	}})
 }

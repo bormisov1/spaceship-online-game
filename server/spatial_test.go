@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestSpatialGridInsertAndQuery(t *testing.T) {
-	var grid SpatialGrid
+	grid := NewSpatialGrid(WorldWidth, WorldHeight)
 	grid.Clear()
 
 	ref := EntityRef{Kind: 'p', Idx: 0}
@@ -32,7 +32,7 @@ func TestSpatialGridInsertAndQuery(t *testing.T) {
 }
 
 func TestSpatialGridClear(t *testing.T) {
-	var grid SpatialGrid
+	grid := NewSpatialGrid(WorldWidth, WorldHeight)
 	grid.Clear()
 
 	grid.Insert(500, 500, EntityRef{Kind: 'm', Idx: 0})
@@ -45,7 +45,7 @@ func TestSpatialGridClear(t *testing.T) {
 }
 
 func TestSpatialGridInsertCircle(t *testing.T) {
-	var grid SpatialGrid
+	grid := NewSpatialGrid(WorldWidth, WorldHeight)
 	grid.Clear()
 
 	// Insert a large entity (asteroid radius 40)
@@ -66,7 +66,7 @@ func TestSpatialGridInsertCircle(t *testing.T) {
 }
 
 func TestSpatialGridBoundaryClamp(t *testing.T) {
-	var grid SpatialGrid
+	grid := NewSpatialGrid(WorldWidth, WorldHeight)
 	grid.Clear()
 
 	// Negative coords should clamp to 0

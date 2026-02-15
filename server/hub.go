@@ -18,16 +18,21 @@ type Hub struct {
 	connMu     sync.Mutex
 	ipConns    map[string]int
 	totalConns int
+	// Auth & DB
+	db   *DB
+	auth *Auth
 }
 
-// NewHub creates a new Hub
-func NewHub() *Hub {
+// NewHub creates a new Hub with database
+func NewHub(db *DB) *Hub {
 	h := &Hub{
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client, 64),
 		unregister: make(chan *Client, 64),
 		sessions:   NewSessionManager(),
 		ipConns:    make(map[string]int),
+		db:         db,
+		auth:       NewAuth(db),
 	}
 	return h
 }

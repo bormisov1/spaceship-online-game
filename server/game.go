@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"math"
 	"sync"
 	"time"
@@ -92,9 +93,12 @@ type Game struct {
 	filtAsteroids []AsteroidState
 	filtPickups   []PickupState
 
-	// Phase 2: abilities
+	// Abilities
 	homingMissiles map[string]*HomingProjectile
 	healZones      map[string]*HealZone
+
+	// Database for stat persistence (nil if no DB)
+	db *DB
 }
 
 // NewGame creates a new Game with the given match configuration
@@ -223,6 +227,13 @@ func (g *Game) SetClient(playerID string, client Broadcaster) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.clients[playerID] = client
+}
+
+// SetDB sets the database reference for stat persistence
+func (g *Game) SetDB(db *DB) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.db = db
 }
 
 // HandleInput processes input from a player
@@ -682,6 +693,48 @@ func (g *Game) endMatch() {
 		Phase: int(PhaseResult),
 		Mode:  int(g.match_.Config.Mode),
 	}})
+
+	// Persist match and player stats to database
+	if g.db != nil {
+		go g.persistMatchResults(int(g.match_.Config.Mode), duration, winnerTeam, results)
+	}
+}
+
+// persistMatchResults records match results in the database (runs in goroutine)
+func (g *Game) persistMatchResults(mode int, duration float64, winnerTeam int, results []PlayerMatchResult) {
+	matchID, err := g.db.RecordMatch(mode, duration, winnerTeam)
+	if err != nil {
+		log.Printf("DB: failed to record match: %v", err)
+		return
+	}
+
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	for _, r := range results {
+		p, ok := g.players[r.ID]
+		if !ok || p.AuthPlayerID == 0 {
+			continue // skip guests/disconnected
+		}
+
+		// Calculate XP: 10 per kill + 5 per assist + 50 win bonus
+		xp := r.Kills*10 + r.Assists*5
+		won := false
+		if winnerTeam != TeamNone && r.Team == winnerTeam {
+			xp += 50
+			won = true
+		} else if winnerTeam == TeamNone && r.MVP {
+			xp += 50
+			won = true
+		}
+
+		if err := g.db.RecordMatchPlayer(matchID, p.AuthPlayerID, r.Team, r.Kills, r.Deaths, r.Assists, r.Score, xp); err != nil {
+			log.Printf("DB: failed to record match player: %v", err)
+		}
+		if err := g.db.UpdateStatsAfterMatch(p.AuthPlayerID, r.Kills, r.Deaths, r.Assists, won, duration, xp); err != nil {
+			log.Printf("DB: failed to update player stats: %v", err)
+		}
+	}
 }
 
 // resetToLobby transitions back to lobby for a new match

@@ -64,6 +64,9 @@ type Player struct {
 	Ability     Ability
 	AbilityUsed bool // input flag for ability activation
 
+	// Auth (0 = guest/unauthenticated)
+	AuthPlayerID int64
+
 	// World bounds (set from match config)
 	worldW float64
 	worldH float64

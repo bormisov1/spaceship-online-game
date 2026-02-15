@@ -13,6 +13,7 @@ import (
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	clientRustDir := flag.String("client-rust", "", "Path to Rust client dist directory (default: ../client-rust/dist)")
+	dbPath := flag.String("db", "spaceship.db", "Path to SQLite database file")
 	flag.Parse()
 
 	if *clientRustDir == "" {
@@ -28,7 +29,15 @@ func main() {
 		}
 	}
 
-	hub := NewHub()
+	// Initialize database
+	db, err := OpenDB(*dbPath)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	defer db.Close()
+	log.Printf("Database initialized at %s", *dbPath)
+
+	hub := NewHub(db)
 	go hub.Run()
 
 	mux := SetupRoutes(hub, *clientRustDir)

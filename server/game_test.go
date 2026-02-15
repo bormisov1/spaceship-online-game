@@ -31,7 +31,7 @@ func (m *mockBroadcaster) SendBinary(data []byte) {
 }
 
 func TestGameAddRemovePlayer(t *testing.T) {
-	g := NewGame()
+	g := NewGame(DefaultConfig(ModeFFA))
 	p := g.AddPlayer("TestPilot")
 	if p.Name != "TestPilot" {
 		t.Errorf("expected name TestPilot, got %s", p.Name)
@@ -47,7 +47,7 @@ func TestGameAddRemovePlayer(t *testing.T) {
 }
 
 func TestGameShipTypeRotation(t *testing.T) {
-	g := NewGame()
+	g := NewGame(DefaultConfig(ModeFFA))
 	p1 := g.AddPlayer("A")
 	p2 := g.AddPlayer("B")
 	p3 := g.AddPlayer("C")
@@ -62,7 +62,7 @@ func TestGameShipTypeRotation(t *testing.T) {
 }
 
 func TestGameHandleInput(t *testing.T) {
-	g := NewGame()
+	g := NewGame(DefaultConfig(ModeFFA))
 	p := g.AddPlayer("Test")
 
 	input := ClientInput{
@@ -82,7 +82,7 @@ func TestGameHandleInput(t *testing.T) {
 }
 
 func TestGameUpdate(t *testing.T) {
-	g := NewGame()
+	g := NewGame(DefaultConfig(ModeFFA))
 	p1 := g.AddPlayer("Player1")
 	p2 := g.AddPlayer("Player2")
 
@@ -102,7 +102,8 @@ func TestGameUpdate(t *testing.T) {
 }
 
 func TestGameProjectileCreation(t *testing.T) {
-	g := NewGame()
+	g := NewGame(DefaultConfig(ModeFFA))
+	g.match_.Phase = PhasePlaying // Must be playing to fire
 	p := g.AddPlayer("Shooter")
 	p.Firing = true
 	p.FireCD = 0
