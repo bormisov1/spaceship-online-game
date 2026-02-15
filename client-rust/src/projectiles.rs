@@ -33,7 +33,7 @@ fn get_glow_sprite(color: &str) -> HtmlCanvasElement {
             let _ = gradient.add_color_stop(0.15_f32, color);
             let _ = gradient.add_color_stop(0.5_f32, &format!("{}88", color));
             let _ = gradient.add_color_stop(1.0_f32, "transparent");
-            ctx.set_fill_style(&gradient);
+            ctx.set_fill_style_canvas_gradient(&gradient);
             ctx.fill_rect(0.0, 0.0, size as f64, size as f64);
         }
 
@@ -63,28 +63,28 @@ fn get_bolt_sprite(color: &str) -> HtmlCanvasElement {
 
         // Outer colored glow
         ctx.set_global_alpha(0.3);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(color));
+        ctx.set_fill_style_str(color);
         ctx.begin_path();
         let _ = ctx.ellipse(cx, cy, 18.0, 3.5, 0.0, 0.0, std::f64::consts::PI * 2.0);
         ctx.fill();
 
         // Mid body glow
         ctx.set_global_alpha(0.6);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(color));
+        ctx.set_fill_style_str(color);
         ctx.begin_path();
         let _ = ctx.ellipse(cx, cy, 15.0, 2.2, 0.0, 0.0, std::f64::consts::PI * 2.0);
         ctx.fill();
 
         // Bright white core
         ctx.set_global_alpha(0.95);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        ctx.set_fill_style_str("#ffffff");
         ctx.begin_path();
         let _ = ctx.ellipse(cx, cy, 12.0, 1.4, 0.0, 0.0, std::f64::consts::PI * 2.0);
         ctx.fill();
 
         // Front tip highlight
         ctx.set_global_alpha(1.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        ctx.set_fill_style_str("#ffffff");
         ctx.begin_path();
         let _ = ctx.arc(cx + 10.0, cy, 1.8, 0.0, std::f64::consts::PI * 2.0);
         ctx.fill();

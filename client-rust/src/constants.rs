@@ -3,13 +3,8 @@ pub const WORLD_W: f64 = 4000.0;
 pub const WORLD_H: f64 = 4000.0;
 pub const PLAYER_RADIUS: f64 = 20.0;
 pub const PROJECTILE_RADIUS: f64 = 4.0;
-pub const PLAYER_MAX_HP: i32 = 100;
-
 // Rendering
 pub const SHIP_SIZE: f64 = 60.0;
-pub const STAR_COUNT: usize = 300;
-pub const PARALLAX_FACTOR: f64 = 0.05;
-pub const ENGINE_PARTICLES: usize = 15;
 
 // Network
 pub const INPUT_RATE: u32 = 20; // Hz
@@ -18,15 +13,13 @@ pub const RECONNECT_DELAY: u32 = 2000; // ms
 // Colors per ship type
 pub struct ShipColor {
     pub main: &'static str,
-    pub accent: &'static str,
-    pub engine: &'static str,
 }
 
 pub const SHIP_COLORS: [ShipColor; 4] = [
-    ShipColor { main: "#ff4444", accent: "#ff8888", engine: "#ff6600" }, // Red
-    ShipColor { main: "#4488ff", accent: "#88bbff", engine: "#00aaff" }, // Blue
-    ShipColor { main: "#44ff44", accent: "#88ff88", engine: "#00ff66" }, // Green
-    ShipColor { main: "#ffff44", accent: "#ffffaa", engine: "#ffaa00" }, // Yellow
+    ShipColor { main: "#ff4444" }, // Red
+    ShipColor { main: "#4488ff" }, // Blue
+    ShipColor { main: "#44ff44" }, // Green
+    ShipColor { main: "#ffff44" }, // Yellow
 ];
 
 // New entity sizes (must match server)

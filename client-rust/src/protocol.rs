@@ -8,16 +8,6 @@ pub struct Envelope {
     pub d: Option<serde_json::Value>,
 }
 
-// Client -> Server input
-#[derive(Serialize, Debug)]
-pub struct ClientInput {
-    pub mx: f64,
-    pub my: f64,
-    pub fire: bool,
-    pub boost: bool,
-    pub thresh: f64,
-}
-
 // Server -> Client: welcome
 #[derive(Deserialize, Debug, Clone)]
 pub struct WelcomeMsg {
@@ -123,7 +113,6 @@ pub struct KillMsg {
 // Server -> Client: death notification
 #[derive(Deserialize, Debug, Clone)]
 pub struct DeathMsg {
-    pub kid: String,
     pub kn: String,
 }
 
@@ -138,7 +127,6 @@ pub struct SessionInfo {
 // Server -> Client: session check response
 #[derive(Deserialize, Debug, Clone)]
 pub struct CheckedMsg {
-    pub sid: String,
     pub exists: bool,
     #[serde(default)]
     pub name: String,

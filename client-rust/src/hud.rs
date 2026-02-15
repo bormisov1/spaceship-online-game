@@ -78,7 +78,7 @@ pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
 
     // Connection status
     if !s.connected {
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ff4444"));
+        ctx.set_fill_style_str("#ff4444");
         ctx.set_font("16px monospace");
         ctx.set_text_align("center");
         let _ = ctx.fill_text("DISCONNECTED - Reconnecting...", screen_w / 2.0, 30.0);
@@ -88,18 +88,18 @@ pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
 fn draw_health_bar(ctx: &CanvasRenderingContext2d, x: f64, y: f64, w: f64, h: f64, hp: i32, max_hp: i32) {
     let ratio = hp as f64 / max_hp as f64;
 
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 0, 0, 0.5)"));
+    ctx.set_fill_style_str("rgba(0, 0, 0, 0.5)");
     ctx.fill_rect(x - w / 2.0 - 2.0, y - 2.0, w + 4.0, h + 4.0);
 
     let color = if ratio > 0.6 { "#44ff44" } else if ratio > 0.3 { "#ffaa00" } else { "#ff4444" };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(color));
+    ctx.set_fill_style_str(color);
     ctx.fill_rect(x - w / 2.0, y, w * ratio, h);
 
-    ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("#ffffff44"));
+    ctx.set_stroke_style_str("#ffffff44");
     ctx.set_line_width(1.0);
     ctx.stroke_rect(x - w / 2.0, y, w, h);
 
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+    ctx.set_fill_style_str("#ffffff");
     ctx.set_font("bold 12px monospace");
     ctx.set_text_align("center");
     let _ = ctx.fill_text(&format!("{}/{}", hp, max_hp), x, y + h - 3.0);
@@ -112,10 +112,10 @@ fn draw_minimap(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, scr
     let x = screen_w - size - margin;
     let y = margin;
 
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 40, 0, 0.5)"));
+    ctx.set_fill_style_str("rgba(0, 40, 0, 0.5)");
     ctx.fill_rect(x, y, size, size);
 
-    ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("#00ff00"));
+    ctx.set_stroke_style_str("#00ff00");
     ctx.set_line_width(1.0);
     ctx.stroke_rect(x, y, size, size);
 
@@ -130,7 +130,7 @@ fn draw_minimap(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, scr
 
         ctx.begin_path();
         let _ = ctx.arc(dot_x, dot_y, radius, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(if is_me { "#ffffff" } else { SHIP_COLORS[idx].main }));
+        ctx.set_fill_style_str(if is_me { "#ffffff" } else { SHIP_COLORS[idx].main });
         ctx.fill();
     }
 
@@ -141,7 +141,7 @@ fn draw_minimap(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, scr
         let dot_y = y + (mob.y / WORLD_H) * size;
         ctx.begin_path();
         let _ = ctx.arc(dot_x, dot_y, 2.0, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffff44"));
+        ctx.set_fill_style_str("#ffff44");
         ctx.fill();
     }
 
@@ -151,7 +151,7 @@ fn draw_minimap(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, scr
         let dot_y = y + (ast.y / WORLD_H) * size;
         ctx.begin_path();
         let _ = ctx.arc(dot_x, dot_y, 3.0, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#aa7744"));
+        ctx.set_fill_style_str("#aa7744");
         ctx.fill();
     }
 
@@ -161,7 +161,7 @@ fn draw_minimap(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, scr
         let dot_y = y + (pk.y / WORLD_H) * size;
         ctx.begin_path();
         let _ = ctx.arc(dot_x, dot_y, 2.5, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#44ff88"));
+        ctx.set_fill_style_str("#44ff88");
         ctx.fill();
     }
 }
@@ -190,13 +190,13 @@ fn draw_kill_feed(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, s
         let killed_w = cached_measure_text(ctx, killed_text, font_size);
 
         // Draw killer name (orange)
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffaa00"));
+        ctx.set_fill_style_str("#ffaa00");
         let _ = ctx.fill_text(&kill.killer, x - victim_w - killed_w, y);
         // Draw " killed " (white)
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        ctx.set_fill_style_str("#ffffff");
         let _ = ctx.fill_text(killed_text, x - victim_w, y);
         // Draw victim name (red)
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ff4444"));
+        ctx.set_fill_style_str("#ff4444");
         let _ = ctx.fill_text(&kill.victim, x, y);
 
         y += 20.0;
@@ -231,10 +231,10 @@ fn draw_scoreboard(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, 
         let x = 15.0;
         let mut y = 60.0 * scale;
 
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 0, 0, 0.4)"));
+        ctx.set_fill_style_str("rgba(0, 0, 0, 0.4)");
         ctx.fill_rect(x - 5.0, y - line_h as f64, panel_w, (cache.1.len() as f64 * (line_h as f64 + 2.0)) + line_h as f64 + 6.0);
 
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff88"));
+        ctx.set_fill_style_str("#ffffff88");
         ctx.set_font(&format!("bold {}px monospace", header_size));
         let _ = ctx.fill_text("SCOREBOARD", x, y - 2.0);
         y += line_h as f64;
@@ -246,7 +246,7 @@ fn draw_scoreboard(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, 
             let is_me = s.my_id.as_ref() == Some(&p.id);
             let idx = (p.s as usize).min(SHIP_COLORS.len() - 1);
 
-            ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(if is_me { "#ffffff" } else { "#aaaaaa" }));
+            ctx.set_fill_style_str(if is_me { "#ffffff" } else { "#aaaaaa" });
             let name = if p.n.len() > max_name_len {
                 format!("{}..", &p.n[..max_name_len])
             } else {
@@ -254,7 +254,7 @@ fn draw_scoreboard(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, 
             };
             let _ = ctx.fill_text(&name, x, y);
 
-            ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(SHIP_COLORS[idx].main));
+            ctx.set_fill_style_str(SHIP_COLORS[idx].main);
             let _ = ctx.fill_text(&p.sc.to_string(), x + score_x, y);
             y += line_h as f64;
         }
@@ -262,26 +262,26 @@ fn draw_scoreboard(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, 
 }
 
 fn draw_death_screen(ctx: &CanvasRenderingContext2d, screen_w: f64, screen_h: f64, killer_name: &str) {
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 0, 0, 0.5)"));
+    ctx.set_fill_style_str("rgba(0, 0, 0, 0.5)");
     ctx.fill_rect(0.0, 0.0, screen_w, screen_h);
 
     ctx.set_text_align("center");
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ff4444"));
+    ctx.set_fill_style_str("#ff4444");
     ctx.set_font("bold 36px monospace");
     let _ = ctx.fill_text("DESTROYED", screen_w / 2.0, screen_h / 2.0 - 30.0);
 
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+    ctx.set_fill_style_str("#ffffff");
     ctx.set_font("20px monospace");
     let _ = ctx.fill_text(&format!("by {}", killer_name), screen_w / 2.0, screen_h / 2.0 + 10.0);
 
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#aaaaaa"));
+    ctx.set_fill_style_str("#aaaaaa");
     ctx.set_font("16px monospace");
     let _ = ctx.fill_text("Respawning...", screen_w / 2.0, screen_h / 2.0 + 50.0);
 }
 
 fn draw_crosshair(ctx: &CanvasRenderingContext2d, mx: f64, my: f64) {
     let size = 12.0;
-    ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.6)"));
+    ctx.set_stroke_style_str("rgba(255, 255, 255, 0.6)");
     ctx.set_line_width(1.5);
 
     ctx.begin_path();
@@ -297,7 +297,7 @@ fn draw_crosshair(ctx: &CanvasRenderingContext2d, mx: f64, my: f64) {
 
     ctx.begin_path();
     let _ = ctx.arc(mx, my, 2.0, 0.0, std::f64::consts::PI * 2.0);
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.6)"));
+    ctx.set_fill_style_str("rgba(255, 255, 255, 0.6)");
     ctx.fill();
 }
 
@@ -307,14 +307,14 @@ fn draw_mobile_joystick(ctx: &CanvasRenderingContext2d, start_x: f64, start_y: f
     // Base circle
     ctx.begin_path();
     let _ = ctx.arc(start_x, start_y, max_radius, 0.0, std::f64::consts::PI * 2.0);
-    ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.2)"));
+    ctx.set_stroke_style_str("rgba(255, 255, 255, 0.2)");
     ctx.set_line_width(2.0);
     ctx.stroke();
 
     // Inner dead zone
     ctx.begin_path();
     let _ = ctx.arc(start_x, start_y, 12.0, 0.0, std::f64::consts::PI * 2.0);
-    ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.1)"));
+    ctx.set_stroke_style_str("rgba(255, 255, 255, 0.1)");
     ctx.set_line_width(1.0);
     ctx.stroke();
 
@@ -329,9 +329,9 @@ fn draw_mobile_joystick(ctx: &CanvasRenderingContext2d, start_x: f64, start_y: f
 
     ctx.begin_path();
     let _ = ctx.arc(start_x + dx, start_y + dy, 18.0, 0.0, std::f64::consts::PI * 2.0);
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.25)"));
+    ctx.set_fill_style_str("rgba(255, 255, 255, 0.25)");
     ctx.fill();
-    ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.4)"));
+    ctx.set_stroke_style_str("rgba(255, 255, 255, 0.4)");
     ctx.set_line_width(1.5);
     ctx.stroke();
 }
@@ -342,18 +342,18 @@ pub fn draw_player_health_bar(ctx: &CanvasRenderingContext2d, x: f64, y: f64, hp
     let bar_y = y - 30.0;
 
     if !is_me {
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff99"));
+        ctx.set_fill_style_str("#ffffff99");
         ctx.set_font("11px monospace");
         ctx.set_text_align("center");
         let _ = ctx.fill_text(name, x, bar_y - 8.0);
     }
 
     let ratio = hp as f64 / max_hp as f64;
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0,0,0,0.5)"));
+    ctx.set_fill_style_str("rgba(0,0,0,0.5)");
     ctx.fill_rect(x - bar_w / 2.0, bar_y, bar_w, bar_h);
 
     let color = if ratio > 0.6 { "#44ff44" } else if ratio > 0.3 { "#ffaa00" } else { "#ff4444" };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(color));
+    ctx.set_fill_style_str(color);
     ctx.fill_rect(x - bar_w / 2.0, bar_y, bar_w * ratio, bar_h);
 }
 

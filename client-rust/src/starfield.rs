@@ -23,10 +23,6 @@ struct StarInfo {
     x: f64,
     y: f64,
     size: f64,
-    alpha: f64,
-    r: u8,
-    g: u8,
-    b: u8,
     layer: usize,
 }
 
@@ -67,12 +63,12 @@ fn build_offscreen_canvases(w: f64, h: f64) {
             };
 
             ctx.set_global_alpha(alpha);
-            ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(&format!("rgb({},{},{})", r, g, b)));
+            ctx.set_fill_style_str(&format!("rgb({},{},{})", r, g, b));
             ctx.begin_path();
             let _ = ctx.arc(x, y, size, 0.0, std::f64::consts::PI * 2.0);
             ctx.fill();
 
-            star_data.push(StarInfo { x, y, size, alpha, r, g, b, layer });
+            star_data.push(StarInfo { x, y, size, layer });
         }
         ctx.set_global_alpha(1.0);
         layers.push(canvas);
@@ -103,7 +99,7 @@ fn build_offscreen_canvases(w: f64, h: f64) {
         if let Ok(gradient) = nctx.create_radial_gradient(x, y, 0.0, x, y, r) {
             let _ = gradient.add_color_stop(0.0_f32, color);
             let _ = gradient.add_color_stop(1.0_f32, "transparent");
-            nctx.set_fill_style(&gradient);
+            nctx.set_fill_style_canvas_gradient(&gradient);
             nctx.fill_rect(x - r, y - r, r * 2.0, r * 2.0);
         }
     }
@@ -131,7 +127,7 @@ pub fn render_starfield(ctx: &CanvasRenderingContext2d, cx: f64, cy: f64, w: f64
         build_offscreen_canvases(w, h);
     }
 
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#0a0a1a"));
+    ctx.set_fill_style_str("#0a0a1a");
     ctx.fill_rect(0.0, 0.0, w, h);
 
     // Nebula (always rendered)
@@ -174,7 +170,7 @@ pub fn render_starfield(ctx: &CanvasRenderingContext2d, cx: f64, cy: f64, w: f64
 
                 // Most stars are white (255,255,255), batch them together
                 // Set a representative style for the layer
-                ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgb(255,255,255)"));
+                ctx.set_stroke_style_str("rgb(255,255,255)");
                 ctx.set_global_alpha((LAYER_ALPHAS[layer].1 * (1.0 + hyperspace_t * 0.3)).min(1.0));
                 ctx.set_line_width(LAYER_SIZES[layer].1 * 0.7);
 
@@ -192,7 +188,7 @@ pub fn render_starfield(ctx: &CanvasRenderingContext2d, cx: f64, cy: f64, w: f64
                 ctx.stroke();
 
                 // Batch dots as fill_rect (tiny squares, visually identical to arcs)
-                ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgb(255,255,255)"));
+                ctx.set_fill_style_str("rgb(255,255,255)");
                 for star in stars.iter().filter(|s| s.layer == layer) {
                     let sx = ((star.x - ox) % w + w) % w;
                     let sy = ((star.y - oy) % h + h) % h;

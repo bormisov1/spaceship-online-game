@@ -22,10 +22,10 @@ pub fn render_mob(
     let bar_y = sy - 35.0;
     let ratio = hp as f64 / mhp as f64;
 
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0,0,0,0.5)"));
+    ctx.set_fill_style_str("rgba(0,0,0,0.5)");
     ctx.fill_rect(sx - bar_w / 2.0, bar_y, bar_w, bar_h);
 
     let color = if ratio > 0.6 { "#ff8844" } else if ratio > 0.3 { "#ffaa00" } else { "#ff4444" };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(color));
+    ctx.set_fill_style_str(color);
     ctx.fill_rect(sx - bar_w / 2.0, bar_y, bar_w * ratio, bar_h);
 }

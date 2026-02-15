@@ -122,7 +122,7 @@ pub fn update_and_draw_controller_aim(
         ctx.rotate(aim.spin_angle).unwrap_or(());
 
         let alpha = 0.3 + 0.3 * p;
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str(&format!("rgba(255, 255, 255, {})", alpha)));
+        ctx.set_stroke_style_str(&format!("rgba(255, 255, 255, {})", alpha));
         ctx.set_line_width(1.5);
         ctx.set_line_dash(&js_sys::Array::of2(&8.0.into(), &6.0.into())).unwrap_or(());
         ctx.begin_path();

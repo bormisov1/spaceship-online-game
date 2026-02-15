@@ -38,7 +38,6 @@ pub struct Particle {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParticleKind {
-    Engine,
     Explosion,
 }
 
@@ -114,8 +113,6 @@ pub struct GameState {
     // Input
     pub mouse_x: f64,
     pub mouse_y: f64,
-    pub mouse_world_x: f64,
-    pub mouse_world_y: f64,
     pub firing: bool,
     pub boosting: bool,
     pub shift_pressed: bool,
@@ -191,8 +188,6 @@ impl GameState {
 
             mouse_x: 0.0,
             mouse_y: 0.0,
-            mouse_world_x: 0.0,
-            mouse_world_y: 0.0,
             firing: false,
             boosting: false,
             shift_pressed: false,

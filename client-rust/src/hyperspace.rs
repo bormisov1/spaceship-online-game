@@ -43,14 +43,14 @@ pub fn render_hyperspace(ctx: &CanvasRenderingContext2d, w: f64, h: f64, dt: f64
     });
 
     // Clear with dark background
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#0a0a1a"));
+    ctx.set_fill_style_str("#0a0a1a");
     ctx.fill_rect(0.0, 0.0, w, h);
 
     // Subtle radial gradient overlay for depth
     if let Ok(grad) = ctx.create_radial_gradient(w / 2.0, h / 2.0, 0.0, w / 2.0, h / 2.0, w.max(h) * 0.6) {
         let _ = grad.add_color_stop(0.0, "rgba(20, 20, 50, 0.3)");
         let _ = grad.add_color_stop(1.0, "rgba(10, 10, 26, 0)");
-        ctx.set_fill_style(&grad);
+        ctx.set_fill_style_canvas_gradient(&grad);
         ctx.fill_rect(0.0, 0.0, w, h);
     }
 
@@ -89,9 +89,9 @@ pub fn render_hyperspace(ctx: &CanvasRenderingContext2d, w: f64, h: f64, dt: f64
             let r = 180 + (star.brightness * 75.0) as u32;
             let g = 190 + (star.brightness * 65.0) as u32;
             let b = 255;
-            ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str(
+            ctx.set_stroke_style_str(
                 &format!("rgba({}, {}, {}, {})", r.min(255), g.min(255), b, alpha),
-            ));
+            );
             ctx.set_line_width(width);
             ctx.begin_path();
             ctx.move_to(x, y);

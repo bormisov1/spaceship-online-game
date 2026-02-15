@@ -254,7 +254,7 @@ pub fn render(state: &SharedState, dt: f64) {
 }
 
 fn draw_world_bounds(ctx: &CanvasRenderingContext2d, offset_x: f64, offset_y: f64) {
-    ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 100, 100, 0.3)"));
+    ctx.set_stroke_style_str("rgba(255, 100, 100, 0.3)");
     ctx.set_line_width(2.0);
     ctx.set_line_dash(&js_sys::Array::of2(&10.0.into(), &10.0.into())).unwrap_or(());
     ctx.stroke_rect(-offset_x, -offset_y, WORLD_W, WORLD_H);
@@ -271,9 +271,9 @@ fn draw_debug_hitboxes(ctx: &CanvasRenderingContext2d, s: &crate::state::GameSta
 
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, PLAYER_RADIUS, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 0, 0.15)"));
+        ctx.set_fill_style_str("rgba(255, 255, 0, 0.15)");
         ctx.fill();
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 0, 0.6)"));
+        ctx.set_stroke_style_str("rgba(255, 255, 0, 0.6)");
         ctx.set_line_width(1.0);
         ctx.stroke();
     }
@@ -286,9 +286,9 @@ fn draw_debug_hitboxes(ctx: &CanvasRenderingContext2d, s: &crate::state::GameSta
 
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, PROJECTILE_RADIUS, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 0, 0, 0.2)"));
+        ctx.set_fill_style_str("rgba(255, 0, 0, 0.2)");
         ctx.fill();
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 0, 0, 0.7)"));
+        ctx.set_stroke_style_str("rgba(255, 0, 0, 0.7)");
         ctx.set_line_width(1.0);
         ctx.stroke();
     }
@@ -302,9 +302,9 @@ fn draw_debug_hitboxes(ctx: &CanvasRenderingContext2d, s: &crate::state::GameSta
 
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, MOB_RADIUS, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 165, 0, 0.15)"));
+        ctx.set_fill_style_str("rgba(255, 165, 0, 0.15)");
         ctx.fill();
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 165, 0, 0.6)"));
+        ctx.set_stroke_style_str("rgba(255, 165, 0, 0.6)");
         ctx.set_line_width(1.0);
         ctx.stroke();
     }
@@ -317,9 +317,9 @@ fn draw_debug_hitboxes(ctx: &CanvasRenderingContext2d, s: &crate::state::GameSta
 
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, ASTEROID_RADIUS, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(139, 90, 43, 0.15)"));
+        ctx.set_fill_style_str("rgba(139, 90, 43, 0.15)");
         ctx.fill();
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(139, 90, 43, 0.6)"));
+        ctx.set_stroke_style_str("rgba(139, 90, 43, 0.6)");
         ctx.set_line_width(1.0);
         ctx.stroke();
     }
@@ -332,9 +332,9 @@ fn draw_debug_hitboxes(ctx: &CanvasRenderingContext2d, s: &crate::state::GameSta
 
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, PICKUP_RADIUS, 0.0, std::f64::consts::PI * 2.0);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 255, 0, 0.15)"));
+        ctx.set_fill_style_str("rgba(0, 255, 0, 0.15)");
         ctx.fill();
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(0, 255, 0, 0.6)"));
+        ctx.set_stroke_style_str("rgba(0, 255, 0, 0.6)");
         ctx.set_line_width(1.0);
         ctx.stroke();
     }

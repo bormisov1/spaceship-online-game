@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlImageElement};
 use crate::constants::SHIP_SIZE;
 

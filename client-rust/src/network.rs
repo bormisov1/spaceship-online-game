@@ -253,10 +253,6 @@ impl Network {
         Network::send_raw(net, "join", &serde_json::json!({"name": name, "sid": session_id}));
     }
 
-    pub fn check_session(net: &SharedNetwork, sid: &str) {
-        Network::send_raw(net, "check", &serde_json::json!({"sid": sid}));
-    }
-
     pub fn send_leave(net: &SharedNetwork) {
         Network::send_raw(net, "leave", &serde_json::json!({}));
     }
@@ -500,7 +496,6 @@ fn handle_state(state: &SharedState, phase_signal: &leptos::prelude::RwSignal<Ph
             let me_y = me.y;
             let me_alive = me.a;
             let me_boosting = me.b;
-            drop(me);
             s.cam_x = me_x;
             s.cam_y = me_y;
 

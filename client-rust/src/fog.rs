@@ -39,7 +39,7 @@ fn build_fog_canvas() {
         if let Ok(gradient) = ctx.create_radial_gradient(x, y, 0.0, x, y, r) {
             let _ = gradient.add_color_stop(0.0_f32, fog_colors[color_idx]);
             let _ = gradient.add_color_stop(1.0_f32, "transparent");
-            ctx.set_fill_style(&gradient);
+            ctx.set_fill_style_canvas_gradient(&gradient);
             ctx.fill_rect(x - r, y - r, r * 2.0, r * 2.0);
         }
     }
@@ -48,7 +48,7 @@ fn build_fog_canvas() {
     FOG_BUILT.with(|fb| *fb.borrow_mut() = true);
 }
 
-pub fn render_fog(ctx: &CanvasRenderingContext2d, offset_x: f64, offset_y: f64, vw: f64, vh: f64) {
+pub fn render_fog(ctx: &CanvasRenderingContext2d, offset_x: f64, offset_y: f64, _vw: f64, _vh: f64) {
     let built = FOG_BUILT.with(|fb| *fb.borrow());
     if !built {
         build_fog_canvas();

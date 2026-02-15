@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{MouseEvent, KeyboardEvent, TouchEvent, HtmlCanvasElement};
+use web_sys::{MouseEvent, KeyboardEvent, TouchEvent};
 use crate::state::{SharedState, Phase, TouchJoystick};
 use crate::network::SharedNetwork;
 
@@ -126,8 +126,7 @@ pub fn setup_input(state: SharedState, _net: SharedNetwork) {
         let prevent = Closure::wrap(Box::new(move |e: web_sys::Event| {
             e.prevent_default();
         }) as Box<dyn FnMut(web_sys::Event)>);
-        let mut opts = web_sys::AddEventListenerOptions::new();
-        opts.set_passive(false);
+        let opts = web_sys::AddEventListenerOptions::new();
         let _ = document.add_event_listener_with_callback_and_add_event_listener_options(
             "touchmove", prevent.as_ref().unchecked_ref(), &opts,
         );
@@ -188,8 +187,7 @@ fn setup_touch_input(state: SharedState, canvas: &web_sys::Element) {
         }
     }) as Box<dyn FnMut(TouchEvent)>);
 
-    let mut opts = web_sys::AddEventListenerOptions::new();
-    opts.set_passive(false);
+    let opts = web_sys::AddEventListenerOptions::new();
     let _ = canvas.add_event_listener_with_callback_and_add_event_listener_options(
         "touchstart", touchstart.as_ref().unchecked_ref(), &opts,
     );

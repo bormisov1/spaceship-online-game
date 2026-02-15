@@ -61,7 +61,7 @@ fn get_particle_glow(color: &str) -> HtmlCanvasElement {
             let inner = format!("{}66", color);
             let _ = gradient.add_color_stop(0.4_f32, &inner);
             let _ = gradient.add_color_stop(1.0_f32, "transparent");
-            ctx.set_fill_style(&gradient);
+            ctx.set_fill_style_canvas_gradient(&gradient);
             ctx.fill_rect(0.0, 0.0, size as f64, size as f64);
         }
 
@@ -90,7 +90,7 @@ fn get_flash_sprite() -> HtmlCanvasElement {
             let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 255, 220, 0.9)");
             let _ = gradient.add_color_stop(0.3_f32, "rgba(255, 200, 80, 0.5)");
             let _ = gradient.add_color_stop(1.0_f32, "transparent");
-            ctx.set_fill_style(&gradient);
+            ctx.set_fill_style_canvas_gradient(&gradient);
             ctx.fill_rect(0.0, 0.0, size as f64, size as f64);
         }
 
@@ -119,44 +119,13 @@ fn get_fill_sprite() -> HtmlCanvasElement {
             let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 150, 50, 0.3)");
             let _ = gradient.add_color_stop(0.6_f32, "rgba(255, 100, 20, 0.1)");
             let _ = gradient.add_color_stop(1.0_f32, "transparent");
-            ctx.set_fill_style(&gradient);
+            ctx.set_fill_style_canvas_gradient(&gradient);
             ctx.fill_rect(0.0, 0.0, size as f64, size as f64);
         }
 
         *opt = Some(canvas.clone());
         canvas
     })
-}
-
-pub fn add_engine_particles(
-    particles: &mut Vec<Particle>,
-    x: f64, y: f64, rotation: f64, speed: f64, ship_type: i32,
-) {
-    if speed < 20.0 { return; }
-    init_rng_if_needed();
-    if particles.len() >= MAX_PARTICLES { return; }
-
-    let idx = (ship_type as usize).min(SHIP_COLORS.len() - 1);
-    let engine_color = SHIP_COLORS[idx].engine.to_string();
-    let count = ((speed / 50.0) as usize).min(5);
-
-    for _ in 0..count {
-        if particles.len() >= MAX_PARTICLES { break; }
-        let angle = rotation + std::f64::consts::PI + (fast_random() - 0.5) * 0.6;
-        let spd = speed * 0.3 + fast_random() * 80.0;
-        let life = 0.3 + fast_random() * 0.3;
-        particles.push(Particle {
-            x: x - rotation.cos() * 15.0 + (fast_random() - 0.5) * 6.0,
-            y: y - rotation.sin() * 15.0 + (fast_random() - 0.5) * 6.0,
-            vx: angle.cos() * spd,
-            vy: angle.sin() * spd,
-            life,
-            max_life: life,
-            size: 2.0 + fast_random() * 3.0,
-            color: engine_color.clone(),
-            kind: ParticleKind::Engine,
-        });
-    }
 }
 
 pub fn add_explosion(
@@ -323,7 +292,7 @@ pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotati
         2 => "rgba(50, 255, 100, 0.6)",
         _ => "rgba(255, 200, 50, 0.6)",
     };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(glow_color));
+    ctx.set_fill_style_str(glow_color);
     ctx.fill();
 
     // Core beam (bright white-blue, narrower)
@@ -340,7 +309,7 @@ pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotati
         2 => "rgba(150, 255, 180, 0.8)",
         _ => "rgba(255, 240, 150, 0.8)",
     };
-    ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(core_color));
+    ctx.set_fill_style_str(core_color);
     ctx.fill();
 
     ctx.restore();
@@ -369,7 +338,7 @@ pub fn render_particles(ctx: &CanvasRenderingContext2d, particles: &[Particle], 
             // Engine particles: simple dots that shrink
             let size = p.size * t;
             ctx.set_global_alpha(t);
-            ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(&p.color));
+            ctx.set_fill_style_str(&p.color);
             if size < 3.0 {
                 ctx.fill_rect(sx - size, sy - size, size * 2.0, size * 2.0);
             } else {
@@ -455,10 +424,10 @@ pub fn render_damage_numbers(ctx: &CanvasRenderingContext2d, numbers: &[DamageNu
         ctx.set_global_alpha(alpha);
         ctx.set_font(&format!("bold {}px monospace", font_size));
         // Shadow
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#000000"));
+        ctx.set_fill_style_str("#000000");
         let _ = ctx.fill_text(&dn.text, sx + 1.0, sy + 1.0);
         // Color
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(dn.color));
+        ctx.set_fill_style_str(dn.color);
         let _ = ctx.fill_text(&dn.text, sx, sy);
     }
     ctx.set_global_alpha(1.0);
@@ -499,7 +468,7 @@ pub fn render_hit_markers(ctx: &CanvasRenderingContext2d, markers: &[HitMarker],
         let gap = 3.0;
 
         ctx.set_global_alpha(alpha);
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        ctx.set_stroke_style_str("#ffffff");
         ctx.set_line_width(2.5);
         ctx.begin_path();
         // Top-left to center
@@ -575,7 +544,7 @@ pub fn render_mob_speech(ctx: &CanvasRenderingContext2d, speech: &[MobSpeech], m
         let bh = 20.0;
 
         // Bubble background
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 0, 0, 0.7)"));
+        ctx.set_fill_style_str("rgba(0, 0, 0, 0.7)");
         let corner_r = 6.0;
         ctx.begin_path();
         let _ = ctx.arc(bx - bw / 2.0 + corner_r, by - bh / 2.0 + corner_r, corner_r, std::f64::consts::PI, 1.5 * std::f64::consts::PI);
@@ -586,7 +555,7 @@ pub fn render_mob_speech(ctx: &CanvasRenderingContext2d, speech: &[MobSpeech], m
         ctx.fill();
 
         // Bubble border
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 200, 50, 0.5)"));
+        ctx.set_stroke_style_str("rgba(255, 200, 50, 0.5)");
         ctx.set_line_width(1.0);
         ctx.stroke();
 
@@ -596,11 +565,11 @@ pub fn render_mob_speech(ctx: &CanvasRenderingContext2d, speech: &[MobSpeech], m
         ctx.line_to(bx, by + bh / 2.0 + 5.0);
         ctx.line_to(bx + 4.0, by + bh / 2.0);
         ctx.close_path();
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 0, 0, 0.7)"));
+        ctx.set_fill_style_str("rgba(0, 0, 0, 0.7)");
         ctx.fill();
 
         // Text
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        ctx.set_fill_style_str("#ffffff");
         let _ = ctx.fill_text(&s.text, bx, by + 4.0);
     }
     ctx.set_global_alpha(1.0);
@@ -630,7 +599,7 @@ pub fn render_explosions(ctx: &CanvasRenderingContext2d, explosions: &[Explosion
         let ring_alpha = t * 0.6;
         let ring_width = 4.0 + (1.0 - t) * 2.0; // thins as it expands
         ctx.set_global_alpha(ring_alpha);
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 180, 50, 0.8)"));
+        ctx.set_stroke_style_str("rgba(255, 180, 50, 0.8)");
         ctx.set_line_width(ring_width);
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, e.radius, 0.0, std::f64::consts::PI * 2.0);

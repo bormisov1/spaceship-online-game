@@ -226,13 +226,12 @@ fn update_status(text: &str) {
 }
 
 fn setup_touch_handlers(ctrl: &SharedCtrl) {
-    let document = web_sys::window().unwrap().document().unwrap();
     // Wait a bit for DOM to be ready
     let ctrl_clone = ctrl.clone();
     let _ = gloo_timers::callback::Timeout::new(100, move || {
         let document = web_sys::window().unwrap().document().unwrap();
         if let Some(pad) = document.get_element_by_id("ctrlPad") {
-            let mut opts = web_sys::AddEventListenerOptions::new();
+            let opts = web_sys::AddEventListenerOptions::new();
             opts.set_passive(false);
 
             // Touch start

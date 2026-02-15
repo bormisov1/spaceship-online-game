@@ -208,8 +208,8 @@ fn GameView(
 }
 
 #[component]
-#[allow(unused_variables)]
 fn IngameUI(state: SharedState, net: SharedNetwork) -> impl IntoView {
+    let _ = net;
     // Setup buttons after this component mounts
     let state_for_setup = send_wrapper::SendWrapper::new(state.clone());
     Effect::new(move |_| {

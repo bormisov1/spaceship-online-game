@@ -26,7 +26,7 @@ pub fn render_pickups(
             let _ = gradient.add_color_stop(0.0_f32, "rgba(100, 255, 150, 0.5)");
             let _ = gradient.add_color_stop(0.4_f32, "rgba(0, 255, 100, 0.2)");
             let _ = gradient.add_color_stop(1.0_f32, "transparent");
-            ctx.set_fill_style(&gradient);
+            ctx.set_fill_style_canvas_gradient(&gradient);
             ctx.begin_path();
             let _ = ctx.arc(sx, sy, glow_size * 1.3, 0.0, std::f64::consts::PI * 2.0);
             ctx.fill();
@@ -38,7 +38,7 @@ pub fn render_pickups(
             let _ = gradient.add_color_stop(0.0_f32, "rgba(80, 255, 140, 0.9)");
             let _ = gradient.add_color_stop(0.7_f32, "rgba(40, 200, 100, 0.7)");
             let _ = gradient.add_color_stop(1.0_f32, "rgba(20, 160, 80, 0.5)");
-            ctx.set_fill_style(&gradient);
+            ctx.set_fill_style_canvas_gradient(&gradient);
         }
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, circle_r, 0.0, std::f64::consts::PI * 2.0);
@@ -46,7 +46,7 @@ pub fn render_pickups(
 
         // Green circle border
         ctx.set_global_alpha(0.6 + 0.3 * pulse);
-        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(100, 255, 160, 0.8)"));
+        ctx.set_stroke_style_str("rgba(100, 255, 160, 0.8)");
         ctx.set_line_width(1.5);
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, circle_r, 0.0, std::f64::consts::PI * 2.0);
@@ -63,7 +63,7 @@ pub fn render_pickups(
             let _ = gradient.add_color_stop(0.0_f32, "rgba(255, 255, 255, 0.95)");
             let _ = gradient.add_color_stop(0.5_f32, "rgba(240, 255, 245, 0.85)");
             let _ = gradient.add_color_stop(1.0_f32, "rgba(220, 255, 235, 0.6)");
-            ctx.set_fill_style(&gradient);
+            ctx.set_fill_style_canvas_gradient(&gradient);
         }
 
         ctx.begin_path();
@@ -95,7 +95,7 @@ pub fn render_pickups(
 
         // White center diamond
         ctx.set_global_alpha(0.85 + 0.15 * pulse);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(255, 255, 255, 0.9)"));
+        ctx.set_fill_style_str("rgba(255, 255, 255, 0.9)");
         ctx.begin_path();
         ctx.move_to(sx, sy - arm_width);
         ctx.line_to(sx + arm_width, sy);
@@ -106,7 +106,7 @@ pub fn render_pickups(
 
         // White hot core dot
         ctx.set_global_alpha(0.9 + 0.1 * pulse);
-        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        ctx.set_fill_style_str("#ffffff");
         ctx.begin_path();
         let _ = ctx.arc(sx, sy, 2.5, 0.0, std::f64::consts::PI * 2.0);
         ctx.fill();
