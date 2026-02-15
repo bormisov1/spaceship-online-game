@@ -66,19 +66,4 @@ export const state = {
     // Effects
     particles: [],
     explosions: [],
-
-    // Screen shake
-    shakeX: 0,
-    shakeY: 0,
-    shakeIntensity: 0,
-    shakeDecay: 0,
-
-    // Damage numbers (world-space floating text)
-    damageNumbers: [],
-
-    // Hit markers (screen-space, brief flash when own shot connects)
-    hitMarkers: [],
-
-    // Mob speech bubbles
-    mobSpeech: [],  // { mobID, text, time }
 };

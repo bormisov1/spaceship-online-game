@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { renderStarfield } from './starfield.js';
 import { drawShip, initShips } from './ships.js';
 import { renderProjectiles } from './projectiles.js';
-import { updateParticles, renderParticles, renderExplosions, addEngineParticles, updateShake, updateDamageNumbers, renderDamageNumbers, updateHitMarkers, renderHitMarkers } from './effects.js';
+import { updateParticles, renderParticles, renderExplosions, addEngineParticles } from './effects.js';
 import { renderHUD, drawPlayerHealthBar } from './hud.js';
 import { WORLD_W, WORLD_H, PLAYER_RADIUS, PROJECTILE_RADIUS, MOB_RADIUS, ASTEROID_RADIUS, PICKUP_RADIUS } from './constants.js';
 import { renderMobs } from './mobs.js';
@@ -26,16 +26,13 @@ export function render(dt) {
     const h = state.screenH;
     const zoom = state.camZoom;
 
-    // Update screen shake
-    updateShake(dt);
-
     // Virtual viewport in world units (what the camera sees)
     const vw = w / zoom;
     const vh = h / zoom;
 
-    // Camera offset in world coords (with screen shake)
-    const offsetX = state.camX - vw / 2 + state.shakeX;
-    const offsetY = state.camY - vh / 2 + state.shakeY;
+    // Camera offset in world coords
+    const offsetX = state.camX - vw / 2;
+    const offsetY = state.camY - vh / 2;
 
     // Render background stars (screen-space, no zoom)
     renderStarfield();
@@ -55,8 +52,6 @@ export function render(dt) {
 
     // Update and render particles
     updateParticles(dt);
-    updateDamageNumbers(dt);
-    updateHitMarkers(dt);
     renderParticles(ctx, offsetX, offsetY, vw, vh);
     renderExplosions(ctx, offsetX, offsetY, vw, vh);
 
@@ -104,13 +99,7 @@ export function render(dt) {
         drawHitboxes(ctx, offsetX, offsetY, vw, vh);
     }
 
-    // Damage numbers (world-space, inside zoom transform)
-    renderDamageNumbers(ctx, offsetX, offsetY, vw, vh);
-
     ctx.restore(); // Remove zoom transform
-
-    // Hit markers (screen-space, no zoom)
-    renderHitMarkers(ctx);
 
     // HUD overlay (screen coords, no zoom)
     renderHUD(ctx);
