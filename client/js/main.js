@@ -4,7 +4,7 @@ import { setupInput } from './input.js';
 import { initLobby, hideLobby, showLobby, updateSessions, updateURL, checkURLSession, handleSessionCheck } from './lobby.js';
 import { render } from './renderer.js';
 import { initStarfield } from './starfield.js';
-import { addExplosion, addEngineParticles } from './effects.js';
+import { addExplosion, addEngineParticles, triggerShake, addDamageNumber, addHitMarker } from './effects.js';
 import { WORLD_W, WORLD_H } from './constants.js';
 import { initController } from './controller.js';
 
@@ -197,6 +197,9 @@ function handleMessage(msg) {
         case 'sessions':
             updateSessions(msg.d || []);
             break;
+        case 'hit':
+            handleHit(msg.d);
+            break;
         case 'kill':
             handleKill(msg.d);
             break;
@@ -304,6 +307,26 @@ function handleCreated(data) {
     joinSession(name, data.sid);
 }
 
+function handleHit(data) {
+    // Damage number at hit position
+    addDamageNumber(data.x, data.y, data.dmg, false);
+
+    // Screen shake — bigger shake for bigger damage
+    const shakeAmount = Math.min(data.dmg / 10, 6);
+
+    // If I'm the victim, bigger shake
+    if (data.vid === state.myID) {
+        triggerShake(shakeAmount * 1.5);
+    } else {
+        triggerShake(shakeAmount * 0.5);
+    }
+
+    // Hit marker if I'm the attacker
+    if (data.aid === state.myID) {
+        addHitMarker();
+    }
+}
+
 function handleKill(data) {
     state.killFeed.push({
         killer: data.kn,
@@ -319,6 +342,15 @@ function handleKill(data) {
     const victim = state.players.get(data.vid) || state.mobs.get(data.vid);
     if (victim) {
         addExplosion(victim.x, victim.y);
+    }
+
+    // Screen shake on kills — bigger than hits
+    if (data.kid === state.myID) {
+        triggerShake(8); // I got a kill
+    } else if (data.vid === state.myID) {
+        triggerShake(12); // I died
+    } else {
+        triggerShake(3); // nearby kill
     }
 }
 

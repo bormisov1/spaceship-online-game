@@ -2,6 +2,8 @@ import { state } from './state.js';
 import { SHIP_COLORS } from './constants.js';
 
 const MAX_PARTICLES = 200;
+const MAX_DAMAGE_NUMBERS = 30;
+const HIT_MARKER_DURATION = 0.25; // seconds
 
 // Engine particles
 export function addEngineParticles(x, y, rotation, speed, shipType) {
@@ -136,4 +138,138 @@ export function renderExplosions(ctx, offsetX, offsetY, vw, vh) {
         ctx.arc(sx, sy, e.radius, 0, Math.PI * 2);
         ctx.stroke();
     }
+}
+
+// --- Screen Shake ---
+
+export function triggerShake(intensity) {
+    // Stack shakes but cap intensity
+    state.shakeIntensity = Math.min(state.shakeIntensity + intensity, 20);
+    state.shakeDecay = state.shakeIntensity;
+}
+
+export function updateShake(dt) {
+    if (state.shakeIntensity <= 0) {
+        state.shakeX = 0;
+        state.shakeY = 0;
+        return;
+    }
+    // Random offset proportional to intensity
+    const angle = Math.random() * Math.PI * 2;
+    state.shakeX = Math.cos(angle) * state.shakeIntensity;
+    state.shakeY = Math.sin(angle) * state.shakeIntensity;
+    // Decay quickly
+    state.shakeIntensity -= state.shakeDecay * dt * 6;
+    if (state.shakeIntensity < 0.5) {
+        state.shakeIntensity = 0;
+        state.shakeX = 0;
+        state.shakeY = 0;
+    }
+}
+
+// --- Damage Numbers ---
+
+export function addDamageNumber(x, y, dmg, isHeal) {
+    if (state.damageNumbers.length >= MAX_DAMAGE_NUMBERS) {
+        state.damageNumbers.shift();
+    }
+    state.damageNumbers.push({
+        x,
+        y,
+        text: isHeal ? `+${dmg}` : `-${dmg}`,
+        color: isHeal ? '#44ff44' : '#ff4444',
+        life: 1.0,
+        maxLife: 1.0,
+        vy: -60, // float upward in world units/s
+        offsetX: (Math.random() - 0.5) * 20,
+    });
+}
+
+export function updateDamageNumbers(dt) {
+    let i = 0;
+    while (i < state.damageNumbers.length) {
+        const dn = state.damageNumbers[i];
+        dn.life -= dt;
+        dn.y += dn.vy * dt;
+        if (dn.life <= 0) {
+            state.damageNumbers.splice(i, 1);
+        } else {
+            i++;
+        }
+    }
+}
+
+export function renderDamageNumbers(ctx, offsetX, offsetY, vw, vh) {
+    ctx.textAlign = 'center';
+    for (const dn of state.damageNumbers) {
+        const sx = dn.x + dn.offsetX - offsetX;
+        const sy = dn.y - offsetY;
+        if (sx < -50 || sx > vw + 50 || sy < -50 || sy > vh + 50) continue;
+
+        const alpha = Math.max(0, dn.life / dn.maxLife);
+        const scale = 1 + (1 - alpha) * 0.3; // grow slightly as fading
+
+        ctx.globalAlpha = alpha;
+        ctx.font = `bold ${Math.round(14 * scale)}px monospace`;
+        // Shadow for readability
+        ctx.fillStyle = '#000000';
+        ctx.fillText(dn.text, sx + 1, sy + 1);
+        ctx.fillStyle = dn.color;
+        ctx.fillText(dn.text, sx, sy);
+    }
+    ctx.globalAlpha = 1;
+}
+
+// --- Hit Markers (screen-space) ---
+
+export function addHitMarker() {
+    state.hitMarkers.push({
+        life: HIT_MARKER_DURATION,
+        maxLife: HIT_MARKER_DURATION,
+    });
+}
+
+export function updateHitMarkers(dt) {
+    let i = 0;
+    while (i < state.hitMarkers.length) {
+        state.hitMarkers[i].life -= dt;
+        if (state.hitMarkers[i].life <= 0) {
+            state.hitMarkers.splice(i, 1);
+        } else {
+            i++;
+        }
+    }
+}
+
+export function renderHitMarkers(ctx) {
+    if (state.hitMarkers.length === 0) return;
+
+    // Draw an X at screen center (crosshair position)
+    const cx = state.screenW / 2;
+    const cy = state.screenH / 2;
+
+    for (const hm of state.hitMarkers) {
+        const alpha = Math.max(0, hm.life / hm.maxLife);
+        const size = 10 + (1 - alpha) * 4; // expand slightly
+        const gap = 3;
+
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        // Top-left to center
+        ctx.moveTo(cx - size, cy - size);
+        ctx.lineTo(cx - gap, cy - gap);
+        // Top-right to center
+        ctx.moveTo(cx + size, cy - size);
+        ctx.lineTo(cx + gap, cy - gap);
+        // Bottom-left to center
+        ctx.moveTo(cx - size, cy + size);
+        ctx.lineTo(cx - gap, cy + gap);
+        // Bottom-right to center
+        ctx.moveTo(cx + size, cy + size);
+        ctx.lineTo(cx + gap, cy + gap);
+        ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
 }
