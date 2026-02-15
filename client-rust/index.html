@@ -464,11 +464,8 @@
             white-space: nowrap;
             height: 100%;
             align-items: center;
-            animation: donation-marquee 90s linear infinite;
-        }
-
-        .donation-scroll:hover {
-            animation-play-state: paused;
+            animation: donation-marquee var(--marquee-dur, 45s) linear infinite;
+            transition: animation-duration 0.3s;
         }
 
         .donation-text {

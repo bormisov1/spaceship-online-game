@@ -277,7 +277,25 @@ fn DonationBanner() -> impl IntoView {
     };
 
     view! {
-        <div class="donation-banner">
+        <div class="donation-banner"
+            on:mousemove=|e: web_sys::MouseEvent| {
+                if let Some(ct) = e.current_target() {
+                    if let Ok(el) = ct.dyn_into::<web_sys::HtmlElement>() {
+                        let rect = el.get_bounding_client_rect();
+                        let x = e.client_x() as f64 - rect.left();
+                        let dur = if x < rect.width() / 3.0 { "11.25s" } else { "45s" };
+                        let _ = el.style().set_property("--marquee-dur", dur);
+                    }
+                }
+            }
+            on:mouseleave=|e: web_sys::MouseEvent| {
+                if let Some(ct) = e.current_target() {
+                    if let Ok(el) = ct.dyn_into::<web_sys::HtmlElement>() {
+                        let _ = el.style().set_property("--marquee-dur", "45s");
+                    }
+                }
+            }
+        >
             <div class="donation-scroll">
                 <span class="donation-text">
                     "\u{2605} This game is free & runs on donations \u{2014} no ads, ever! "
