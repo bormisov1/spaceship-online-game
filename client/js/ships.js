@@ -40,7 +40,7 @@ export function drawShip(ctx, x, y, rotation, shipType, alpha = 1) {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(x, y);
-    ctx.rotate(rotation);
+    ctx.rotate(rotation + Math.PI / 2);
     ctx.drawImage(sprite, -SHIP_SIZE / 2, -SHIP_SIZE / 2, SHIP_SIZE, SHIP_SIZE);
     ctx.restore();
 }

@@ -31,7 +31,7 @@ pub fn draw_ship(ctx: &CanvasRenderingContext2d, x: f64, y: f64, rotation: f64, 
 
         ctx.save();
         ctx.translate(x, y).unwrap_or(());
-        ctx.rotate(rotation).unwrap_or(());
+        ctx.rotate(rotation + std::f64::consts::FRAC_PI_2).unwrap_or(());
 
         let half = SHIP_SIZE / 2.0;
         let _ = ctx.draw_image_with_html_image_element_and_dw_and_dh(
