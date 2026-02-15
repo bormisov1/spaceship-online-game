@@ -9,8 +9,8 @@ const (
 	MobRadius         = 20.0
 	MobMaxHP          = 60
 	MobSpeed          = 180.0
-	MobDetectRange    = 655.0
-	MobShootRange     = 900.0  // start shooting when this close
+	MobDetectRange    = 400.0
+	MobShootRange     = 550.0  // start shooting when this close
 	MobDetectRangeSq  = MobDetectRange * MobDetectRange
 	MobShootRangeSq   = MobShootRange * MobShootRange
 	MobRepelRadius    = 50.0
@@ -31,7 +31,7 @@ const (
 	MobLowHPThreshold = 0.25  // below 25% HP triggers "almost dying" phrase
 
 	// Smart AI constants
-	MobOptimalRange   = 450.0 // preferred combat distance
+	MobOptimalRange   = 300.0 // preferred combat distance
 	MobOptimalRangeSq = MobOptimalRange * MobOptimalRange
 	MobDodgeRange     = 300.0 // range to detect incoming projectiles
 	MobDodgeRangeSq   = MobDodgeRange * MobDodgeRange
