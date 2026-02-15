@@ -464,8 +464,7 @@
             white-space: nowrap;
             height: 100%;
             align-items: center;
-            animation: donation-marquee var(--marquee-dur, 45s) linear infinite;
-            transition: animation-duration 0.3s;
+            animation: donation-marquee 45s linear infinite;
         }
 
         .donation-text {
@@ -501,6 +500,11 @@
         @keyframes donation-marquee {
             0% { transform: translateX(0); }
             100% { transform: translateX(-50%); }
+        }
+
+        @keyframes donation-marquee-reverse {
+            0% { transform: translateX(-50%); }
+            100% { transform: translateX(0); }
         }
 
         @media (hover: none), (max-width: 900px) {
@@ -594,5 +598,57 @@
     </style>
 </head>
 <body>
+<script>
+(function() {
+    var dir = 'f';
+    function setup(banner) {
+        var scroll = banner.querySelector('.donation-scroll');
+        if (!scroll) return;
+        banner.addEventListener('mousemove', function(e) {
+            var rect = banner.getBoundingClientRect();
+            var x = e.clientX - rect.left;
+            var want = x < rect.width / 3 ? 'r' : 'f';
+            if (want === dir) return;
+            var anims = scroll.getAnimations();
+            var p = 0;
+            if (anims.length) {
+                var t = anims[0].effect.getComputedTiming();
+                p = t.progress || 0;
+            }
+            var pos = (dir === 'f') ? p : (1 - p);
+            dir = want;
+            if (want === 'r') {
+                var d = -(1 - pos) * 22.5;
+                scroll.style.animation = 'donation-marquee-reverse 22.5s linear infinite';
+                scroll.style.animationDelay = d + 's';
+            } else {
+                var d = -(pos * 45);
+                scroll.style.animation = 'donation-marquee 45s linear infinite';
+                scroll.style.animationDelay = d + 's';
+            }
+        });
+        banner.addEventListener('mouseleave', function() {
+            var scroll = banner.querySelector('.donation-scroll');
+            if (!scroll) return;
+            var anims = scroll.getAnimations();
+            var p = 0;
+            if (anims.length) {
+                var t = anims[0].effect.getComputedTiming();
+                p = t.progress || 0;
+            }
+            var pos = (dir === 'f') ? p : (1 - p);
+            dir = 'f';
+            var d = -(pos * 45);
+            scroll.style.animation = 'donation-marquee 45s linear infinite';
+            scroll.style.animationDelay = d + 's';
+        });
+    }
+    var obs = new MutationObserver(function(_, o) {
+        var b = document.querySelector('.donation-banner');
+        if (b) { o.disconnect(); setup(b); }
+    });
+    obs.observe(document.documentElement, { childList: true, subtree: true });
+})();
+</script>
 </body>
 </html>
