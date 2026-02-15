@@ -272,6 +272,13 @@ func (g *Game) update() {
 			delete(g.mobs, id)
 			continue
 		}
+		// Broadcast mob phrase if any
+		if mob.PendingPhrase != "" {
+			g.broadcastMsg(Envelope{T: MsgMobSay, Data: MobSayMsg{
+				MobID: mob.ID, Text: mob.PendingPhrase,
+			}})
+			mob.PendingPhrase = ""
+		}
 		if wantFire && len(g.projectiles) < maxProjectilesPerSession {
 			proj := NewMobProjectile(mob)
 			g.projectiles[proj.ID] = proj
@@ -417,7 +424,13 @@ func (g *Game) checkCollisions() {
 							}})
 						}
 					} else {
-						// Killed by mob
+						// Killed by mob — mob celebrates
+						if killerMob, ok := g.mobs[proj.OwnerID]; ok && killerMob.Alive {
+							phrase := pickPhraseAlways("kill_player")
+							g.broadcastMsg(Envelope{T: MsgMobSay, Data: MobSayMsg{
+								MobID: killerMob.ID, Text: phrase,
+							}})
+						}
 						g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
 							KillerID: proj.OwnerID, KillerName: "Mob",
 							VictimID: p.ID, VictimName: p.Name,
@@ -719,6 +732,15 @@ func (g *Game) checkMobMobCollisions() {
 				rvy := a.VY - b.VY
 				relV := math.Sqrt(rvx*rvx + rvy*rvy)
 				if relV > MobExplodeRelV {
+					// Crash phrases
+					phraseA := pickPhraseAlways("mob_crash")
+					g.broadcastMsg(Envelope{T: MsgMobSay, Data: MobSayMsg{
+						MobID: a.ID, Text: phraseA,
+					}})
+					phraseB := pickPhraseAlways("mob_crash")
+					g.broadcastMsg(Envelope{T: MsgMobSay, Data: MobSayMsg{
+						MobID: b.ID, Text: phraseB,
+					}})
 					// Both explode
 					a.Alive = false
 					b.Alive = false
@@ -849,6 +871,11 @@ func (g *Game) checkAsteroidMobCollisions() {
 				continue
 			}
 			if CheckCollision(ast.X, ast.Y, AsteroidRadius, mob.X, mob.Y, MobRadius) {
+				// Mob phrase before dying
+				phrase := pickPhraseAlways("asteroid_death")
+				g.broadcastMsg(Envelope{T: MsgMobSay, Data: MobSayMsg{
+					MobID: mob.ID, Text: phrase,
+				}})
 				mob.Alive = false
 				g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
 					KillerID: "asteroid", KillerName: "Asteroid",

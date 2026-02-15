@@ -1,6 +1,9 @@
 package main
 
-import "math"
+import (
+	"math"
+	"math/rand"
+)
 
 const (
 	MobRadius         = 20.0
@@ -24,7 +27,61 @@ const (
 	MobBurstCooldown  = 5.0   // seconds between bursts
 	MobWanderDrift    = 1.0   // max radians/s the wander angle changes
 	MobWanderTurn     = 1.5   // how fast mob turns toward wander heading (rad/s)
+	MobPhraseChance   = 0.15  // 15% chance of saying a phrase on state change
+	MobLowHPThreshold = 0.25  // below 25% HP triggers "almost dying" phrase
 )
+
+// Mob phrase pools keyed by situation
+var mobPhrases = map[string][]string{
+	"notice": {
+		"🎯 Target acquired!",
+		"👀 I see you!",
+		"💀 You're mine!",
+		"🔥 Time to fight!",
+		"⚡ Engaging!",
+		"😈 Found one!",
+	},
+	"low_hp": {
+		"😰 I'm hit bad...",
+		"💔 Systems failing!",
+		"🆘 Mayday mayday!",
+		"😱 Not like this...",
+		"🔧 Need repairs!",
+		"💀 Tell my family...",
+	},
+	"lost": {
+		"🤔 Where'd they go?",
+		"👻 Lost visual...",
+		"❓ Come back here!",
+		"🔍 Scanning...",
+		"😤 Coward!",
+	},
+	"fire": {
+		"💥 Eat this!",
+		"🔫 Pew pew pew!",
+		"🎆 FIRE!",
+		"☄️ Take that!",
+		"😤 Die already!",
+	},
+	"asteroid_death": {
+		"🪨 Oh no—",
+		"💫 Didn't see that!",
+		"😵 ROCK!",
+		"🪨 Not a rock...",
+	},
+	"mob_crash": {
+		"🤦 Watch where you're going!",
+		"💥 Oops...",
+		"😵 My bad!",
+		"🫠 Friendly fire!",
+	},
+	"kill_player": {
+		"😎 Got 'em!",
+		"🏆 Too easy!",
+		"✨ Another one down!",
+		"💪 Who's next?",
+	},
+}
 
 // Mob is an AI-controlled enemy ship
 type Mob struct {
@@ -39,6 +96,32 @@ type Mob struct {
 	FireCD      float64 // cooldown between individual shots
 	BurstCD     float64 // cooldown between bursts
 	WanderAngle float64 // desired heading when idle
+
+	// State tracking for phrases
+	WasTracking  bool   // was tracking a player last tick
+	SaidLowHP    bool   // already said low-HP phrase
+	PendingPhrase string // phrase to broadcast this tick
+}
+
+// pickPhrase randomly selects a phrase from a pool (with chance gate)
+func pickPhrase(pool string, chance float64) string {
+	if rand.Float64() > chance {
+		return ""
+	}
+	phrases := mobPhrases[pool]
+	if len(phrases) == 0 {
+		return ""
+	}
+	return phrases[rand.Intn(len(phrases))]
+}
+
+// pickPhraseAlways selects a phrase without chance gate
+func pickPhraseAlways(pool string) string {
+	phrases := mobPhrases[pool]
+	if len(phrases) == 0 {
+		return ""
+	}
+	return phrases[rand.Intn(len(phrases))]
 }
 
 // NewMob spawns a mob at a random map edge
@@ -107,7 +190,16 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 		}
 	}
 
+	// Clear pending phrase each tick
+	m.PendingPhrase = ""
+
 	if found {
+		// State transition: started tracking
+		if !m.WasTracking {
+			m.PendingPhrase = pickPhrase("notice", MobPhraseChance)
+		}
+		m.WasTracking = true
+
 		// Rotate toward target player
 		desiredR := math.Atan2(targetY-m.Y, targetX-m.X)
 		diff := NormalizeAngle(desiredR - m.Rotation)
@@ -119,6 +211,12 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 		}
 		m.Rotation += diff
 	} else {
+		// State transition: lost player
+		if m.WasTracking {
+			m.PendingPhrase = pickPhrase("lost", MobPhraseChance)
+		}
+		m.WasTracking = false
+
 		// Wander: drift the wander angle gently, then turn toward it
 		m.WanderAngle += (randFloat()*2 - 1) * MobWanderDrift * dt
 		diff := NormalizeAngle(m.WanderAngle - m.Rotation)
@@ -176,7 +274,10 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 				m.BurstCD = MobBurstCooldown
 			}
 		} else if m.BurstLeft == 0 && m.BurstCD <= 0 {
-			// Start new burst
+			// Start new burst — say fire phrase
+			if m.PendingPhrase == "" {
+				m.PendingPhrase = pickPhrase("fire", MobPhraseChance)
+			}
 			m.BurstLeft = MobBurstSize
 			wantFire = true
 			m.BurstLeft--
@@ -200,6 +301,11 @@ func (m *Mob) TakeDamage(dmg int) bool {
 		m.HP = 0
 		m.Alive = false
 		return true
+	}
+	// Low HP phrase (once)
+	if !m.SaidLowHP && float64(m.HP)/float64(m.MaxHP) < MobLowHPThreshold {
+		m.SaidLowHP = true
+		m.PendingPhrase = pickPhraseAlways("low_hp")
 	}
 	return false
 }
