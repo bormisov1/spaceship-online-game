@@ -91,6 +91,10 @@ type Game struct {
 	filtMobs      []MobState
 	filtAsteroids []AsteroidState
 	filtPickups   []PickupState
+
+	// Phase 2: abilities
+	homingMissiles map[string]*HomingProjectile
+	healZones      map[string]*HealZone
 }
 
 // NewGame creates a new Game with the given match configuration
@@ -117,6 +121,8 @@ func NewGame(config MatchConfig) *Game {
 		bcastAsteroids:  make([]asteroidWithPos, 0, maxAsteroidsPerSession),
 		bcastPickups:    make([]pickupWithPos, 0, maxPickupsPerSession),
 		bcastProjs:      make([]projWithPos, 0, 64),
+		homingMissiles:  make(map[string]*HomingProjectile),
+		healZones:       make(map[string]*HealZone),
 		filtPlayers:     make([]PlayerState, 0, maxPlayersPerSession),
 		filtProjs:       make([]ProjectileState, 0, 64),
 		filtMobs:        make([]MobState, 0, maxMobsPerSession),
@@ -240,6 +246,7 @@ func (g *Game) HandleInput(playerID string, input ClientInput) {
 	p.TargetX = input.MX
 	p.TargetY = input.MY
 	p.SlowThresh = Clamp(input.Thresh, 50, 400)
+	p.AbilityUsed = input.Ability
 }
 
 // HandleReady toggles a player's ready state
@@ -386,11 +393,66 @@ func (g *Game) updatePlaying(dt float64) {
 	for _, p := range g.players {
 		p.Update(dt)
 
-		// Handle firing
+		// Handle firing (class-based)
 		if p.CanFire() && len(g.projectiles) < maxProjectilesPerSession {
-			proj := NewProjectile(p)
-			g.projectiles[proj.ID] = proj
-			p.FireCD = FireCooldown
+			def := GetClassDef(p.Class)
+			if def.ProjCount <= 1 {
+				proj := NewProjectileWithClass(p, def, 0)
+				g.projectiles[proj.ID] = proj
+			} else {
+				// Spread shot (e.g. Tank shotgun)
+				half := def.ProjSpread / 2.0
+				step := def.ProjSpread / float64(def.ProjCount-1)
+				for i := 0; i < def.ProjCount && len(g.projectiles) < maxProjectilesPerSession; i++ {
+					offset := -half + step*float64(i)
+					proj := NewProjectileWithClass(p, def, offset)
+					g.projectiles[proj.ID] = proj
+				}
+			}
+			p.FireCD = def.FireCD
+		}
+
+		// Handle ability activation
+		if p.AbilityUsed && p.Alive && p.Ability.CanActivate() {
+			g.activateAbility(p)
+			p.AbilityUsed = false
+		}
+	}
+
+	// Update homing missiles
+	for id, hm := range g.homingMissiles {
+		hm.Update(dt, g.players, g.mobs)
+		if !hm.Alive {
+			delete(g.homingMissiles, id)
+		}
+	}
+
+	// Update heal zones
+	for id, hz := range g.healZones {
+		if !hz.Update(dt) {
+			delete(g.healZones, id)
+			continue
+		}
+		// Heal nearby allies
+		for _, p := range g.players {
+			if !p.Alive || p.HP >= p.MaxHP {
+				continue
+			}
+			// Heal owner and teammates
+			if p.ID != hz.OwnerID && (hz.TeamID == TeamNone || p.Team != hz.TeamID) {
+				continue
+			}
+			d2 := (p.X-hz.X)*(p.X-hz.X) + (p.Y-hz.Y)*(p.Y-hz.Y)
+			if d2 <= hz.Radius*hz.Radius {
+				heal := int(hz.Rate * dt)
+				if heal < 1 {
+					heal = 1
+				}
+				p.HP += heal
+				if p.HP > p.MaxHP {
+					p.HP = p.MaxHP
+				}
+			}
 		}
 	}
 
@@ -453,6 +515,7 @@ func (g *Game) updatePlaying(dt float64) {
 	g.checkProjectileAsteroidCollisions()
 	g.checkPlayerPickupCollisions()
 	g.checkPlayerMobCollisions()
+	g.checkHomingMissileCollisions()
 
 	// Spawn entities
 	g.spawnEntities(dt)
@@ -666,6 +729,41 @@ func (g *Game) resetToLobby() {
 		Phase: int(PhaseLobby),
 		Mode:  int(g.match_.Config.Mode),
 	}})
+}
+
+// activateAbility processes a player's ability activation
+func (g *Game) activateAbility(p *Player) {
+	if !p.Ability.Activate() {
+		return
+	}
+	switch p.Ability.Type {
+	case AbilityMissileBarrage:
+		// Spawn homing missiles in a fan
+		for i := 0; i < MissileBarrageCount; i++ {
+			offset := (float64(i) - float64(MissileBarrageCount-1)/2) * 0.15
+			hm := NewHomingProjectile(
+				p.X+math.Cos(p.Rotation)*ProjectileOffset,
+				p.Y+math.Sin(p.Rotation)*ProjectileOffset,
+				p.Rotation+offset,
+				p.ID,
+			)
+			g.homingMissiles[hm.ID] = hm
+		}
+	case AbilityShield:
+		// Shield is passive (damage absorption in TakeDamage)
+	case AbilityBlink:
+		// Teleport forward
+		p.X += math.Cos(p.Rotation) * BlinkDistance
+		p.Y += math.Sin(p.Rotation) * BlinkDistance
+		// Wrap
+		ww := g.match_.Config.WorldWidth
+		wh := g.match_.Config.WorldHeight
+		if p.X < 0 { p.X += ww } else if p.X > ww { p.X -= ww }
+		if p.Y < 0 { p.Y += wh } else if p.Y > wh { p.Y -= wh }
+	case AbilityHealAura:
+		hz := NewHealZone(p.X, p.Y, p.ID, p.Team)
+		g.healZones[hz.ID] = hz
+	}
 }
 
 // checkScoreLimit returns true if any team/player has reached the score limit
@@ -1060,6 +1158,17 @@ func (g *Game) broadcastState() {
 			}
 		}
 
+		// Collect heal zone states
+		var hzStates []HealZoneState
+		if len(g.healZones) > 0 {
+			hzStates = make([]HealZoneState, 0, len(g.healZones))
+			for _, hz := range g.healZones {
+				hzStates = append(hzStates, HealZoneState{
+					ID: hz.ID, X: round1(hz.X), Y: round1(hz.Y), R: round1(hz.Radius),
+				})
+			}
+		}
+
 		state := GameState{
 			Players:     g.filtPlayers,
 			Projectiles: g.filtProjs,
@@ -1071,6 +1180,7 @@ func (g *Game) broadcastState() {
 			TimeLeft:    math.Round(g.match_.TimeLeft*10) / 10,
 			TeamRedSc:   g.match_.Teams[TeamRed].Score,
 			TeamBlueSc:  g.match_.Teams[TeamBlue].Score,
+			HealZones:   hzStates,
 		}
 
 		data, err := msgpack.Marshal(&state)
@@ -1429,6 +1539,96 @@ func (g *Game) checkPlayerMobCollisions() {
 	}
 }
 
+// checkHomingMissileCollisions checks homing missiles against players and mobs
+func (g *Game) checkHomingMissileCollisions() {
+	for _, hm := range g.homingMissiles {
+		if !hm.Alive {
+			continue
+		}
+		// Check against players
+		for _, p := range g.players {
+			if !p.Alive || p.ID == hm.OwnerID {
+				continue
+			}
+			if p.SpawnProtection > 0 {
+				continue
+			}
+			// Skip friendly fire
+			if g.isTeamMode() {
+				if owner, ok := g.players[hm.OwnerID]; ok && owner.Team == p.Team && owner.Team != TeamNone {
+					continue
+				}
+			}
+			if CheckCollision(hm.X, hm.Y, ProjectileRadius, p.X, p.Y, PlayerRadius) {
+				hm.Alive = false
+				died := p.TakeDamage(hm.Damage)
+				p.RecordDamage(hm.OwnerID, g.gameTime)
+				if owner, ok := g.players[hm.OwnerID]; ok {
+					owner.DamageDealt += hm.Damage
+				}
+				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
+					X: p.X, Y: p.Y, Dmg: hm.Damage,
+					VictimID: p.ID, AttackerID: hm.OwnerID,
+				}})
+				if died {
+					if killer, ok := g.players[hm.OwnerID]; ok {
+						killer.Score += 10
+						killer.Kills++
+						if g.isTeamMode() && killer.Team != TeamNone {
+							g.match_.Teams[killer.Team].Score++
+						}
+					}
+					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+						KillerID: hm.OwnerID, KillerName: g.playerName(hm.OwnerID),
+						VictimID: p.ID, VictimName: p.Name,
+					}})
+					if client, ok := g.clients[p.ID]; ok {
+						client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
+							KillerID: hm.OwnerID, KillerName: g.playerName(hm.OwnerID),
+						}})
+					}
+				}
+				break
+			}
+		}
+		if !hm.Alive {
+			continue
+		}
+		// Check against mobs
+		for _, mob := range g.mobs {
+			if !mob.Alive {
+				continue
+			}
+			if CheckCollision(hm.X, hm.Y, ProjectileRadius, mob.X, mob.Y, mob.Radius) {
+				hm.Alive = false
+				died := mob.TakeDamage(hm.Damage)
+				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
+					X: mob.X, Y: mob.Y, Dmg: hm.Damage,
+					VictimID: mob.ID, AttackerID: hm.OwnerID,
+				}})
+				if died {
+					if owner, ok := g.players[hm.OwnerID]; ok {
+						owner.Score += MobKillScore
+					}
+					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+						KillerID: hm.OwnerID, KillerName: g.playerName(hm.OwnerID),
+						VictimID: mob.ID, VictimName: "Mob",
+					}})
+				}
+				break
+			}
+		}
+	}
+}
+
+// playerName returns the player name for an ID, or "Unknown"
+func (g *Game) playerName(id string) string {
+	if p, ok := g.players[id]; ok {
+		return p.Name
+	}
+	return "Unknown"
+}
+
 // spawnEntities spawns mobs, asteroids, and pickups on timers
 func (g *Game) spawnEntities(dt float64) {
 	// Only spawn if there are players
@@ -1461,12 +1661,4 @@ func (g *Game) spawnEntities(dt float64) {
 		g.pickups[pk.ID] = pk
 		g.pickupSpawnCD = PickupSpawnInterval
 	}
-}
-
-// playerName returns a player's name or "Unknown"
-func (g *Game) playerName(id string) string {
-	if p, ok := g.players[id]; ok {
-		return p.Name
-	}
-	return "Unknown"
 }

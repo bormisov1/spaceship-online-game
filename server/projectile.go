@@ -41,6 +41,26 @@ func NewProjectile(owner *Player) *Projectile {
 	}
 }
 
+// NewProjectileWithClass creates a projectile using class-specific stats
+func NewProjectileWithClass(owner *Player, def ShipClassDef, angleOffset float64) *Projectile {
+	id := GenerateID(3)
+	angle := owner.Rotation + angleOffset
+	vx := math.Cos(angle) * def.ProjSpeed
+	vy := math.Sin(angle) * def.ProjSpeed
+	return &Projectile{
+		ID:       id,
+		OwnerID:  owner.ID,
+		X:        owner.X + math.Cos(angle)*ProjectileOffset,
+		Y:        owner.Y + math.Sin(angle)*ProjectileOffset,
+		VX:       vx + owner.VX*0.3,
+		VY:       vy + owner.VY*0.3,
+		Rotation: angle,
+		Life:     ProjectileLifetime,
+		Damage:   def.ProjDamage,
+		Alive:    true,
+	}
+}
+
 // NewMobProjectile creates a projectile from a mob's position and facing direction
 func NewMobProjectile(mob *Mob) *Projectile {
 	id := GenerateID(3)

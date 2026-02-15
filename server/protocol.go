@@ -53,11 +53,12 @@ type InEnvelope struct {
 
 // ClientInput is sent by the client at 20Hz
 type ClientInput struct {
-	MX     float64 `json:"mx"`    // mouse X (world coords)
-	MY     float64 `json:"my"`    // mouse Y (world coords)
-	Fire   bool    `json:"fire"`  // W key held
-	Boost  bool    `json:"boost"` // Shift key held
-	Thresh float64 `json:"thresh"` // distance threshold for speed modulation
+	MX      float64 `json:"mx"`      // mouse X (world coords)
+	MY      float64 `json:"my"`      // mouse Y (world coords)
+	Fire    bool    `json:"fire"`    // W key held
+	Boost   bool    `json:"boost"`   // Shift key held
+	Thresh  float64 `json:"thresh"`  // distance threshold for speed modulation
+	Ability bool    `json:"ability"` // ability key pressed
 }
 
 // JoinMsg is sent when player wants to join a session
@@ -87,8 +88,12 @@ type PlayerState struct {
 	Ship  int      `json:"s" msgpack:"s"`
 	Score int      `json:"sc" msgpack:"sc"`
 	Alive bool     `json:"a" msgpack:"a"`
-	Boost bool     `json:"b,omitempty" msgpack:"b,omitempty"`
-	Team  int      `json:"tm,omitempty" msgpack:"tm,omitempty"`
+	Boost   bool    `json:"b,omitempty" msgpack:"b,omitempty"`
+	Team    int     `json:"tm,omitempty" msgpack:"tm,omitempty"`
+	Class   int     `json:"cl,omitempty" msgpack:"cl,omitempty"`
+	AbilCD  float64 `json:"acd,omitempty" msgpack:"acd,omitempty"`
+	AbilAct bool    `json:"aact,omitempty" msgpack:"aact,omitempty"`
+	SpawnP  bool    `json:"sp,omitempty" msgpack:"sp,omitempty"`
 }
 
 // ProjectileState is broadcast per projectile
@@ -141,6 +146,15 @@ type GameState struct {
 	TimeLeft    float64           `json:"tl,omitempty" msgpack:"tl,omitempty"`
 	TeamRedSc   int               `json:"trs,omitempty" msgpack:"trs,omitempty"`
 	TeamBlueSc  int               `json:"tbs,omitempty" msgpack:"tbs,omitempty"`
+	HealZones   []HealZoneState   `json:"hz,omitempty" msgpack:"hz,omitempty"`
+}
+
+// HealZoneState is broadcast per heal zone
+type HealZoneState struct {
+	ID string  `json:"id" msgpack:"id"`
+	X  float64 `json:"x" msgpack:"x"`
+	Y  float64 `json:"y" msgpack:"y"`
+	R  float64 `json:"r" msgpack:"r"` // radius
 }
 
 // WelcomeMsg is sent to a player when they join

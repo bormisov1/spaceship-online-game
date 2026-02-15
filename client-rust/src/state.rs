@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::protocol::{PlayerState, ProjectileState, MobState, AsteroidState, PickupState, PlayerMatchResult, TeamPlayerInfo};
+use crate::protocol::{PlayerState, ProjectileState, MobState, AsteroidState, PickupState, HealZoneState, PlayerMatchResult, TeamPlayerInfo};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Phase {
@@ -130,6 +130,7 @@ pub struct GameState {
     pub mobs: HashMap<String, MobState>,
     pub asteroids: HashMap<String, AsteroidState>,
     pub pickups: HashMap<String, PickupState>,
+    pub heal_zones: Vec<HealZoneState>,
     pub tick: u64,
 
     // Screen
@@ -146,6 +147,7 @@ pub struct GameState {
     pub mouse_y: f64,
     pub firing: bool,
     pub boosting: bool,
+    pub ability_pressed: bool,
     pub shift_pressed: bool,
     pub hyperspace_t: f64, // 0.0 = normal stars, 1.0 = full hyperspace
     pub hyperspace_locked_r: Option<f64>, // rotation locked when shift pressed
@@ -221,6 +223,7 @@ impl GameState {
             mobs: HashMap::new(),
             asteroids: HashMap::new(),
             pickups: HashMap::new(),
+            heal_zones: Vec::new(),
             tick: 0,
 
             screen_w: 0.0,
@@ -234,6 +237,7 @@ impl GameState {
             mouse_y: 0.0,
             firing: false,
             boosting: false,
+            ability_pressed: false,
             shift_pressed: false,
             hyperspace_t: 0.0,
             hyperspace_locked_r: None,

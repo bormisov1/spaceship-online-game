@@ -272,11 +272,12 @@ func (c *Client) handleBinaryInput(msg []byte) {
 	thresh := float64(uint16(msg[6])<<8 | uint16(msg[7]))
 
 	input := ClientInput{
-		MX:     mx,
-		MY:     my,
-		Fire:   flags&0x01 != 0,
-		Boost:  flags&0x02 != 0,
-		Thresh: thresh,
+		MX:      mx,
+		MY:      my,
+		Fire:    flags&0x01 != 0,
+		Boost:   flags&0x02 != 0,
+		Ability: flags&0x04 != 0,
+		Thresh:  thresh,
 	}
 	sess := c.hub.sessions.GetSession(c.sessionID)
 	if sess == nil {

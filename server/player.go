@@ -59,6 +59,11 @@ type Player struct {
 	SpawnProtection float64
 	RecentDamagers  []DamageRecord
 
+	// Ship class & ability
+	Class       ShipClass
+	Ability     Ability
+	AbilityUsed bool // input flag for ability activation
+
 	// World bounds (set from match config)
 	worldW float64
 	worldH float64
@@ -201,6 +206,9 @@ func (p *Player) Update(dt float64) {
 		p.FireCD -= dt
 	}
 
+	// Tick ability
+	p.Ability.Update(dt)
+
 	// Clean up old damage records
 	if len(p.RecentDamagers) > 20 {
 		p.RecentDamagers = p.RecentDamagers[len(p.RecentDamagers)-20:]
@@ -234,6 +242,11 @@ func (p *Player) TakeDamage(dmg int) bool {
 		return false
 	}
 	if p.SpawnProtection > 0 {
+		return false
+	}
+	// Shield absorption (Tank ability)
+	dmg = p.Ability.AbsorbDamage(dmg)
+	if dmg <= 0 {
 		return false
 	}
 	p.HP -= dmg
@@ -280,21 +293,26 @@ func (p *Player) CanFire() bool {
 func (p *Player) ToState() PlayerState {
 	vx := round1(p.VX)
 	vy := round1(p.VY)
+	acd := round1(p.Ability.Cooldown)
 	return PlayerState{
-		ID:    p.ID,
-		Name:  p.Name,
-		X:     round1(p.X),
-		Y:     round1(p.Y),
-		R:     round1(p.Rotation),
-		VX:    &vx,
-		VY:    &vy,
-		HP:    p.HP,
-		MaxHP: p.MaxHP,
-		Ship:  p.ShipType,
-		Score: p.Score,
-		Alive: p.Alive,
-		Boost: p.Boosting,
-		Team:  p.Team,
+		ID:      p.ID,
+		Name:    p.Name,
+		X:       round1(p.X),
+		Y:       round1(p.Y),
+		R:       round1(p.Rotation),
+		VX:      &vx,
+		VY:      &vy,
+		HP:      p.HP,
+		MaxHP:   p.MaxHP,
+		Ship:    p.ShipType,
+		Score:   p.Score,
+		Alive:   p.Alive,
+		Boost:   p.Boosting,
+		Team:    p.Team,
+		Class:   int(p.Class),
+		AbilCD:  acd,
+		AbilAct: p.Ability.Active,
+		SpawnP:  p.SpawnProtection > 0,
 	}
 }
 

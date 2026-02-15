@@ -142,6 +142,27 @@ pub fn render(state: &SharedState, dt: f64) {
     {
         let s = state.borrow();
         let time_secs = now / 1000.0;
+        // Heal zones
+        for hz in &s.heal_zones {
+            let sx = hz.x - offset_x;
+            let sy = hz.y - offset_y;
+            if sx < -hz.r || sx > vw + hz.r || sy < -hz.r || sy > vh + hz.r { continue; }
+            ctx.begin_path();
+            let _ = ctx.arc(sx, sy, hz.r, 0.0, std::f64::consts::PI * 2.0);
+            ctx.set_fill_style_str("rgba(0, 255, 100, 0.08)");
+            ctx.fill();
+            ctx.set_stroke_style_str("rgba(0, 255, 100, 0.3)");
+            ctx.set_line_width(2.0);
+            ctx.stroke();
+            // Pulsing inner ring
+            let pulse = (time_secs * 3.0).sin() * 0.5 + 0.5;
+            let inner_r = hz.r * (0.3 + pulse * 0.4);
+            ctx.begin_path();
+            let _ = ctx.arc(sx, sy, inner_r, 0.0, std::f64::consts::PI * 2.0);
+            ctx.set_stroke_style_str("rgba(0, 255, 100, 0.15)");
+            ctx.set_line_width(1.0);
+            ctx.stroke();
+        }
         pickups::render_pickups(&ctx, &s.pickups, offset_x, offset_y, vw, vh, time_secs);
     }
 
@@ -185,6 +206,27 @@ pub fn render(state: &SharedState, dt: f64) {
 
             effects::draw_engine_beam(&ctx, sx, sy, pr, speed, p.s, boosting);
             ships::draw_ship(&ctx, sx, sy, pr, p.s);
+
+            // Spawn protection glow
+            if p.sp {
+                ctx.begin_path();
+                let _ = ctx.arc(sx, sy, 28.0, 0.0, std::f64::consts::PI * 2.0);
+                ctx.set_stroke_style_str("rgba(255, 255, 255, 0.4)");
+                ctx.set_line_width(2.0);
+                ctx.stroke();
+            }
+
+            // Shield bubble (Tank ability)
+            if p.aact && p.cl == 1 {
+                ctx.begin_path();
+                let _ = ctx.arc(sx, sy, 32.0, 0.0, std::f64::consts::PI * 2.0);
+                ctx.set_stroke_style_str("rgba(100, 180, 255, 0.6)");
+                ctx.set_line_width(3.0);
+                ctx.stroke();
+                ctx.set_fill_style_str("rgba(100, 180, 255, 0.1)");
+                ctx.fill();
+            }
+
             hud::draw_player_health_bar(&ctx, sx, sy, p.hp, p.mhp, &p.n, is_me);
         }
     }

@@ -224,14 +224,17 @@ impl Network {
         }
         drop(s);
 
-        let fire = state.borrow().firing;
-        let boost = state.borrow().boosting;
+        let s2 = state.borrow();
+        let fire = s2.firing;
+        let boost = s2.boosting;
+        let ability = s2.ability_pressed;
+        drop(s2);
 
         // Binary input: 8 bytes [0x01, mx_hi, mx_lo, my_hi, my_lo, flags, thresh_hi, thresh_lo]
         let mx_i = mx.round() as i16;
         let my_i = my.round() as i16;
         let thresh_i = thresh.round().max(0.0).min(65535.0) as u16;
-        let flags: u8 = (if fire { 0x01 } else { 0 }) | (if boost { 0x02 } else { 0 });
+        let flags: u8 = (if fire { 0x01 } else { 0 }) | (if boost { 0x02 } else { 0 }) | (if ability { 0x04 } else { 0 });
         let buf: [u8; 8] = [
             0x01,
             (mx_i as u16 >> 8) as u8, mx_i as u8,
@@ -549,6 +552,7 @@ fn handle_state(state: &SharedState, phase_signal: &leptos::prelude::RwSignal<Ph
         s.pickups.insert(pk.id.clone(), pk);
     }
 
+    s.heal_zones = gs.hz;
     s.tick = gs.tick;
     s.match_phase = gs.mp;
     s.match_time_left = gs.tl;

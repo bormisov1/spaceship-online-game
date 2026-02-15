@@ -91,6 +91,9 @@ pub fn setup_input(state: SharedState, _net: SharedNetwork) {
                     s.hyperspace_locked_r = locked_r;
                 }
             }
+            "q" | "Q" | " " => {
+                state_kd.borrow_mut().ability_pressed = true;
+            }
             "d" | "D" => {
                 let mut s = state_kd.borrow_mut();
                 s.debug_hitboxes = !s.debug_hitboxes;
@@ -111,6 +114,9 @@ pub fn setup_input(state: SharedState, _net: SharedNetwork) {
                 s.boosting = false;
                 s.shift_pressed = false;
                 s.hyperspace_locked_r = None;
+            }
+            "q" | "Q" | " " => {
+                state_ku.borrow_mut().ability_pressed = false;
             }
             _ => {}
         }

@@ -46,6 +46,14 @@ pub struct PlayerState {
     pub b: bool,
     #[serde(default)]
     pub tm: i32,
+    #[serde(default)]
+    pub cl: i32,
+    #[serde(default)]
+    pub acd: f64,
+    #[serde(default)]
+    pub aact: bool,
+    #[serde(default)]
+    pub sp: bool,
 }
 
 // Server -> Client: projectile state
@@ -113,6 +121,17 @@ pub struct GameStateMsg {
     pub trs: i32,
     #[serde(default)]
     pub tbs: i32,
+    #[serde(default)]
+    pub hz: Vec<HealZoneState>,
+}
+
+// Server -> Client: heal zone state
+#[derive(Deserialize, Debug, Clone)]
+pub struct HealZoneState {
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    pub r: f64, // radius
 }
 
 // Server -> Client: kill notification

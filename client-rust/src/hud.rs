@@ -79,6 +79,15 @@ pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
         }
     }
 
+    // Ability cooldown indicator
+    if let Some(my_id) = &s.my_id {
+        if let Some(me) = s.players.get(my_id) {
+            if me.a {
+                draw_ability_cooldown(ctx, screen_w, screen_h, me.acd, me.aact, me.cl);
+            }
+        }
+    }
+
     // Death screen
     if s.phase == Phase::Dead {
         if let Some(ref death_info) = s.death_info {
@@ -377,6 +386,70 @@ pub fn draw_player_health_bar(ctx: &CanvasRenderingContext2d, x: f64, y: f64, hp
     let color = if ratio > 0.6 { "#44ff44" } else if ratio > 0.3 { "#ffaa00" } else { "#ff4444" };
     ctx.set_fill_style_str(color);
     ctx.fill_rect(x - bar_w / 2.0, bar_y, bar_w * ratio, bar_h);
+}
+
+fn draw_ability_cooldown(ctx: &CanvasRenderingContext2d, screen_w: f64, screen_h: f64, cooldown: f64, active: bool, class: i32) {
+    let x = screen_w - 60.0;
+    let y = screen_h - 60.0;
+    let radius = 22.0;
+
+    let label = match class {
+        0 => "Q: Missiles",
+        1 => "Q: Shield",
+        2 => "Q: Blink",
+        3 => "Q: Heal",
+        _ => "Q: Ability",
+    };
+
+    // Background circle
+    ctx.begin_path();
+    let _ = ctx.arc(x, y, radius, 0.0, std::f64::consts::PI * 2.0);
+    ctx.set_fill_style_str(if active { "rgba(0, 255, 100, 0.3)" } else { "rgba(0, 0, 0, 0.5)" });
+    ctx.fill();
+
+    if cooldown > 0.0 {
+        // Cooldown sweep
+        let max_cd = match class {
+            0 => 12.0,
+            1 => 15.0,
+            2 => 8.0,
+            3 => 18.0,
+            _ => 10.0,
+        };
+        let ratio = (cooldown / max_cd).min(1.0);
+        let start = -std::f64::consts::FRAC_PI_2;
+        let end = start + std::f64::consts::PI * 2.0 * ratio;
+        ctx.begin_path();
+        ctx.move_to(x, y);
+        let _ = ctx.arc(x, y, radius, start, end);
+        ctx.close_path();
+        ctx.set_fill_style_str("rgba(100, 100, 100, 0.6)");
+        ctx.fill();
+
+        // Cooldown text
+        ctx.set_text_align("center");
+        ctx.set_fill_style_str("#ffffff");
+        ctx.set_font("bold 14px monospace");
+        let _ = ctx.fill_text(&format!("{:.0}", cooldown.ceil()), x, y + 5.0);
+    } else {
+        // Ready indicator
+        ctx.begin_path();
+        let _ = ctx.arc(x, y, radius, 0.0, std::f64::consts::PI * 2.0);
+        ctx.set_stroke_style_str("#44ff44");
+        ctx.set_line_width(2.0);
+        ctx.stroke();
+
+        ctx.set_text_align("center");
+        ctx.set_fill_style_str("#44ff44");
+        ctx.set_font("bold 12px monospace");
+        let _ = ctx.fill_text("RDY", x, y + 4.0);
+    }
+
+    // Label
+    ctx.set_fill_style_str("#aaaaaa");
+    ctx.set_font("10px monospace");
+    ctx.set_text_align("center");
+    let _ = ctx.fill_text(label, x, y + radius + 14.0);
 }
 
 fn draw_match_timer(ctx: &CanvasRenderingContext2d, screen_w: f64, time_left: f64) {
