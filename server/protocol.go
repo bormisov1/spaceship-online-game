@@ -29,6 +29,8 @@ const (
 	MsgControlOK  = "control_ok"  // controller attach confirmed
 	MsgCtrlOn     = "ctrl_on"     // notify desktop: controller attached
 	MsgCtrlOff    = "ctrl_off"    // notify desktop: controller detached
+	MsgHit        = "hit"         // damage dealt to an entity
+	MsgMobSay     = "mob_say"     // mob speech bubble
 )
 
 // Envelope wraps all outgoing messages with a type field
@@ -177,4 +179,19 @@ type CheckedMsg struct {
 	Exists  bool   `json:"exists"`
 	Name    string `json:"name,omitempty"`
 	Players int    `json:"players,omitempty"`
+}
+
+// HitMsg is broadcast when damage is dealt
+type HitMsg struct {
+	X          float64 `json:"x"`
+	Y          float64 `json:"y"`
+	Dmg        int     `json:"dmg"`
+	VictimID   string  `json:"vid"`
+	AttackerID string  `json:"aid"`
+}
+
+// MobSayMsg is broadcast when a mob says a phrase
+type MobSayMsg struct {
+	MobID string `json:"mid"`
+	Text  string `json:"text"`
 }

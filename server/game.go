@@ -391,6 +391,12 @@ func (g *Game) checkCollisions() {
 				died := p.TakeDamage(ProjectileDamage)
 				proj.Alive = false
 
+				// Broadcast hit event
+				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
+					X: p.X, Y: p.Y, Dmg: ProjectileDamage,
+					VictimID: p.ID, AttackerID: proj.OwnerID,
+				}})
+
 				if died {
 					p.Score -= DeathScorePenalty
 					// Award kill to shooter
@@ -761,6 +767,12 @@ func (g *Game) checkProjectileMobCollisions() {
 				died := mob.TakeDamage(ProjectileDamage)
 				proj.Alive = false
 
+				// Broadcast hit event
+				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
+					X: mob.X, Y: mob.Y, Dmg: ProjectileDamage,
+					VictimID: mob.ID, AttackerID: proj.OwnerID,
+				}})
+
 				if died {
 					if killer, ok := g.players[proj.OwnerID]; ok {
 						killer.Score += MobKillScore
@@ -797,7 +809,12 @@ func (g *Game) checkAsteroidPlayerCollisions() {
 				continue
 			}
 			if CheckCollision(ast.X, ast.Y, AsteroidRadius, p.X, p.Y, PlayerRadius) {
-				died := p.TakeDamage(p.HP)
+				dmg := p.HP
+				died := p.TakeDamage(dmg)
+				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
+					X: p.X, Y: p.Y, Dmg: dmg,
+					VictimID: p.ID, AttackerID: "asteroid",
+				}})
 				if died {
 					p.Score -= DeathScorePenalty
 					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
@@ -916,6 +933,12 @@ func (g *Game) checkPlayerMobCollisions() {
 
 				// Player takes collision damage
 				died := p.TakeDamage(MobCollisionDmg)
+
+				// Broadcast hit on player from mob collision
+				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
+					X: p.X, Y: p.Y, Dmg: MobCollisionDmg,
+					VictimID: p.ID, AttackerID: mob.ID,
+				}})
 
 				// Player gets kill credit for the mob
 				p.Score += MobKillScore
