@@ -67,8 +67,12 @@ pub struct MobState {
     pub vy: Option<f64>,
     pub hp: i32,
     pub mhp: i32,
+    #[serde(default = "default_mob_ship")]
+    pub s: i32,
     pub a: bool,
 }
+
+fn default_mob_ship() -> i32 { 3 }
 
 // Server -> Client: asteroid state
 #[derive(Deserialize, Debug, Clone)]

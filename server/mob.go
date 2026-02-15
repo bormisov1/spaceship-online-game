@@ -7,8 +7,6 @@ import (
 
 const (
 	MobRadius         = 20.0
-	MobMaxHP          = 60
-	MobSpeed          = 180.0
 	MobDetectRange    = 400.0
 	MobShootRange     = 550.0  // start shooting when this close
 	MobDetectRangeSq  = MobDetectRange * MobDetectRange
@@ -16,13 +14,9 @@ const (
 	MobRepelRadius    = 50.0
 	MobRepelForce     = 120.0 // gentle nudge, allows head-on collisions
 	MobExplodeRelV    = 250.0
-	MobAccel          = 200.0
 	MobFriction       = 0.96
 	MobTurnSpeed      = 4.0
-	MobShipType       = 3
 	MobKillScore      = 5
-	MobCollisionDmg   = 30
-	MobBurstSize      = 5
 	MobBurstFireRate  = 0.15  // seconds between shots in a burst
 	MobBurstCooldown  = 5.0   // seconds between bursts
 	MobWanderDrift    = 1.0   // max radians/s the wander angle changes
@@ -39,6 +33,25 @@ const (
 	MobDodgeCooldown  = 0.3   // seconds between dodge reactions
 	MobStrafeFlipMin  = 1.5   // min seconds before strafe direction flip
 	MobStrafeFlipMax  = 3.5   // max seconds before strafe direction flip
+
+	// TIE Fighter stats (regular mob)
+	TieMaxHP        = 60
+	TieSpeed        = 180.0
+	TieAccel        = 200.0
+	TieCollisionDmg = 30
+	TieProjDamage   = 20
+	TieBurstSize    = 5
+
+	// Star Destroyer stats (elite mob: 5x HP, 3x damage, 3x slower)
+	SDMaxHP        = 300
+	SDSpeed        = 60.0
+	SDAccel        = 70.0
+	SDCollisionDmg = 90
+	SDProjDamage   = 60
+	SDBurstSize    = 8
+
+	// Spawn chance: 30% Star Destroyer, 70% TIE
+	SDSpawnChance = 0.3
 )
 
 // Mob phrase pools keyed by situation
@@ -101,6 +114,12 @@ type Mob struct {
 	Rotation  float64
 	HP        int
 	MaxHP     int
+	ShipType    int
+	MaxSpeed    float64
+	Accel       float64
+	CollisionDmg int
+	ProjDamage  int
+	BurstSize   int
 	Alive       bool
 	BurstLeft   int     // shots remaining in current burst
 	FireCD      float64 // cooldown between individual shots
@@ -139,13 +158,47 @@ func pickPhraseAlways(pool string) string {
 	return phrases[rand.Intn(len(phrases))]
 }
 
-// NewMob spawns a mob at a random map edge
+// NewMob spawns a random mob type at a random map edge
 func NewMob() *Mob {
+	if rand.Float64() < SDSpawnChance {
+		return NewStarDestroyerMob()
+	}
+	return NewTieMob()
+}
+
+// NewTieMob spawns a TIE fighter mob (regular)
+func NewTieMob() *Mob {
+	m := newBaseMob()
+	m.HP = TieMaxHP
+	m.MaxHP = TieMaxHP
+	m.ShipType = 4 + rand.Intn(2) // type 4 or 5
+	m.MaxSpeed = TieSpeed
+	m.Accel = TieAccel
+	m.CollisionDmg = TieCollisionDmg
+	m.ProjDamage = TieProjDamage
+	m.BurstSize = TieBurstSize
+	return m
+}
+
+// NewStarDestroyerMob spawns a Star Destroyer mob (elite: 5x HP, 3x damage, 3x slower)
+func NewStarDestroyerMob() *Mob {
+	m := newBaseMob()
+	m.HP = SDMaxHP
+	m.MaxHP = SDMaxHP
+	m.ShipType = 3
+	m.MaxSpeed = SDSpeed
+	m.Accel = SDAccel
+	m.CollisionDmg = SDCollisionDmg
+	m.ProjDamage = SDProjDamage
+	m.BurstSize = SDBurstSize
+	return m
+}
+
+// newBaseMob creates a mob with shared setup (position, rotation, strafe)
+func newBaseMob() *Mob {
 	id := GenerateID(4)
 	m := &Mob{
 		ID:    id,
-		HP:    MobMaxHP,
-		MaxHP: MobMaxHP,
 		Alive: true,
 	}
 
@@ -263,7 +316,7 @@ func (m *Mob) Update(dt float64, players map[string]*Player, projectiles map[str
 		}
 
 		// Accelerate in movement direction (decoupled from aim)
-		accel := MobAccel * dt
+		accel := m.Accel * dt
 		m.VX += math.Cos(moveAngle) * accel
 		m.VY += math.Sin(moveAngle) * accel
 	} else {
@@ -285,7 +338,7 @@ func (m *Mob) Update(dt float64, players map[string]*Player, projectiles map[str
 		m.Rotation += diff
 
 		// Accelerate in facing direction when wandering
-		accel := MobAccel * dt
+		accel := m.Accel * dt
 		m.VX += math.Cos(m.Rotation) * accel
 		m.VY += math.Sin(m.Rotation) * accel
 	}
@@ -296,8 +349,8 @@ func (m *Mob) Update(dt float64, players map[string]*Player, projectiles map[str
 
 	// Clamp speed
 	speed := math.Sqrt(m.VX*m.VX + m.VY*m.VY)
-	if speed > MobSpeed {
-		scale := MobSpeed / speed
+	if speed > m.MaxSpeed {
+		scale := m.MaxSpeed / speed
 		m.VX *= scale
 		m.VY *= scale
 	}
@@ -384,7 +437,7 @@ func (m *Mob) Update(dt float64, players map[string]*Player, projectiles map[str
 			if m.PendingPhrase == "" {
 				m.PendingPhrase = pickPhrase("fire", MobPhraseChance)
 			}
-			m.BurstLeft = MobBurstSize
+			m.BurstLeft = m.BurstSize
 			wantFire = true
 			m.BurstLeft--
 			m.FireCD = MobBurstFireRate
@@ -429,6 +482,7 @@ func (m *Mob) ToState() MobState {
 		VY:    &vy,
 		HP:    m.HP,
 		MaxHP: m.MaxHP,
+		Ship:  m.ShipType,
 		Alive: m.Alive,
 	}
 }

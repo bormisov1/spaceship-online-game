@@ -15,11 +15,12 @@ export function renderMobs(ctx, offsetX, offsetY, vw, vh) {
         if (sx < -100 || sx > vw + 100 || sy < -100 || sy > vh + 100) continue;
 
         // Engine particles
+        const shipType = mob.s !== undefined ? mob.s : 3;
         const speed = Math.sqrt(mob.vx * mob.vx + mob.vy * mob.vy);
-        addEngineParticles(mob.x, mob.y, mob.r, speed, 3);
+        addEngineParticles(mob.x, mob.y, mob.r, speed, shipType);
 
-        // Draw ship (type 3 = Destroyer/Yellow, slightly smaller)
-        drawShip(ctx, sx, sy, mob.r, 3, 0.85);
+        // Draw ship using mob's ship type
+        drawShip(ctx, sx, sy, mob.r, shipType, 0.85);
 
         // Health bar
         drawPlayerHealthBar(ctx, sx, sy, mob.hp, mob.mhp, 'MOB', false);

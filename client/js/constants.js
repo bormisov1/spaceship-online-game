@@ -17,10 +17,12 @@ export const RECONNECT_DELAY = 2000; // ms
 
 // Colors per ship type
 export const SHIP_COLORS = [
-    { main: '#ff4444', accent: '#ff8888', engine: '#ff6600' }, // Red
-    { main: '#4488ff', accent: '#88bbff', engine: '#00aaff' }, // Blue
-    { main: '#44ff44', accent: '#88ff88', engine: '#00ff66' }, // Green
-    { main: '#ffff44', accent: '#ffffaa', engine: '#ffaa00' }, // Yellow
+    { main: '#ff4444', accent: '#ff8888', engine: '#ff6600' }, // Rebel 1
+    { main: '#4488ff', accent: '#88bbff', engine: '#00aaff' }, // Rebel 2
+    { main: '#44ff44', accent: '#88ff88', engine: '#00ff66' }, // Rebel 3
+    { main: '#88ff88', accent: '#ccffcc', engine: '#44ff44' }, // Star Destroyer
+    { main: '#aaaaff', accent: '#ccccff', engine: '#6666ff' }, // TIE 1
+    { main: '#aaaaff', accent: '#ccccff', engine: '#6666ff' }, // TIE 2
 ];
 
 // New entity sizes (must match server)
@@ -35,5 +37,7 @@ export const LASER_COLORS = [
     '#ff2222',
     '#2288ff',
     '#22ff22',
-    '#ffff22',
+    '#22ff22', // Star Destroyer
+    '#44ff44', // TIE 1
+    '#44ff44', // TIE 2
 ];

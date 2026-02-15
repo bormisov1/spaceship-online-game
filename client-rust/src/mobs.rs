@@ -5,7 +5,7 @@ use crate::effects;
 /// Render a single mob with pre-interpolated position/rotation
 pub fn render_mob(
     ctx: &CanvasRenderingContext2d,
-    x: f64, y: f64, r: f64, vx: f64, vy: f64, hp: i32, mhp: i32,
+    x: f64, y: f64, r: f64, vx: f64, vy: f64, hp: i32, mhp: i32, ship_type: i32,
     offset_x: f64, offset_y: f64, vw: f64, vh: f64,
 ) {
     let sx = x - offset_x;
@@ -13,8 +13,8 @@ pub fn render_mob(
     if sx < -60.0 || sx > vw + 60.0 || sy < -60.0 || sy > vh + 60.0 { return; }
 
     let speed = (vx * vx + vy * vy).sqrt();
-    effects::draw_engine_beam(ctx, sx, sy, r, speed, 3, false);
-    ships::draw_ship(ctx, sx, sy, r, 3);
+    effects::draw_engine_beam(ctx, sx, sy, r, speed, ship_type, false);
+    ships::draw_ship(ctx, sx, sy, r, ship_type);
 
     // Health bar above mob
     let bar_w = 40.0;

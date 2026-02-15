@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use web_sys::{CanvasRenderingContext2d, HtmlImageElement};
 use crate::constants::SHIP_SIZE;
 
-const SHIP_NAMES: [&str; 4] = ["Fighter", "Cruiser", "Artillery", "Destroyer"];
+const SHIP_NAMES: [&str; 6] = ["rebel-ship-1", "rebel-ship-2", "rebel-ship-3", "star-destroyer-1", "tie-1", "tie-2"];
 
 thread_local! {
     static SHIP_IMAGES: RefCell<Vec<HtmlImageElement>> = RefCell::new(Vec::new());

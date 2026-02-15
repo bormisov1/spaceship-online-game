@@ -395,12 +395,12 @@ func (g *Game) checkCollisions() {
 				continue
 			}
 			if CheckCollision(proj.X, proj.Y, ProjectileRadius, p.X, p.Y, PlayerRadius) {
-				died := p.TakeDamage(ProjectileDamage)
+				died := p.TakeDamage(proj.Damage)
 				proj.Alive = false
 
 				// Broadcast hit event
 				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
-					X: p.X, Y: p.Y, Dmg: ProjectileDamage,
+					X: p.X, Y: p.Y, Dmg: proj.Damage,
 					VictimID: p.ID, AttackerID: proj.OwnerID,
 				}})
 
@@ -786,12 +786,12 @@ func (g *Game) checkProjectileMobCollisions() {
 				continue
 			}
 			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, MobRadius) {
-				died := mob.TakeDamage(ProjectileDamage)
+				died := mob.TakeDamage(proj.Damage)
 				proj.Alive = false
 
 				// Broadcast hit event
 				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
-					X: mob.X, Y: mob.Y, Dmg: ProjectileDamage,
+					X: mob.X, Y: mob.Y, Dmg: proj.Damage,
 					VictimID: mob.ID, AttackerID: proj.OwnerID,
 				}})
 
@@ -959,11 +959,11 @@ func (g *Game) checkPlayerMobCollisions() {
 				mob.Alive = false
 
 				// Player takes collision damage
-				died := p.TakeDamage(MobCollisionDmg)
+				died := p.TakeDamage(mob.CollisionDmg)
 
 				// Broadcast hit on player from mob collision
 				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
-					X: p.X, Y: p.Y, Dmg: MobCollisionDmg,
+					X: p.X, Y: p.Y, Dmg: mob.CollisionDmg,
 					VictimID: p.ID, AttackerID: mob.ID,
 				}})
 

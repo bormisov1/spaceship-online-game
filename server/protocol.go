@@ -102,6 +102,7 @@ type MobState struct {
 	VY    *float64 `json:"vy,omitempty" msgpack:"vy,omitempty"`
 	HP    int      `json:"hp" msgpack:"hp"`
 	MaxHP int      `json:"mhp" msgpack:"mhp"`
+	Ship  int      `json:"s" msgpack:"s"`
 	Alive bool     `json:"a" msgpack:"a"`
 }
 

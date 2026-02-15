@@ -1,10 +1,12 @@
 import { SHIP_SIZE } from './constants.js';
 
 const SHIP_FILES = [
-    'assets/ships/Fighter.png',
-    'assets/ships/Artillery.png',
-    'assets/ships/Cruiser.png',
-    'assets/ships/Destroyer.png',
+    'assets/ships/rebel-ship-1.png',
+    'assets/ships/rebel-ship-2.png',
+    'assets/ships/rebel-ship-3.png',
+    'assets/ships/star-destroyer-1.png',
+    'assets/ships/tie-1.png',
+    'assets/ships/tie-2.png',
 ];
 
 // Cache ship sprite canvases
@@ -22,7 +24,7 @@ export function initShips() {
             const ctx = c.getContext('2d');
             ctx.drawImage(img, 0, 0, size, size);
             shipCanvases[i] = c;
-            if (shipCanvases.filter(Boolean).length === 4) loaded = true;
+            if (shipCanvases.filter(Boolean).length === SHIP_FILES.length) loaded = true;
         };
         img.src = src;
     });

@@ -18,6 +18,7 @@ type Projectile struct {
 	VX, VY   float64
 	Rotation float64
 	Life     float64
+	Damage   int
 	Alive    bool
 }
 
@@ -35,6 +36,7 @@ func NewProjectile(owner *Player) *Projectile {
 		VY:       vy + owner.VY*0.3,
 		Rotation: owner.Rotation,
 		Life:     ProjectileLifetime,
+		Damage:   ProjectileDamage,
 		Alive:    true,
 	}
 }
@@ -53,6 +55,7 @@ func NewMobProjectile(mob *Mob) *Projectile {
 		VY:       vy + mob.VY*0.3,
 		Rotation: mob.Rotation,
 		Life:     ProjectileLifetime,
+		Damage:   mob.ProjDamage,
 		Alive:    true,
 	}
 }

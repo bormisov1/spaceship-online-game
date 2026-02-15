@@ -201,7 +201,7 @@ pub fn render(state: &SharedState, dt: f64) {
             } else {
                 (mob.x, mob.y, mob.r)
             };
-            mobs::render_mob(&ctx, mx, my, mr, mob.vx.unwrap_or(0.0), mob.vy.unwrap_or(0.0), mob.hp, mob.mhp, offset_x, offset_y, vw, vh);
+            mobs::render_mob(&ctx, mx, my, mr, mob.vx.unwrap_or(0.0), mob.vy.unwrap_or(0.0), mob.hp, mob.mhp, mob.s, offset_x, offset_y, vw, vh);
         }
     }
 

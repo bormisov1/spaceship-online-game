@@ -15,11 +15,13 @@ pub struct ShipColor {
     pub main: &'static str,
 }
 
-pub const SHIP_COLORS: [ShipColor; 4] = [
-    ShipColor { main: "#ff4444" }, // Red
-    ShipColor { main: "#4488ff" }, // Blue
-    ShipColor { main: "#44ff44" }, // Green
-    ShipColor { main: "#ffff44" }, // Yellow
+pub const SHIP_COLORS: [ShipColor; 6] = [
+    ShipColor { main: "#ff4444" }, // Rebel 1
+    ShipColor { main: "#4488ff" }, // Rebel 2
+    ShipColor { main: "#44ff44" }, // Rebel 3
+    ShipColor { main: "#88ff88" }, // Star Destroyer
+    ShipColor { main: "#aaaaff" }, // TIE 1
+    ShipColor { main: "#aaaaff" }, // TIE 2
 ];
 
 // New entity sizes (must match server)
@@ -30,9 +32,11 @@ pub const PICKUP_RADIUS: f64 = 15.0;
 pub const PICKUP_RENDER_SIZE: f64 = 30.0;
 
 // Laser colors per ship type
-pub const LASER_COLORS: [&str; 4] = [
+pub const LASER_COLORS: [&str; 6] = [
     "#ff2222",
     "#2288ff",
     "#22ff22",
-    "#ffff22",
+    "#22ff22", // Star Destroyer
+    "#44ff44", // TIE 1
+    "#44ff44", // TIE 2
 ];

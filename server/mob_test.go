@@ -15,14 +15,14 @@ func TestMobEdgeSpawn(t *testing.T) {
 		if !m.Alive {
 			t.Error("mob should be alive on spawn")
 		}
-		if m.HP != MobMaxHP {
-			t.Errorf("mob HP should be %d, got %d", MobMaxHP, m.HP)
+		if m.HP != m.MaxHP {
+			t.Errorf("mob HP should be %d, got %d", m.MaxHP, m.HP)
 		}
 	}
 }
 
 func TestMobTakeDamage(t *testing.T) {
-	m := NewMob()
+	m := NewTieMob() // TIE has 60 HP
 
 	died := m.TakeDamage(20)
 	if died {

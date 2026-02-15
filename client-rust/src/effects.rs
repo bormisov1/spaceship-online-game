@@ -290,6 +290,8 @@ pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotati
         0 => "rgba(255, 100, 50, 0.6)",
         1 => "rgba(50, 150, 255, 0.6)",
         2 => "rgba(50, 255, 100, 0.6)",
+        3 => "rgba(50, 255, 100, 0.6)",  // Star Destroyer
+        4 | 5 => "rgba(100, 100, 255, 0.6)", // TIE fighters
         _ => "rgba(255, 200, 50, 0.6)",
     };
     ctx.set_fill_style_str(glow_color);
