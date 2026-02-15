@@ -283,7 +283,7 @@ fn DonationBanner() -> impl IntoView {
                     if let Ok(el) = ct.dyn_into::<web_sys::HtmlElement>() {
                         let rect = el.get_bounding_client_rect();
                         let x = e.client_x() as f64 - rect.left();
-                        let dur = if x < rect.width() / 3.0 { "11.25s" } else { "45s" };
+                        let dur = if x < rect.width() / 3.0 { "22.5s" } else { "45s" };
                         let _ = el.style().set_property("--marquee-dur", dur);
                     }
                 }
