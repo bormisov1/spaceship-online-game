@@ -47,6 +47,9 @@ func NewClient(hub *Hub, conn *websocket.Conn, remoteAddr string) *Client {
 // ReadPump reads messages from the WebSocket connection
 func (c *Client) ReadPump() {
 	defer func() {
+		if c.authPlayerID > 0 {
+			c.hub.SetOffline(c.authPlayerID)
+		}
 		c.hub.TrackDisconnect(c.remoteAddr)
 		c.hub.unregister <- c
 		c.conn.Close()
@@ -197,6 +200,18 @@ func (c *Client) handleMessage(raw []byte) {
 		c.handleProfile()
 	case MsgLeaderboard:
 		c.handleLeaderboard()
+	case MsgFriendAdd:
+		c.handleFriendAdd(env.D)
+	case MsgFriendAccept:
+		c.handleFriendAccept(env.D)
+	case MsgFriendDecline:
+		c.handleFriendDecline(env.D)
+	case MsgFriendRemove:
+		c.handleFriendRemove(env.D)
+	case MsgFriendList:
+		c.handleFriendList()
+	case MsgChat:
+		c.handleChat(env.D)
 	}
 }
 
@@ -426,6 +441,7 @@ func (c *Client) handleRegister(data json.RawMessage) {
 	}
 	c.authPlayerID = id
 	c.authUsername = msg.Username
+	c.hub.SetOnline(id, c)
 	c.SendJSON(Envelope{T: MsgAuthOK, Data: AuthOKMsg{
 		Token:    token,
 		Username: msg.Username,
@@ -448,6 +464,7 @@ func (c *Client) handleLogin(data json.RawMessage) {
 	}
 	c.authPlayerID = id
 	c.authUsername = msg.Username
+	c.hub.SetOnline(id, c)
 	c.SendJSON(Envelope{T: MsgAuthOK, Data: AuthOKMsg{
 		Token:    token,
 		Username: msg.Username,
@@ -470,6 +487,7 @@ func (c *Client) handleAuth(data json.RawMessage) {
 	}
 	c.authPlayerID = id
 	c.authUsername = username
+	c.hub.SetOnline(id, c)
 	c.SendJSON(Envelope{T: MsgAuthOK, Data: AuthOKMsg{
 		Token:    msg.Token,
 		Username: username,
@@ -510,4 +528,165 @@ func (c *Client) handleLeaderboard() {
 		return
 	}
 	c.SendJSON(Envelope{T: MsgLeaderboardRes, Data: LeaderboardMsg{Entries: entries}})
+}
+
+func (c *Client) handleFriendAdd(data json.RawMessage) {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	var msg FriendActionMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	target, err := c.hub.db.GetPlayerByUsername(msg.Username)
+	if err != nil || target == nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "player not found"}})
+		return
+	}
+	if target.ID == c.authPlayerID {
+		return
+	}
+	if err := c.hub.db.SendFriendRequest(c.authPlayerID, target.ID); err != nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "could not send request"}})
+		return
+	}
+	// Notify target if online
+	if targetClient := c.hub.GetOnlineClient(target.ID); targetClient != nil {
+		targetClient.SendJSON(Envelope{T: MsgFriendNotify, Data: FriendNotifyMsg{
+			Type:     "request",
+			Username: c.authUsername,
+		}})
+	}
+	c.handleFriendList() // refresh sender's list
+}
+
+func (c *Client) handleFriendAccept(data json.RawMessage) {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	var msg FriendActionMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	target, err := c.hub.db.GetPlayerByUsername(msg.Username)
+	if err != nil || target == nil {
+		return
+	}
+	if err := c.hub.db.AcceptFriendRequest(c.authPlayerID, target.ID); err != nil {
+		return
+	}
+	// Notify the requester if online
+	if targetClient := c.hub.GetOnlineClient(target.ID); targetClient != nil {
+		targetClient.SendJSON(Envelope{T: MsgFriendNotify, Data: FriendNotifyMsg{
+			Type:     "accepted",
+			Username: c.authUsername,
+		}})
+	}
+	c.handleFriendList()
+}
+
+func (c *Client) handleFriendDecline(data json.RawMessage) {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	var msg FriendActionMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	target, err := c.hub.db.GetPlayerByUsername(msg.Username)
+	if err != nil || target == nil {
+		return
+	}
+	c.hub.db.DeclineFriendRequest(c.authPlayerID, target.ID)
+	c.handleFriendList()
+}
+
+func (c *Client) handleFriendRemove(data json.RawMessage) {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	var msg FriendActionMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	target, err := c.hub.db.GetPlayerByUsername(msg.Username)
+	if err != nil || target == nil {
+		return
+	}
+	c.hub.db.RemoveFriend(c.authPlayerID, target.ID)
+	c.handleFriendList()
+}
+
+func (c *Client) handleFriendList() {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	friends, _ := c.hub.db.GetFriends(c.authPlayerID)
+	requests, _ := c.hub.db.GetPendingRequests(c.authPlayerID)
+
+	friendInfos := make([]FriendInfo, 0, len(friends))
+	for _, f := range friends {
+		friendInfos = append(friendInfos, FriendInfo{
+			Username: f.Username,
+			Level:    f.Level,
+			Online:   c.hub.IsOnline(f.FriendID),
+			Status:   FriendAccepted,
+		})
+	}
+
+	requestInfos := make([]FriendInfo, 0, len(requests))
+	for _, r := range requests {
+		requestInfos = append(requestInfos, FriendInfo{
+			Username: r.Username,
+			Level:    r.Level,
+			Online:   c.hub.IsOnline(r.FriendID),
+			Status:   FriendPending,
+		})
+	}
+
+	c.SendJSON(Envelope{T: MsgFriendListRes, Data: FriendListMsg{
+		Friends:  friendInfos,
+		Requests: requestInfos,
+	}})
+}
+
+func (c *Client) handleChat(data json.RawMessage) {
+	if c.sessionID == "" || c.playerID == "" {
+		return
+	}
+	var msg ChatSendMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	text := msg.Text
+	if len(text) > 200 {
+		text = text[:200]
+	}
+	if text == "" {
+		return
+	}
+
+	// Get sender name
+	name := c.authUsername
+	if name == "" {
+		name = "Pilot"
+	}
+
+	sess := c.hub.sessions.GetSession(c.sessionID)
+	if sess == nil {
+		return
+	}
+
+	broadcast := ChatBroadcastMsg{
+		From: name,
+		Text: text,
+		Team: msg.Team,
+	}
+
+	// If team chat, only send to teammates
+	if msg.Team {
+		sess.Game.BroadcastTeamChat(c.playerID, broadcast)
+	} else {
+		sess.Game.BroadcastChat(broadcast)
+	}
 }

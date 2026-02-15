@@ -20,7 +20,13 @@ const (
 	MsgLogin       = "login"       // login
 	MsgAuth        = "auth"        // auth with token
 	MsgProfile     = "profile"     // request profile
-	MsgLeaderboard = "leaderboard" // request leaderboard
+	MsgLeaderboard   = "leaderboard"    // request leaderboard
+	MsgFriendAdd     = "friend_add"     // send friend request
+	MsgFriendAccept  = "friend_accept"  // accept friend request
+	MsgFriendDecline = "friend_decline" // decline friend request
+	MsgFriendRemove  = "friend_remove"  // remove friend
+	MsgFriendList    = "friend_list"    // request friends list
+	MsgChat          = "chat"           // send chat message
 )
 
 // Server -> Client message types
@@ -44,6 +50,9 @@ const (
 	MsgXPUpdate        = "xp_update"        // XP gained after match
 	MsgLeaderboardRes  = "leaderboard_res"  // leaderboard response
 	MsgAchievementUnlock = "achievement"    // achievement unlocked
+	MsgFriendListRes     = "friend_list_res" // friends list response
+	MsgFriendNotify      = "friend_notify"   // friend request notification
+	MsgChatMsg           = "chat_msg"        // chat message broadcast
 	MsgMatchPhase     = "match_phase"     // match phase changed
 	MsgMatchResult = "match_result" // match ended, results
 	MsgTeamUpdate  = "team_update"  // team roster/score update
@@ -338,4 +347,42 @@ type AchievementMsg struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"desc"`
+}
+
+// FriendActionMsg is sent by client for friend add/accept/decline/remove
+type FriendActionMsg struct {
+	Username string `json:"username"` // target username
+}
+
+// FriendInfo represents a friend in the friend list
+type FriendInfo struct {
+	Username string `json:"username"`
+	Level    int    `json:"level"`
+	Online   bool   `json:"online"`
+	Status   int    `json:"status"` // 0=pending, 1=accepted
+}
+
+// FriendListMsg is sent to client with friends list
+type FriendListMsg struct {
+	Friends  []FriendInfo `json:"friends"`
+	Requests []FriendInfo `json:"requests"` // incoming pending requests
+}
+
+// FriendNotifyMsg notifies a player about a friend event
+type FriendNotifyMsg struct {
+	Type     string `json:"type"` // "request", "accepted"
+	Username string `json:"username"`
+}
+
+// ChatSendMsg is sent by client to send a chat message
+type ChatSendMsg struct {
+	Text string `json:"text"`
+	Team bool   `json:"team"` // team-only chat
+}
+
+// ChatBroadcastMsg is sent to clients with a chat message
+type ChatBroadcastMsg struct {
+	From string `json:"from"`
+	Text string `json:"text"`
+	Team bool   `json:"team"`
 }

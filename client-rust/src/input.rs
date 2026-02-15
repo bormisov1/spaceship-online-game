@@ -76,6 +76,8 @@ pub fn setup_input(state: SharedState, _net: SharedNetwork) {
     let keydown = Closure::wrap(Box::new(move |e: KeyboardEvent| {
         let s = state_kd.borrow();
         if s.phase != Phase::Playing { return; }
+        // Don't process game keys while chat is open
+        if s.chat_open { return; }
         drop(s);
         match e.key().as_str() {
             "w" | "W" => state_kd.borrow_mut().firing = true,

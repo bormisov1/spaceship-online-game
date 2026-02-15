@@ -310,6 +310,26 @@ impl Network {
     pub fn send_leaderboard_request(net: &SharedNetwork) {
         Network::send_raw(net, "leaderboard", &serde_json::json!({}));
     }
+
+    pub fn send_friend_add(net: &SharedNetwork, username: &str) {
+        Network::send_raw(net, "friend_add", &serde_json::json!({"username": username}));
+    }
+
+    pub fn send_friend_accept(net: &SharedNetwork, username: &str) {
+        Network::send_raw(net, "friend_accept", &serde_json::json!({"username": username}));
+    }
+
+    pub fn send_friend_decline(net: &SharedNetwork, username: &str) {
+        Network::send_raw(net, "friend_decline", &serde_json::json!({"username": username}));
+    }
+
+    pub fn send_friend_list(net: &SharedNetwork) {
+        Network::send_raw(net, "friend_list", &serde_json::json!({}));
+    }
+
+    pub fn send_chat(net: &SharedNetwork, text: &str, team: bool) {
+        Network::send_raw(net, "chat", &serde_json::json!({"text": text, "team": team}));
+    }
 }
 
 fn handle_message(
@@ -574,6 +594,35 @@ fn handle_message(
                 });
                 if s.achievement_show_time == 0.0 {
                     s.achievement_show_time = web_sys::window().unwrap().performance().unwrap().now();
+                }
+            }
+        }
+        "friend_list_res" => {
+            if let Ok(fl) = serde_json::from_value::<FriendListMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.friends = fl.friends;
+                s.friend_requests = fl.requests;
+            }
+        }
+        "friend_notify" => {
+            if let Ok(n) = serde_json::from_value::<FriendNotifyMsg>(data) {
+                web_sys::console::log_1(&format!("Friend {}: {}", n.notify_type, n.username).into());
+                // Refresh friend list
+                Network::send_friend_list(net);
+            }
+        }
+        "chat_msg" => {
+            if let Ok(msg) = serde_json::from_value::<ChatMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.chat_messages.push(crate::state::ChatMessage {
+                    from: msg.from,
+                    text: msg.text,
+                    team: msg.team,
+                    time: web_sys::window().unwrap().performance().unwrap().now(),
+                });
+                // Keep max 50 messages
+                if s.chat_messages.len() > 50 {
+                    s.chat_messages.remove(0);
                 }
             }
         }

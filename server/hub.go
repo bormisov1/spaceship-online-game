@@ -21,18 +21,22 @@ type Hub struct {
 	// Auth & DB
 	db   *DB
 	auth *Auth
+	// Online auth users: authPlayerID -> *Client
+	onlineMu    sync.RWMutex
+	onlineUsers map[int64]*Client
 }
 
 // NewHub creates a new Hub with database
 func NewHub(db *DB) *Hub {
 	h := &Hub{
-		clients:    make(map[*Client]bool),
-		register:   make(chan *Client, 64),
-		unregister: make(chan *Client, 64),
-		sessions:   NewSessionManager(),
-		ipConns:    make(map[string]int),
-		db:         db,
-		auth:       NewAuth(db),
+		clients:     make(map[*Client]bool),
+		register:    make(chan *Client, 64),
+		unregister:  make(chan *Client, 64),
+		sessions:    NewSessionManager(),
+		ipConns:     make(map[string]int),
+		db:          db,
+		auth:        NewAuth(db),
+		onlineUsers: make(map[int64]*Client),
 	}
 	return h
 }
@@ -95,6 +99,35 @@ func (h *Hub) Run() {
 			}
 		}
 	}
+}
+
+// SetOnline marks an authenticated user as online
+func (h *Hub) SetOnline(playerID int64, client *Client) {
+	h.onlineMu.Lock()
+	defer h.onlineMu.Unlock()
+	h.onlineUsers[playerID] = client
+}
+
+// SetOffline removes an authenticated user from online tracking
+func (h *Hub) SetOffline(playerID int64) {
+	h.onlineMu.Lock()
+	defer h.onlineMu.Unlock()
+	delete(h.onlineUsers, playerID)
+}
+
+// IsOnline checks if a player is online
+func (h *Hub) IsOnline(playerID int64) bool {
+	h.onlineMu.RLock()
+	defer h.onlineMu.RUnlock()
+	_, ok := h.onlineUsers[playerID]
+	return ok
+}
+
+// GetOnlineClient returns the client for an online player
+func (h *Hub) GetOnlineClient(playerID int64) *Client {
+	h.onlineMu.RLock()
+	defer h.onlineMu.RUnlock()
+	return h.onlineUsers[playerID]
 }
 
 // ClientCount returns the number of connected clients

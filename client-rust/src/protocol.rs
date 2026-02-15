@@ -293,6 +293,39 @@ pub struct LeaderboardMsg {
     pub entries: Vec<LeaderboardEntry>,
 }
 
+// Server -> Client: friend list
+#[derive(Deserialize, Debug, Clone)]
+pub struct FriendListMsg {
+    pub friends: Vec<FriendInfo>,
+    pub requests: Vec<FriendInfo>,
+}
+
+// Friend info
+#[derive(Deserialize, Debug, Clone)]
+pub struct FriendInfo {
+    pub username: String,
+    pub level: i32,
+    pub online: bool,
+    pub status: i32,
+}
+
+// Server -> Client: friend notification
+#[derive(Deserialize, Debug, Clone)]
+pub struct FriendNotifyMsg {
+    #[serde(rename = "type")]
+    pub notify_type: String,
+    pub username: String,
+}
+
+// Server -> Client: chat message
+#[derive(Deserialize, Debug, Clone)]
+pub struct ChatMsg {
+    pub from: String,
+    pub text: String,
+    #[serde(default)]
+    pub team: bool,
+}
+
 // Leaderboard entry
 #[derive(Deserialize, Debug, Clone)]
 pub struct LeaderboardEntry {

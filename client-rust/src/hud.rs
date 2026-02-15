@@ -154,6 +154,11 @@ pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
         }
     }
 
+    // Chat messages
+    if !s.chat_messages.is_empty() {
+        draw_chat(ctx, &s, screen_w, screen_h);
+    }
+
     // Connection status
     if !s.connected {
         ctx.set_fill_style_str("#ff4444");
@@ -634,6 +639,40 @@ fn draw_result_screen(
     ctx.set_fill_style_str("#aaaaaa");
     ctx.set_font("14px monospace");
     let _ = ctx.fill_text("Returning to lobby...", screen_w / 2.0, screen_h * 0.85);
+}
+
+fn draw_chat(ctx: &CanvasRenderingContext2d, s: &crate::state::GameState, _screen_w: f64, screen_h: f64) {
+    let now = web_sys::window().unwrap().performance().unwrap().now();
+    let x = 15.0;
+    let mut y = screen_h - 80.0;
+
+    ctx.set_text_align("left");
+    ctx.set_font("12px monospace");
+
+    // Show last 5 messages that are less than 10 seconds old
+    for msg in s.chat_messages.iter().rev().take(5) {
+        let age = (now - msg.time) / 1000.0;
+        if age > 10.0 { continue; }
+        let alpha = if age > 7.0 { (10.0 - age) / 3.0 } else { 1.0 };
+        ctx.set_global_alpha(alpha);
+
+        let prefix_color = if msg.team { "#44aaff" } else { "#ffffff" };
+        let prefix = if msg.team { "[TEAM] " } else { "" };
+
+        ctx.set_fill_style_str("rgba(0,0,0,0.4)");
+        let text = format!("{}{}: {}", prefix, msg.from, msg.text);
+        let text_w = ctx.measure_text(&text).map(|m| m.width()).unwrap_or(200.0);
+        ctx.fill_rect(x - 4.0, y - 12.0, text_w + 8.0, 16.0);
+
+        ctx.set_fill_style_str(prefix_color);
+        let _ = ctx.fill_text(&format!("{}{}", prefix, msg.from), x, y);
+        let name_w = ctx.measure_text(&format!("{}{}", prefix, msg.from)).map(|m| m.width()).unwrap_or(0.0);
+        ctx.set_fill_style_str("#cccccc");
+        let _ = ctx.fill_text(&format!(": {}", msg.text), x + name_w, y);
+
+        y -= 18.0;
+    }
+    ctx.set_global_alpha(1.0);
 }
 
 /// Calculate total XP needed from level start to next level (mirrors server formula)

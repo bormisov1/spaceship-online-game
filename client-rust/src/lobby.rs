@@ -2,7 +2,7 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 use crate::state::SharedState;
 use crate::network::{Network, SharedNetwork};
-use crate::protocol::{SessionInfo, CheckedMsg, LeaderboardEntry};
+use crate::protocol::{SessionInfo, CheckedMsg};
 
 #[component]
 pub fn AuthPanel(
@@ -130,6 +130,8 @@ pub fn NormalLobby(
 
     let state_auth = state.clone();
     let state_lb = send_wrapper::SendWrapper::new(state.clone());
+    let state_friends = state.clone();
+    let net_friends = net.clone();
     let net_auth = net.clone();
     let default_name = state.borrow().auth_username.clone().unwrap_or_else(|| "Pilot".to_string());
 
@@ -260,7 +262,121 @@ pub fn NormalLobby(
                         }}
                     </div>
                 </div>
+                <FriendsPanel state=state_friends net=net_friends auth_signal=auth_signal />
             </div>
+        </div>
+    }
+}
+
+#[component]
+fn FriendsPanel(
+    state: SharedState,
+    net: SharedNetwork,
+    auth_signal: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let net_add = send_wrapper::SendWrapper::new(net.clone());
+    let net_accept = send_wrapper::SendWrapper::new(net.clone());
+    let net_decline = send_wrapper::SendWrapper::new(net.clone());
+    let state_friends = send_wrapper::SendWrapper::new(state.clone());
+    let net_list = send_wrapper::SendWrapper::new(net.clone());
+
+    // Fetch friend list when panel appears and user is logged in
+    let net_init = send_wrapper::SendWrapper::new(net.clone());
+    Effect::new(move |_| {
+        if auth_signal.get().is_some() {
+            Network::send_friend_list(&net_init);
+        }
+    });
+
+    let on_add_friend = move |_: web_sys::MouseEvent| {
+        let doc = web_sys::window().unwrap().document().unwrap();
+        if let Some(input) = doc.get_element_by_id("friendInput")
+            .and_then(|e| e.dyn_into::<web_sys::HtmlInputElement>().ok())
+        {
+            let username = input.value();
+            if !username.trim().is_empty() {
+                Network::send_friend_add(&net_add, username.trim());
+                input.set_value("");
+            }
+        }
+    };
+
+    view! {
+        <div class="friends-panel" style:display=move || if auth_signal.get().is_some() { "block" } else { "none" }>
+            <h3>"Friends"</h3>
+            <div class="friend-add-form">
+                <input type="text" id="friendInput" placeholder="Add friend by username..." maxlength="16" />
+                <button class="btn-friend-add" on:click=on_add_friend>"Add"</button>
+            </div>
+            {move || {
+                let s = state_friends.borrow();
+                let requests = s.friend_requests.clone();
+                let friends = s.friends.clone();
+                drop(s);
+
+                let request_views: Vec<_> = requests.iter().map(|r| {
+                    let name = r.username.clone();
+                    let name_a = name.clone();
+                    let name_d = name.clone();
+                    let net_a = (*net_accept).clone();
+                    let net_d = (*net_decline).clone();
+                    let net_l1 = (*net_list).clone();
+                    let net_l2 = (*net_list).clone();
+                    view! {
+                        <div class="friend-request-item">
+                            <span class="friend-name">{name}" wants to be friends"</span>
+                            <span>
+                                <button class="btn-accept" on:click=move |_| {
+                                    Network::send_friend_accept(&net_a, &name_a);
+                                    // Refresh after action
+                                    let _ = gloo_timers::callback::Timeout::new(500, {
+                                        let n = net_l1.clone();
+                                        move || Network::send_friend_list(&n)
+                                    });
+                                }>"Accept"</button>
+                                <button class="btn-decline" on:click=move |_| {
+                                    Network::send_friend_decline(&net_d, &name_d);
+                                    let _ = gloo_timers::callback::Timeout::new(500, {
+                                        let n = net_l2.clone();
+                                        move || Network::send_friend_list(&n)
+                                    });
+                                }>"Decline"</button>
+                            </span>
+                        </div>
+                    }
+                }).collect();
+
+                let friend_views: Vec<_> = friends.iter().map(|f| {
+                    let name = f.username.clone();
+                    let online = f.online;
+                    let level = f.level;
+                    view! {
+                        <div class="friend-item">
+                            <span>
+                                <span class="friend-name">{name}</span>
+                                {if online {
+                                    view! { <span class="friend-online">"ONLINE"</span> }.into_any()
+                                } else {
+                                    view! { <span class="friend-offline">"offline"</span> }.into_any()
+                                }}
+                            </span>
+                            <span class="lb-level">"Lv." {level}</span>
+                        </div>
+                    }
+                }).collect();
+
+                view! {
+                    <div>
+                        {request_views}
+                        {friend_views}
+                        {if friends.is_empty() && requests.is_empty() {
+                            view! { <p class="no-sessions" style="font-size:11px">"No friends yet. Add someone!"</p> }.into_any()
+                        } else {
+                            view! { <span></span> }.into_any()
+                        }}
+                    </div>
+                }
+            }}
         </div>
     }
 }

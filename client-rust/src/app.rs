@@ -237,12 +237,81 @@ fn GameView(
 
 #[component]
 fn IngameUI(state: SharedState, net: SharedNetwork) -> impl IntoView {
-    let _ = net;
     // Setup buttons after this component mounts
     let state_for_setup = send_wrapper::SendWrapper::new(state.clone());
+    let net_for_chat = send_wrapper::SendWrapper::new(net.clone());
+    let state_for_chat = send_wrapper::SendWrapper::new(state.clone());
+
     Effect::new(move |_| {
         crate::canvas::setup_fullscreen();
         crate::canvas::setup_controller_btn((*state_for_setup).clone());
+
+        // Setup Enter key to toggle chat
+        let state_k = (*state_for_chat).clone();
+        let net_k = (*net_for_chat).clone();
+        let document = web_sys::window().unwrap().document().unwrap();
+        let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
+            let doc = web_sys::window().unwrap().document().unwrap();
+            if e.key() == "Enter" {
+                let chat_open = state_k.borrow().chat_open;
+                if chat_open {
+                    // Send message
+                    if let Some(input) = doc.get_element_by_id("chatInput")
+                        .and_then(|el| el.dyn_into::<web_sys::HtmlInputElement>().ok())
+                    {
+                        let text = input.value();
+                        if !text.trim().is_empty() {
+                            let team = text.starts_with("/t ") || text.starts_with("/team ");
+                            let clean = if team {
+                                text.trim_start_matches("/t ").trim_start_matches("/team ").to_string()
+                            } else {
+                                text
+                            };
+                            Network::send_chat(&net_k, &clean, team);
+                        }
+                        input.set_value("");
+                        let _ = input.blur();
+                    }
+                    state_k.borrow_mut().chat_open = false;
+                    // Hide chat box
+                    if let Some(box_el) = doc.get_element_by_id("chatInputBox") {
+                        let _ = box_el.class_list().remove_1("open");
+                    }
+                } else {
+                    // Open chat
+                    let phase = state_k.borrow().phase.clone();
+                    if matches!(phase, crate::state::Phase::Playing | crate::state::Phase::Dead) {
+                        state_k.borrow_mut().chat_open = true;
+                        // Show chat box and focus input
+                        if let Some(box_el) = doc.get_element_by_id("chatInputBox") {
+                            let _ = box_el.class_list().add_1("open");
+                        }
+                        if let Some(input) = doc.get_element_by_id("chatInput")
+                            .and_then(|el| el.dyn_into::<web_sys::HtmlInputElement>().ok())
+                        {
+                            let _ = input.focus();
+                        }
+                        e.prevent_default();
+                    }
+                }
+            } else if e.key() == "Escape" {
+                let chat_open = state_k.borrow().chat_open;
+                if chat_open {
+                    state_k.borrow_mut().chat_open = false;
+                    if let Some(box_el) = doc.get_element_by_id("chatInputBox") {
+                        let _ = box_el.class_list().remove_1("open");
+                    }
+                    if let Some(input) = doc.get_element_by_id("chatInput")
+                        .and_then(|el| el.dyn_into::<web_sys::HtmlInputElement>().ok())
+                    {
+                        input.set_value("");
+                        let _ = input.blur();
+                    }
+                }
+            }
+        }) as Box<dyn FnMut(web_sys::KeyboardEvent)>);
+        let _ = document.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref());
+        closure.forget();
     });
 
     view! {
@@ -262,6 +331,9 @@ fn IngameUI(state: SharedState, net: SharedNetwork) -> impl IntoView {
             <div class="qr-box"><img id="qrImg" alt="QR Code"/></div>
             <p class="qr-url" id="qrUrl"></p>
             <button class="btn-close" id="qrClose">"Close"</button>
+        </div>
+        <div id="chatInputBox">
+            <input type="text" id="chatInput" placeholder="Press Enter to chat (/t for team)" maxlength="200" autocomplete="off" />
         </div>
     }
 }

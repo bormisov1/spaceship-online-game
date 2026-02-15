@@ -1709,6 +1709,36 @@ func (g *Game) checkHomingMissileCollisions() {
 	}
 }
 
+// BroadcastChat sends a chat message to all players in the session
+func (g *Game) BroadcastChat(msg ChatBroadcastMsg) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	g.broadcastMsg(Envelope{T: MsgChatMsg, Data: msg})
+}
+
+// BroadcastTeamChat sends a chat message only to the sender's teammates
+func (g *Game) BroadcastTeamChat(senderID string, msg ChatBroadcastMsg) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	sender, ok := g.players[senderID]
+	if !ok || sender.Team == TeamNone {
+		// No team — send to all
+		g.broadcastMsg(Envelope{T: MsgChatMsg, Data: msg})
+		return
+	}
+
+	data, err := json.Marshal(Envelope{T: MsgChatMsg, Data: msg})
+	if err != nil {
+		return
+	}
+	for pid, client := range g.clients {
+		if p, ok := g.players[pid]; ok && p.Team == sender.Team {
+			client.SendRaw(data)
+		}
+	}
+}
+
 // playerName returns the player name for an ID, or "Unknown"
 func (g *Game) playerName(id string) string {
 	if p, ok := g.players[id]; ok {

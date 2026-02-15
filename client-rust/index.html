@@ -772,6 +772,127 @@
         .lb-level {
             color: #44aaff;
         }
+
+        /* Chat input box */
+        #chatInputBox {
+            position: fixed;
+            bottom: 30px;
+            left: 15px;
+            z-index: 20;
+            display: none;
+        }
+        #chatInputBox.open {
+            display: block;
+        }
+        #chatInput {
+            width: 300px;
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            font-size: 13px;
+            font-family: monospace;
+            outline: none;
+        }
+        #chatInput:focus {
+            border-color: rgba(100, 150, 255, 0.5);
+        }
+
+        /* Friends panel in lobby */
+        .friends-panel {
+            margin-top: 12px;
+            width: 100%;
+        }
+        .friends-panel h3 {
+            color: #88aacc;
+            font-size: 13px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .friend-add-form {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+        .friend-add-form input {
+            flex: 1;
+            padding: 6px 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
+            color: #fff;
+            font-size: 12px;
+            outline: none;
+        }
+        .friend-add-form input:focus {
+            border-color: rgba(100, 150, 255, 0.4);
+        }
+        .btn-friend-add {
+            background: rgba(50, 200, 100, 0.15);
+            color: #55bb77;
+            border: 1px solid rgba(50, 200, 100, 0.25);
+            padding: 6px 10px;
+            font-size: 11px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-friend-add:hover {
+            background: rgba(50, 200, 100, 0.3);
+        }
+        .friend-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .friend-name {
+            color: #ccddee;
+        }
+        .friend-online {
+            color: #44ff88;
+            font-size: 10px;
+            margin-left: 6px;
+        }
+        .friend-offline {
+            color: #556677;
+            font-size: 10px;
+            margin-left: 6px;
+        }
+        .friend-request-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 8px;
+            font-size: 12px;
+            background: rgba(255, 200, 50, 0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .btn-accept {
+            background: rgba(50, 200, 100, 0.2);
+            color: #44dd88;
+            border: 1px solid rgba(50, 200, 100, 0.3);
+            padding: 3px 8px;
+            font-size: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-left: 4px;
+        }
+        .btn-accept:hover { background: rgba(50, 200, 100, 0.35); }
+        .btn-decline {
+            background: rgba(255, 80, 80, 0.15);
+            color: #cc6666;
+            border: 1px solid rgba(255, 80, 80, 0.2);
+            padding: 3px 8px;
+            font-size: 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-left: 4px;
+        }
+        .btn-decline:hover { background: rgba(255, 80, 80, 0.3); }
     </style>
 </head>
 <body>

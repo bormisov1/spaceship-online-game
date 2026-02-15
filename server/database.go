@@ -136,6 +136,15 @@ func (db *DB) migrate() error {
 		PRIMARY KEY (player_id, achievement)
 	);
 
+	CREATE TABLE IF NOT EXISTS friends (
+		player_id INTEGER NOT NULL REFERENCES players(id),
+		friend_id INTEGER NOT NULL REFERENCES players(id),
+		status INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (player_id, friend_id)
+	);
+	CREATE INDEX IF NOT EXISTS idx_friends_friend ON friends(friend_id);
+
 	CREATE INDEX IF NOT EXISTS idx_match_players_player ON match_players(player_id);
 	CREATE INDEX IF NOT EXISTS idx_players_username ON players(username);
 	`
@@ -400,6 +409,138 @@ func (db *DB) UsernameExists(username string) (bool, error) {
 	var count int
 	err := db.conn.QueryRow("SELECT COUNT(*) FROM players WHERE username = ?", username).Scan(&count)
 	return count > 0, err
+}
+
+// Friend status constants
+const (
+	FriendPending  = 0 // request sent, awaiting acceptance
+	FriendAccepted = 1 // mutual friends
+)
+
+// FriendRow represents a friend relationship
+type FriendRow struct {
+	PlayerID int64
+	FriendID int64
+	Username string
+	Level    int
+	Status   int // 0=pending, 1=accepted
+}
+
+// SendFriendRequest creates a pending friend request
+func (db *DB) SendFriendRequest(fromID, toID int64) error {
+	if fromID == toID {
+		return nil
+	}
+	_, err := db.conn.Exec(
+		"INSERT OR IGNORE INTO friends (player_id, friend_id, status) VALUES (?, ?, ?)",
+		fromID, toID, FriendPending,
+	)
+	return err
+}
+
+// AcceptFriendRequest accepts a friend request (creates mutual entries)
+func (db *DB) AcceptFriendRequest(playerID, fromID int64) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Update the incoming request to accepted
+	_, err = tx.Exec(
+		"UPDATE friends SET status = ? WHERE player_id = ? AND friend_id = ? AND status = ?",
+		FriendAccepted, fromID, playerID, FriendPending,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Create the reverse relationship
+	_, err = tx.Exec(
+		"INSERT OR REPLACE INTO friends (player_id, friend_id, status) VALUES (?, ?, ?)",
+		playerID, fromID, FriendAccepted,
+	)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// DeclineFriendRequest removes a pending friend request
+func (db *DB) DeclineFriendRequest(playerID, fromID int64) error {
+	_, err := db.conn.Exec(
+		"DELETE FROM friends WHERE player_id = ? AND friend_id = ? AND status = ?",
+		fromID, playerID, FriendPending,
+	)
+	return err
+}
+
+// RemoveFriend removes a mutual friendship
+func (db *DB) RemoveFriend(playerID, friendID int64) error {
+	_, err := db.conn.Exec(
+		"DELETE FROM friends WHERE (player_id = ? AND friend_id = ?) OR (player_id = ? AND friend_id = ?)",
+		playerID, friendID, friendID, playerID,
+	)
+	return err
+}
+
+// GetFriends returns accepted friends for a player
+func (db *DB) GetFriends(playerID int64) ([]FriendRow, error) {
+	rows, err := db.conn.Query(`
+		SELECT f.friend_id, p.username, COALESCE(s.level, 1)
+		FROM friends f
+		JOIN players p ON p.id = f.friend_id
+		LEFT JOIN stats s ON s.player_id = f.friend_id
+		WHERE f.player_id = ? AND f.status = ?
+		ORDER BY p.username`,
+		playerID, FriendAccepted,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []FriendRow
+	for rows.Next() {
+		var r FriendRow
+		if err := rows.Scan(&r.FriendID, &r.Username, &r.Level); err != nil {
+			return nil, err
+		}
+		r.PlayerID = playerID
+		r.Status = FriendAccepted
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// GetPendingRequests returns incoming friend requests for a player
+func (db *DB) GetPendingRequests(playerID int64) ([]FriendRow, error) {
+	rows, err := db.conn.Query(`
+		SELECT f.player_id, p.username, COALESCE(s.level, 1)
+		FROM friends f
+		JOIN players p ON p.id = f.player_id
+		LEFT JOIN stats s ON s.player_id = f.player_id
+		WHERE f.friend_id = ? AND f.status = ?
+		ORDER BY f.created_at DESC`,
+		playerID, FriendPending,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []FriendRow
+	for rows.Next() {
+		var r FriendRow
+		if err := rows.Scan(&r.FriendID, &r.Username, &r.Level); err != nil {
+			return nil, err
+		}
+		r.PlayerID = playerID
+		r.Status = FriendPending
+		result = append(result, r)
+	}
+	return result, rows.Err()
 }
 
 // UnlockAchievement records a player's achievement. Returns true if newly unlocked.
