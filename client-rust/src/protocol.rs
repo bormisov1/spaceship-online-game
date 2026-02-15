@@ -54,6 +54,10 @@ pub struct PlayerState {
     pub aact: bool,
     #[serde(default)]
     pub sp: bool,
+    #[serde(default)]
+    pub sk: String,
+    #[serde(default)]
+    pub tr: String,
 }
 
 // Server -> Client: projectile state
@@ -265,6 +269,8 @@ pub struct ProfileDataMsg {
     pub wins: i32,
     pub losses: i32,
     pub playtime: f64,
+    #[serde(default)]
+    pub credits: i32,
 }
 
 // Server -> Client: XP gained after match
@@ -324,6 +330,67 @@ pub struct ChatMsg {
     pub text: String,
     #[serde(default)]
     pub team: bool,
+}
+
+// Server -> Client: store catalog response
+#[derive(Deserialize, Debug, Clone)]
+pub struct StoreResMsg {
+    pub items: Vec<StoreItem>,
+    pub owned: Vec<String>,
+    pub credits: i32,
+    #[serde(default)]
+    pub skin: String,
+    #[serde(default)]
+    pub trail: String,
+}
+
+// Store item
+#[derive(Deserialize, Debug, Clone)]
+pub struct StoreItem {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub item_type: String,
+    pub rarity: i32,
+    pub price: i32,
+    pub color1: String,
+    pub color2: String,
+    pub preview: String,
+}
+
+// Server -> Client: purchase result
+#[derive(Deserialize, Debug, Clone)]
+pub struct BuyResMsg {
+    pub success: bool,
+    pub item_id: String,
+    pub credits: i32,
+}
+
+// Server -> Client: inventory response
+#[derive(Deserialize, Debug, Clone)]
+pub struct InventoryResMsg {
+    pub owned: Vec<String>,
+    #[serde(default)]
+    pub skin: String,
+    #[serde(default)]
+    pub trail: String,
+    pub credits: i32,
+}
+
+// Server -> Client: credits update
+#[derive(Deserialize, Debug, Clone)]
+pub struct CreditsUpdateMsg {
+    pub credits: i32,
+    pub delta: i32,
+    pub reason: String,
+}
+
+// Server -> Client: daily login result
+#[derive(Deserialize, Debug, Clone)]
+pub struct DailyLoginResMsg {
+    pub credits: i32,
+    pub streak: i32,
+    pub already: bool,
 }
 
 // Leaderboard entry

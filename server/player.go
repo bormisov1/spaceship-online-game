@@ -67,6 +67,10 @@ type Player struct {
 	// Auth (0 = guest/unauthenticated)
 	AuthPlayerID int64
 
+	// Cosmetics
+	Skin  string // equipped skin ID
+	Trail string // equipped trail ID
+
 	// World bounds (set from match config)
 	worldW float64
 	worldH float64
@@ -316,6 +320,8 @@ func (p *Player) ToState() PlayerState {
 		AbilCD:  acd,
 		AbilAct: p.Ability.Active,
 		SpawnP:  p.SpawnProtection > 0,
+		Skin:    p.Skin,
+		Trail:   p.Trail,
 	}
 }
 

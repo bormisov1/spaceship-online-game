@@ -136,6 +136,13 @@ func (db *DB) migrate() error {
 		PRIMARY KEY (player_id, achievement)
 	);
 
+	CREATE TABLE IF NOT EXISTS player_skins (
+		player_id INTEGER NOT NULL REFERENCES players(id),
+		skin_id TEXT NOT NULL,
+		purchased_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (player_id, skin_id)
+	);
+
 	CREATE TABLE IF NOT EXISTS friends (
 		player_id INTEGER NOT NULL REFERENCES players(id),
 		friend_id INTEGER NOT NULL REFERENCES players(id),
@@ -151,8 +158,21 @@ func (db *DB) migrate() error {
 	_, err := db.conn.Exec(schema)
 	if err != nil {
 		log.Printf("DB migration error: %v", err)
+		return err
 	}
-	return err
+
+	// Add credits and equipped columns (safe to run multiple times)
+	for _, col := range []struct{ table, col, def string }{
+		{"stats", "credits", "INTEGER NOT NULL DEFAULT 0"},
+		{"stats", "last_login", "DATETIME DEFAULT NULL"},
+		{"stats", "login_streak", "INTEGER NOT NULL DEFAULT 0"},
+		{"stats", "equipped_skin", "TEXT NOT NULL DEFAULT ''"},
+		{"stats", "equipped_trail", "TEXT NOT NULL DEFAULT ''"},
+	} {
+		_, _ = db.conn.Exec("ALTER TABLE " + col.table + " ADD COLUMN " + col.col + " " + col.def)
+	}
+
+	return nil
 }
 
 // CreatePlayer creates a new player account (returns player ID)
@@ -541,6 +561,146 @@ func (db *DB) GetPendingRequests(playerID int64) ([]FriendRow, error) {
 		result = append(result, r)
 	}
 	return result, rows.Err()
+}
+
+// GetCredits returns a player's credit balance
+func (db *DB) GetCredits(playerID int64) (int, error) {
+	var credits int
+	err := db.conn.QueryRow("SELECT credits FROM stats WHERE player_id = ?", playerID).Scan(&credits)
+	return credits, err
+}
+
+// AddCredits adds credits to a player's balance
+func (db *DB) AddCredits(playerID int64, amount int) error {
+	_, err := db.conn.Exec("UPDATE stats SET credits = credits + ? WHERE player_id = ?", amount, playerID)
+	return err
+}
+
+// SpendCredits deducts credits if balance is sufficient. Returns false if insufficient.
+func (db *DB) SpendCredits(playerID int64, amount int) (bool, error) {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	var credits int
+	err = tx.QueryRow("SELECT credits FROM stats WHERE player_id = ?", playerID).Scan(&credits)
+	if err != nil {
+		return false, err
+	}
+	if credits < amount {
+		return false, nil
+	}
+	_, err = tx.Exec("UPDATE stats SET credits = credits - ? WHERE player_id = ?", amount, playerID)
+	if err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
+}
+
+// ClaimDailyLogin processes daily login bonus. Returns (creditsAwarded, newStreak, error).
+func (db *DB) ClaimDailyLogin(playerID int64) (int, int, error) {
+	var lastLogin sql.NullString
+	var streak int
+	err := db.conn.QueryRow("SELECT last_login, login_streak FROM stats WHERE player_id = ?", playerID).
+		Scan(&lastLogin, &streak)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	now := time.Now().UTC()
+	today := now.Format("2006-01-02")
+
+	if lastLogin.Valid {
+		lastDate := lastLogin.String[:10] // "YYYY-MM-DD"
+		if lastDate == today {
+			return 0, streak, nil // already claimed today
+		}
+		// Check if yesterday for streak continuation
+		yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+		if lastDate == yesterday {
+			streak++
+		} else {
+			streak = 1 // streak broken
+		}
+	} else {
+		streak = 1
+	}
+
+	// Cap streak at 7 for bonus calculation
+	bonusStreak := streak
+	if bonusStreak > 7 {
+		bonusStreak = 7
+	}
+	credits := 25 + bonusStreak*5 // 30, 35, 40, 45, 50, 55, 60
+
+	_, err = db.conn.Exec(
+		"UPDATE stats SET credits = credits + ?, last_login = ?, login_streak = ? WHERE player_id = ?",
+		credits, now.Format(time.RFC3339), streak, playerID,
+	)
+	return credits, streak, err
+}
+
+// PurchaseSkin records a skin purchase
+func (db *DB) PurchaseSkin(playerID int64, skinID string) error {
+	_, err := db.conn.Exec(
+		"INSERT OR IGNORE INTO player_skins (player_id, skin_id) VALUES (?, ?)",
+		playerID, skinID,
+	)
+	return err
+}
+
+// HasSkin checks if a player owns a skin
+func (db *DB) HasSkin(playerID int64, skinID string) (bool, error) {
+	var count int
+	err := db.conn.QueryRow(
+		"SELECT COUNT(*) FROM player_skins WHERE player_id = ? AND skin_id = ?",
+		playerID, skinID,
+	).Scan(&count)
+	return count > 0, err
+}
+
+// GetOwnedSkins returns all skin IDs a player owns
+func (db *DB) GetOwnedSkins(playerID int64) ([]string, error) {
+	rows, err := db.conn.Query(
+		"SELECT skin_id FROM player_skins WHERE player_id = ? ORDER BY purchased_at",
+		playerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []string
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			return nil, err
+		}
+		result = append(result, s)
+	}
+	return result, rows.Err()
+}
+
+// EquipSkin sets the player's equipped skin
+func (db *DB) EquipSkin(playerID int64, skinID string) error {
+	_, err := db.conn.Exec("UPDATE stats SET equipped_skin = ? WHERE player_id = ?", skinID, playerID)
+	return err
+}
+
+// EquipTrail sets the player's equipped trail
+func (db *DB) EquipTrail(playerID int64, trailID string) error {
+	_, err := db.conn.Exec("UPDATE stats SET equipped_trail = ? WHERE player_id = ?", trailID, playerID)
+	return err
+}
+
+// GetEquipped returns the player's equipped skin and trail
+func (db *DB) GetEquipped(playerID int64) (string, string, error) {
+	var skin, trail string
+	err := db.conn.QueryRow("SELECT equipped_skin, equipped_trail FROM stats WHERE player_id = ?", playerID).
+		Scan(&skin, &trail)
+	return skin, trail, err
 }
 
 // UnlockAchievement records a player's achievement. Returns true if newly unlocked.

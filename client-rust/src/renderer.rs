@@ -204,6 +204,16 @@ pub fn render(state: &SharedState, dt: f64) {
             let speed = (pvx * pvx + pvy * pvy).sqrt();
             let boosting = is_me && my_boosting;
 
+            // Trail effect (drawn behind the ship)
+            if !p.tr.is_empty() && speed > 20.0 {
+                draw_trail_effect(&ctx, sx, sy, pr, speed, &p.tr);
+            }
+
+            // Ship skin tint
+            if !p.sk.is_empty() {
+                draw_skin_glow(&ctx, sx, sy, &p.sk);
+            }
+
             effects::draw_engine_beam(&ctx, sx, sy, pr, speed, p.s, boosting);
             ships::draw_ship(&ctx, sx, sy, pr, p.s);
 
@@ -293,6 +303,80 @@ pub fn render(state: &SharedState, dt: f64) {
 
     // HUD (screen-space, no zoom)
     hud::render_hud(&ctx, state);
+}
+
+// Trail color lookup - matches server store.go catalog
+fn trail_colors(trail_id: &str) -> (&str, &str) {
+    match trail_id {
+        "trail_fire" => ("#ff4400", "#ffaa00"),
+        "trail_ice" => ("#44aaff", "#88ddff"),
+        "trail_neon" => ("#00ff88", "#00ffcc"),
+        "trail_plasma" => ("#aa44ff", "#ff44aa"),
+        "trail_rainbow" => ("#ff0000", "#0000ff"), // special: cycles
+        "trail_star" => ("#ffcc00", "#ffffff"),
+        "trail_void" => ("#220044", "#000000"),
+        _ => ("#ffffff", "#ffffff"),
+    }
+}
+
+fn draw_trail_effect(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotation: f64, speed: f64, trail_id: &str) {
+    let (c1, c2) = trail_colors(trail_id);
+    let intensity = (speed / 350.0).min(1.0);
+    let trail_len = 15.0 + intensity * 25.0;
+
+    // Trail is drawn behind the ship (opposite of rotation)
+    let back_x = -rotation.cos();
+    let back_y = -rotation.sin();
+
+    // Draw 3 fading trail segments
+    for i in 0..3 {
+        let offset = (i as f64 + 1.0) * trail_len / 3.0;
+        let alpha = (0.4 - i as f64 * 0.12) * intensity;
+        let radius = 4.0 + i as f64 * 2.0;
+
+        let tx = sx + back_x * offset;
+        let ty = sy + back_y * offset;
+
+        ctx.begin_path();
+        let _ = ctx.arc(tx, ty, radius, 0.0, std::f64::consts::PI * 2.0);
+        let color = if i % 2 == 0 { c1 } else { c2 };
+        // Parse hex to rgba
+        ctx.set_fill_style_str(&format!("{}{}",
+            color,
+            format!("{:02x}", (alpha * 255.0) as u8)
+        ));
+        ctx.fill();
+    }
+}
+
+fn skin_color(skin_id: &str) -> &str {
+    match skin_id {
+        "skin_crimson" => "#ff3333",
+        "skin_forest" => "#33cc33",
+        "skin_ocean" => "#3399ff",
+        "skin_sunset" => "#ff8833",
+        "skin_purple" => "#aa44ff",
+        "skin_gold" => "#ffcc00",
+        "skin_ice" => "#88ddff",
+        "skin_toxic" => "#88ff00",
+        "skin_rose" => "#ff66aa",
+        "skin_phantom" => "#333344",
+        "skin_inferno" => "#ff4400",
+        "skin_arctic" => "#ffffff",
+        "skin_nebula" => "#ff44ff",
+        "skin_void" => "#440088",
+        _ => "#ffffff",
+    }
+}
+
+fn draw_skin_glow(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, skin_id: &str) {
+    let color = skin_color(skin_id);
+    // Outer glow ring
+    ctx.begin_path();
+    let _ = ctx.arc(sx, sy, 26.0, 0.0, std::f64::consts::PI * 2.0);
+    ctx.set_stroke_style_str(&format!("{}33", color)); // low alpha
+    ctx.set_line_width(3.0);
+    ctx.stroke();
 }
 
 fn draw_world_bounds(ctx: &CanvasRenderingContext2d, offset_x: f64, offset_y: f64) {

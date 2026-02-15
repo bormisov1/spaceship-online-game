@@ -330,6 +330,22 @@ impl Network {
     pub fn send_chat(net: &SharedNetwork, text: &str, team: bool) {
         Network::send_raw(net, "chat", &serde_json::json!({"text": text, "team": team}));
     }
+
+    pub fn send_store_request(net: &SharedNetwork) {
+        Network::send_raw(net, "store", &serde_json::json!({}));
+    }
+
+    pub fn send_buy(net: &SharedNetwork, item_id: &str) {
+        Network::send_raw(net, "buy", &serde_json::json!({"item_id": item_id}));
+    }
+
+    pub fn send_equip(net: &SharedNetwork, skin_id: &str, trail_id: &str) {
+        Network::send_raw(net, "equip", &serde_json::json!({"skin_id": skin_id, "trail_id": trail_id}));
+    }
+
+    pub fn send_daily_login(net: &SharedNetwork) {
+        Network::send_raw(net, "daily_login", &serde_json::json!({}));
+    }
 }
 
 fn handle_message(
@@ -549,8 +565,9 @@ fn handle_message(
                 drop(s);
                 // Update auth signal for reactive UI
                 auth_signal.set(Some(a.username.clone()));
-                // Request profile data
+                // Request profile data and claim daily login
                 Network::send_profile_request(net);
+                Network::send_daily_login(net);
             }
         }
         "profile_data" => {
@@ -563,6 +580,7 @@ fn handle_message(
                 s.auth_deaths = p.deaths;
                 s.auth_wins = p.wins;
                 s.auth_losses = p.losses;
+                s.auth_credits = p.credits;
             }
         }
         "xp_update" => {
@@ -610,6 +628,42 @@ fn handle_message(
                 // Refresh friend list
                 Network::send_friend_list(net);
             }
+        }
+        "store_res" => {
+            if let Ok(sr) = serde_json::from_value::<crate::protocol::StoreResMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.store_items = sr.items;
+                s.owned_skins = sr.owned;
+                s.auth_credits = sr.credits;
+                s.equipped_skin = sr.skin;
+                s.equipped_trail = sr.trail;
+            }
+        }
+        "buy_res" => {
+            if let Ok(br) = serde_json::from_value::<crate::protocol::BuyResMsg>(data) {
+                let mut s = state.borrow_mut();
+                if br.success {
+                    s.owned_skins.push(br.item_id);
+                    s.auth_credits = br.credits;
+                }
+            }
+        }
+        "inventory_res" => {
+            if let Ok(ir) = serde_json::from_value::<crate::protocol::InventoryResMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.owned_skins = ir.owned;
+                s.equipped_skin = ir.skin;
+                s.equipped_trail = ir.trail;
+                s.auth_credits = ir.credits;
+            }
+        }
+        "credits_update" => {
+            if let Ok(cu) = serde_json::from_value::<crate::protocol::CreditsUpdateMsg>(data) {
+                state.borrow_mut().auth_credits = cu.credits;
+            }
+        }
+        "daily_login_res" => {
+            // Handled by credits_update that follows
         }
         "chat_msg" => {
             if let Ok(msg) = serde_json::from_value::<ChatMsg>(data) {

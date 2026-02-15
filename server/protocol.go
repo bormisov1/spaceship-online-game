@@ -27,6 +27,11 @@ const (
 	MsgFriendRemove  = "friend_remove"  // remove friend
 	MsgFriendList    = "friend_list"    // request friends list
 	MsgChat          = "chat"           // send chat message
+	MsgStore         = "store"          // request store catalog
+	MsgBuy           = "buy"            // purchase item
+	MsgEquip         = "equip"          // equip item
+	MsgInventory     = "inventory"      // request owned skins
+	MsgDailyLogin    = "daily_login"    // claim daily login bonus
 )
 
 // Server -> Client message types
@@ -53,6 +58,11 @@ const (
 	MsgFriendListRes     = "friend_list_res" // friends list response
 	MsgFriendNotify      = "friend_notify"   // friend request notification
 	MsgChatMsg           = "chat_msg"        // chat message broadcast
+	MsgStoreRes          = "store_res"       // store catalog response
+	MsgBuyRes            = "buy_res"         // purchase result
+	MsgInventoryRes      = "inventory_res"   // owned skins response
+	MsgCreditsUpdate     = "credits_update"  // credits balance update
+	MsgDailyLoginRes     = "daily_login_res" // daily login result
 	MsgMatchPhase     = "match_phase"     // match phase changed
 	MsgMatchResult = "match_result" // match ended, results
 	MsgTeamUpdate  = "team_update"  // team roster/score update
@@ -113,6 +123,8 @@ type PlayerState struct {
 	AbilCD  float64 `json:"acd,omitempty" msgpack:"acd,omitempty"`
 	AbilAct bool    `json:"aact,omitempty" msgpack:"aact,omitempty"`
 	SpawnP  bool    `json:"sp,omitempty" msgpack:"sp,omitempty"`
+	Skin    string  `json:"sk,omitempty" msgpack:"sk,omitempty"`
+	Trail   string  `json:"tr,omitempty" msgpack:"tr,omitempty"`
 }
 
 // ProjectileState is broadcast per projectile
@@ -325,6 +337,7 @@ type ProfileDataMsg struct {
 	Wins     int     `json:"wins"`
 	Losses   int     `json:"losses"`
 	Playtime float64 `json:"playtime"`
+	Credits  int     `json:"credits"`
 }
 
 // XPUpdateMsg is sent to a player after a match with XP gain details
@@ -385,4 +398,53 @@ type ChatBroadcastMsg struct {
 	From string `json:"from"`
 	Text string `json:"text"`
 	Team bool   `json:"team"`
+}
+
+// BuyMsg is sent by client to purchase an item
+type BuyMsg struct {
+	ItemID string `json:"item_id"`
+}
+
+// EquipMsg is sent by client to equip an item
+type EquipMsg struct {
+	SkinID  string `json:"skin_id"`
+	TrailID string `json:"trail_id"`
+}
+
+// StoreResMsg is sent to client with store catalog + owned items
+type StoreResMsg struct {
+	Items   []StoreItem `json:"items"`
+	Owned   []string    `json:"owned"`
+	Credits int         `json:"credits"`
+	Skin    string      `json:"skin"`
+	Trail   string      `json:"trail"`
+}
+
+// BuyResMsg is sent to client after a purchase attempt
+type BuyResMsg struct {
+	Success bool   `json:"success"`
+	ItemID  string `json:"item_id"`
+	Credits int    `json:"credits"` // remaining credits
+}
+
+// InventoryResMsg is sent with player's owned skins + equipped state
+type InventoryResMsg struct {
+	Owned   []string `json:"owned"`
+	Skin    string   `json:"skin"`
+	Trail   string   `json:"trail"`
+	Credits int      `json:"credits"`
+}
+
+// CreditsUpdateMsg is sent to notify credit balance change
+type CreditsUpdateMsg struct {
+	Credits  int    `json:"credits"`
+	Delta    int    `json:"delta"`
+	Reason   string `json:"reason"`
+}
+
+// DailyLoginResMsg is sent after daily login claim
+type DailyLoginResMsg struct {
+	Credits int  `json:"credits"` // credits awarded
+	Streak  int  `json:"streak"`
+	Already bool `json:"already"` // true if already claimed today
 }

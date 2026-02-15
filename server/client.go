@@ -212,6 +212,16 @@ func (c *Client) handleMessage(raw []byte) {
 		c.handleFriendList()
 	case MsgChat:
 		c.handleChat(env.D)
+	case MsgStore:
+		c.handleStore()
+	case MsgBuy:
+		c.handleBuy(env.D)
+	case MsgEquip:
+		c.handleEquip(env.D)
+	case MsgInventory:
+		c.handleInventory()
+	case MsgDailyLogin:
+		c.handleDailyLogin()
 	}
 }
 
@@ -284,6 +294,13 @@ func (c *Client) handleJoin(data json.RawMessage) {
 
 	// Link auth to in-game player
 	player.AuthPlayerID = c.authPlayerID
+
+	// Load equipped cosmetics
+	if c.authPlayerID > 0 && c.hub.db != nil {
+		skin, trail, _ := c.hub.db.GetEquipped(c.authPlayerID)
+		player.Skin = skin
+		player.Trail = trail
+	}
 
 	sess.Game.SetClient(player.ID, c)
 
@@ -505,6 +522,7 @@ func (c *Client) handleProfile() {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "profile not found"}})
 		return
 	}
+	credits, _ := c.hub.db.GetCredits(c.authPlayerID)
 	c.SendJSON(Envelope{T: MsgProfileData, Data: ProfileDataMsg{
 		Username: c.authUsername,
 		Level:    stats.Level,
@@ -515,6 +533,7 @@ func (c *Client) handleProfile() {
 		Wins:     stats.Wins,
 		Losses:   stats.Losses,
 		Playtime: stats.Playtime,
+		Credits:  credits,
 	}})
 }
 
@@ -688,5 +707,150 @@ func (c *Client) handleChat(data json.RawMessage) {
 		sess.Game.BroadcastTeamChat(c.playerID, broadcast)
 	} else {
 		sess.Game.BroadcastChat(broadcast)
+	}
+}
+
+func (c *Client) handleStore() {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	owned, _ := c.hub.db.GetOwnedSkins(c.authPlayerID)
+	credits, _ := c.hub.db.GetCredits(c.authPlayerID)
+	skin, trail, _ := c.hub.db.GetEquipped(c.authPlayerID)
+	if owned == nil {
+		owned = []string{}
+	}
+	c.SendJSON(Envelope{T: MsgStoreRes, Data: StoreResMsg{
+		Items:   StoreCatalog,
+		Owned:   owned,
+		Credits: credits,
+		Skin:    skin,
+		Trail:   trail,
+	}})
+}
+
+func (c *Client) handleBuy(data json.RawMessage) {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	var msg BuyMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	item, ok := StoreCatalogMap[msg.ItemID]
+	if !ok {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "item not found"}})
+		return
+	}
+	// Check if already owned
+	has, _ := c.hub.db.HasSkin(c.authPlayerID, msg.ItemID)
+	if has {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "already owned"}})
+		return
+	}
+	// Spend credits
+	ok, err := c.hub.db.SpendCredits(c.authPlayerID, item.Price)
+	if err != nil {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "purchase failed"}})
+		return
+	}
+	if !ok {
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "not enough credits"}})
+		return
+	}
+	// Record purchase
+	if err := c.hub.db.PurchaseSkin(c.authPlayerID, msg.ItemID); err != nil {
+		log.Printf("DB: failed to record purchase: %v", err)
+	}
+	credits, _ := c.hub.db.GetCredits(c.authPlayerID)
+	c.SendJSON(Envelope{T: MsgBuyRes, Data: BuyResMsg{
+		Success: true,
+		ItemID:  msg.ItemID,
+		Credits: credits,
+	}})
+}
+
+func (c *Client) handleEquip(data json.RawMessage) {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	var msg EquipMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	// Validate ownership (empty string = unequip)
+	if msg.SkinID != "" {
+		has, _ := c.hub.db.HasSkin(c.authPlayerID, msg.SkinID)
+		if !has {
+			c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "skin not owned"}})
+			return
+		}
+	}
+	if msg.TrailID != "" {
+		has, _ := c.hub.db.HasSkin(c.authPlayerID, msg.TrailID)
+		if !has {
+			c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "trail not owned"}})
+			return
+		}
+	}
+	c.hub.db.EquipSkin(c.authPlayerID, msg.SkinID)
+	c.hub.db.EquipTrail(c.authPlayerID, msg.TrailID)
+
+	// Update in-game player if currently in a session
+	if c.sessionID != "" && c.playerID != "" {
+		sess := c.hub.sessions.GetSession(c.sessionID)
+		if sess != nil {
+			sess.Game.mu.Lock()
+			if p, ok := sess.Game.players[c.playerID]; ok {
+				p.Skin = msg.SkinID
+				p.Trail = msg.TrailID
+			}
+			sess.Game.mu.Unlock()
+		}
+	}
+
+	c.handleInventory()
+}
+
+func (c *Client) handleInventory() {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	owned, _ := c.hub.db.GetOwnedSkins(c.authPlayerID)
+	credits, _ := c.hub.db.GetCredits(c.authPlayerID)
+	skin, trail, _ := c.hub.db.GetEquipped(c.authPlayerID)
+	if owned == nil {
+		owned = []string{}
+	}
+	c.SendJSON(Envelope{T: MsgInventoryRes, Data: InventoryResMsg{
+		Owned:   owned,
+		Skin:    skin,
+		Trail:   trail,
+		Credits: credits,
+	}})
+}
+
+func (c *Client) handleDailyLogin() {
+	if c.hub.db == nil || c.authPlayerID == 0 {
+		return
+	}
+	credits, streak, err := c.hub.db.ClaimDailyLogin(c.authPlayerID)
+	if err != nil {
+		log.Printf("DB: daily login error: %v", err)
+		return
+	}
+	c.SendJSON(Envelope{T: MsgDailyLoginRes, Data: DailyLoginResMsg{
+		Credits: credits,
+		Streak:  streak,
+		Already: credits == 0,
+	}})
+	// Send updated credit balance
+	if credits > 0 {
+		total, _ := c.hub.db.GetCredits(c.authPlayerID)
+		c.SendJSON(Envelope{T: MsgCreditsUpdate, Data: CreditsUpdateMsg{
+			Credits: total,
+			Delta:   credits,
+			Reason:  "daily_login",
+		}})
 	}
 }

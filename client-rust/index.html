@@ -893,6 +893,38 @@
             margin-left: 4px;
         }
         .btn-decline:hover { background: rgba(255, 80, 80, 0.3); }
+
+        /* Store */
+        .store-panel {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        .store-items {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            margin-bottom: 6px;
+        }
+        .store-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 8px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 3px;
+        }
+        .store-swatch {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
     </style>
 </head>
 <body>

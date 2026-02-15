@@ -744,6 +744,12 @@ func (g *Game) persistMatchResults(mode int, duration float64, winnerTeam int, r
 			continue
 		}
 
+		// Award credits
+		credits := CreditsPerMatch(r.Kills, r.Assists, won)
+		if err := g.db.AddCredits(p.AuthPlayerID, credits); err != nil {
+			log.Printf("DB: failed to add credits: %v", err)
+		}
+
 		// Send XP update to the player's client
 		if client, ok := g.clients[r.ID]; ok {
 			client.SendJSON(Envelope{T: MsgXPUpdate, Data: XPUpdateMsg{
@@ -753,6 +759,12 @@ func (g *Game) persistMatchResults(mode int, duration float64, winnerTeam int, r
 				PrevLevel: prevLevel,
 				XPNext:    XPToNextLevel(newLevel),
 				LeveledUp: newLevel > prevLevel,
+			}})
+			// Send credits update
+			client.SendJSON(Envelope{T: MsgCreditsUpdate, Data: CreditsUpdateMsg{
+				Credits: func() int { c, _ := g.db.GetCredits(p.AuthPlayerID); return c }(),
+				Delta:   credits,
+				Reason:  "match",
 			}})
 		}
 

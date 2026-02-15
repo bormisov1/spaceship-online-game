@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::protocol::{PlayerState, ProjectileState, MobState, AsteroidState, PickupState, HealZoneState, PlayerMatchResult, TeamPlayerInfo, LeaderboardEntry, FriendInfo};
+use crate::protocol::{PlayerState, ProjectileState, MobState, AsteroidState, PickupState, HealZoneState, PlayerMatchResult, TeamPlayerInfo, LeaderboardEntry, FriendInfo, StoreItem};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Phase {
@@ -214,6 +214,14 @@ pub struct GameState {
     pub achievement_queue: Vec<AchievementNotification>,
     pub achievement_show_time: f64,
 
+    // Store & Credits
+    pub auth_credits: i32,
+    pub store_items: Vec<StoreItem>,
+    pub owned_skins: Vec<String>,
+    pub equipped_skin: String,
+    pub equipped_trail: String,
+    pub store_open: bool,
+
     // Friends
     pub friends: Vec<FriendInfo>,
     pub friend_requests: Vec<FriendInfo>,
@@ -328,6 +336,13 @@ impl GameState {
 
             achievement_queue: Vec::new(),
             achievement_show_time: 0.0,
+
+            auth_credits: 0,
+            store_items: Vec::new(),
+            owned_skins: Vec::new(),
+            equipped_skin: String::new(),
+            equipped_trail: String::new(),
+            store_open: false,
 
             friends: Vec::new(),
             friend_requests: Vec::new(),

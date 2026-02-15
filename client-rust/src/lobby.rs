@@ -2,7 +2,7 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 use crate::state::SharedState;
 use crate::network::{Network, SharedNetwork};
-use crate::protocol::{SessionInfo, CheckedMsg};
+use crate::protocol::{SessionInfo, CheckedMsg, StoreItem};
 
 #[component]
 pub fn AuthPanel(
@@ -131,8 +131,11 @@ pub fn NormalLobby(
     let state_auth = state.clone();
     let state_lb = send_wrapper::SendWrapper::new(state.clone());
     let state_friends = state.clone();
+    let state_store = state.clone();
     let net_friends = net.clone();
+    let net_store = net.clone();
     let net_auth = net.clone();
+    let store_open = RwSignal::new(false);
     let default_name = state.borrow().auth_username.clone().unwrap_or_else(|| "Pilot".to_string());
 
     view! {
@@ -150,6 +153,12 @@ pub fn NormalLobby(
                 <h1 class="title">"STAR WARS"</h1>
                 <h2 class="subtitle">"Space Battle"</h2>
                 <AuthPanel state=state_auth.clone() net=net_auth.clone() auth_signal=auth_signal />
+                <StoreButton
+                    state=state_store.clone()
+                    net=net_store.clone()
+                    auth_signal=auth_signal
+                    store_open=store_open
+                />
                 <div class="name-input-group">
                     <label for="playerName">"Pilot Name"</label>
                     <input type="text" id="playerName" maxlength="16" placeholder="Enter your name..."
@@ -264,6 +273,152 @@ pub fn NormalLobby(
                 </div>
                 <FriendsPanel state=state_friends net=net_friends auth_signal=auth_signal />
             </div>
+        </div>
+    }
+}
+
+#[component]
+fn StoreButton(
+    state: SharedState,
+    net: SharedNetwork,
+    auth_signal: RwSignal<Option<String>>,
+    store_open: RwSignal<bool>,
+) -> impl IntoView {
+    let net_store = send_wrapper::SendWrapper::new(net.clone());
+    let net_daily = send_wrapper::SendWrapper::new(net.clone());
+    let state_credits = send_wrapper::SendWrapper::new(state.clone());
+    let state_store_view = send_wrapper::SendWrapper::new(state.clone());
+    let net_buy = send_wrapper::SendWrapper::new(net.clone());
+    let net_equip = send_wrapper::SendWrapper::new(net.clone());
+
+    let on_open_store = move |_: web_sys::MouseEvent| {
+        Network::send_store_request(&net_store);
+        store_open.set(true);
+    };
+
+    let on_close_store = move |_: web_sys::MouseEvent| {
+        store_open.set(false);
+    };
+
+    let on_daily = move |_: web_sys::MouseEvent| {
+        Network::send_daily_login(&net_daily);
+    };
+
+    view! {
+        <div style:display=move || if auth_signal.get().is_some() { "block" } else { "none" }>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:6px;">
+                <span style="color:#ffcc00;font-size:13px;font-weight:bold;">
+                    {move || format!("{} credits", state_credits.borrow().auth_credits)}
+                </span>
+                <span style="display:flex;gap:4px;">
+                    <button class="btn btn-small btn-login" on:click=on_daily>"Daily Bonus"</button>
+                    <button class="btn btn-small btn-join" on:click=on_open_store>"Store"</button>
+                </span>
+            </div>
+            {move || {
+                if !store_open.get() {
+                    return view! { <span></span> }.into_any();
+                }
+                let s = state_store_view.borrow();
+                let items = s.store_items.clone();
+                let owned = s.owned_skins.clone();
+                let credits = s.auth_credits;
+                let equipped_skin = s.equipped_skin.clone();
+                let equipped_trail = s.equipped_trail.clone();
+                drop(s);
+
+                let rarity_name = |r: i32| match r {
+                    0 => "Common",
+                    1 => "Rare",
+                    2 => "Epic",
+                    3 => "Legendary",
+                    _ => "?",
+                };
+                let rarity_color = |r: i32| match r {
+                    0 => "#aaaaaa",
+                    1 => "#44aaff",
+                    2 => "#aa44ff",
+                    3 => "#ffcc00",
+                    _ => "#ffffff",
+                };
+
+                let skins: Vec<_> = items.iter().filter(|i| i.item_type == "skin").cloned().collect();
+                let trails: Vec<_> = items.iter().filter(|i| i.item_type == "trail").cloned().collect();
+
+                let make_items = |items: Vec<StoreItem>| {
+                    let net_b = (*net_buy).clone();
+                    let net_e = (*net_equip).clone();
+                    let owned_c = owned.clone();
+                    let eq_skin = equipped_skin.clone();
+                    let eq_trail = equipped_trail.clone();
+                    items.into_iter().map(move |item| {
+                        let is_owned = owned_c.contains(&item.id);
+                        let is_equipped = item.id == eq_skin || item.id == eq_trail;
+                        let can_buy = !is_owned && credits >= item.price;
+                        let net_b2 = net_b.clone();
+                        let net_e2 = net_e.clone();
+                        let id_buy = item.id.clone();
+                        let id_equip = item.id.clone();
+                        let item_type = item.item_type.clone();
+                        let eq_s = eq_skin.clone();
+                        let eq_t = eq_trail.clone();
+                        view! {
+                            <div class="store-item" style=format!("border-left:3px solid {}", rarity_color(item.rarity))>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <span class="store-swatch" style=format!("background:{}", item.color1)></span>
+                                    <span style="color:#ffffff;font-size:12px;font-weight:bold;">{item.name.clone()}</span>
+                                    <span style=format!("color:{};font-size:10px;", rarity_color(item.rarity))>
+                                        {rarity_name(item.rarity)}
+                                    </span>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:4px;">
+                                    {if is_equipped {
+                                        view! { <span style="color:#44ff88;font-size:10px;">"EQUIPPED"</span> }.into_any()
+                                    } else if is_owned {
+                                        let item_t = item_type.clone();
+                                        view! {
+                                            <button class="btn-accept" on:click=move |_| {
+                                                let (sk, tr) = if item_t == "skin" {
+                                                    (id_equip.as_str(), eq_t.as_str())
+                                                } else {
+                                                    (eq_s.as_str(), id_equip.as_str())
+                                                };
+                                                Network::send_equip(&net_e2, sk, tr);
+                                            }>"Equip"</button>
+                                        }.into_any()
+                                    } else {
+                                        view! {
+                                            <button
+                                                class=if can_buy { "btn-accept" } else { "btn-decline" }
+                                                disabled=!can_buy
+                                                on:click=move |_| {
+                                                    Network::send_buy(&net_b2, &id_buy);
+                                                }
+                                            >{format!("{} cr", item.price)}</button>
+                                        }.into_any()
+                                    }}
+                                </div>
+                            </div>
+                        }
+                    }).collect::<Vec<_>>()
+                };
+
+                let skin_views = make_items(skins);
+                let trail_views = make_items(trails);
+
+                view! {
+                    <div class="store-panel">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <h3 style="color:#ffcc00;font-size:14px;margin:0;">"Store"</h3>
+                            <button class="btn-decline" on:click=on_close_store>"Close"</button>
+                        </div>
+                        <h4 style="color:#88aacc;font-size:11px;margin:4px 0;text-transform:uppercase;letter-spacing:1px;">"Ship Skins"</h4>
+                        <div class="store-items">{skin_views}</div>
+                        <h4 style="color:#88aacc;font-size:11px;margin:4px 0;text-transform:uppercase;letter-spacing:1px;">"Trail Effects"</h4>
+                        <div class="store-items">{trail_views}</div>
+                    </div>
+                }.into_any()
+            }}
         </div>
     }
 }
