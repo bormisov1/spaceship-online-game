@@ -502,11 +502,6 @@
             100% { transform: translateX(-50%); }
         }
 
-        @keyframes donation-marquee-reverse {
-            0% { transform: translateX(-50%); }
-            100% { transform: translateX(0); }
-        }
-
         @media (hover: none), (max-width: 900px) {
             .donation-banner {
                 display: none !important;
@@ -600,47 +595,43 @@
 <body>
 <script>
 (function() {
-    var dir = 'f';
     function setup(banner) {
         var scroll = banner.querySelector('.donation-scroll');
         if (!scroll) return;
+        var copy = scroll.querySelector('.donation-text');
+        if (!copy) return;
+        var cw = copy.getBoundingClientRect().width;
+        if (!cw) return;
+        scroll.style.animation = 'none';
+        var dir = 'f', anim = null;
+        function go(d, pos) {
+            if (anim) anim.cancel();
+            var dur = d === 'f' ? 45000 : 7500;
+            var neg = -cw + 'px';
+            anim = scroll.animate(
+                d === 'f'
+                    ? [{ transform: 'translateX(0)' }, { transform: 'translateX(' + neg + ')' }]
+                    : [{ transform: 'translateX(' + neg + ')' }, { transform: 'translateX(0)' }],
+                { duration: dur, iterations: Infinity, easing: 'linear' }
+            );
+            if (pos != null) anim.currentTime = (d === 'f' ? pos : 1 - pos) * dur;
+            dir = d;
+        }
+        function getPos() {
+            if (!anim) return 0;
+            var p = anim.effect.getComputedTiming().progress || 0;
+            return dir === 'f' ? p : 1 - p;
+        }
+        go('f');
         banner.addEventListener('mousemove', function(e) {
             var rect = banner.getBoundingClientRect();
-            var x = e.clientX - rect.left;
-            var want = x < rect.width / 3 ? 'r' : 'f';
+            var want = (e.clientX - rect.left) < rect.width / 3 ? 'r' : 'f';
             if (want === dir) return;
-            var anims = scroll.getAnimations();
-            var p = 0;
-            if (anims.length) {
-                var t = anims[0].effect.getComputedTiming();
-                p = t.progress || 0;
-            }
-            var pos = (dir === 'f') ? p : (1 - p);
-            dir = want;
-            if (want === 'r') {
-                var d = -(1 - pos) * 22.5;
-                scroll.style.animation = 'donation-marquee-reverse 22.5s linear infinite';
-                scroll.style.animationDelay = d + 's';
-            } else {
-                var d = -(pos * 45);
-                scroll.style.animation = 'donation-marquee 45s linear infinite';
-                scroll.style.animationDelay = d + 's';
-            }
+            go(want, getPos());
         });
         banner.addEventListener('mouseleave', function() {
-            var scroll = banner.querySelector('.donation-scroll');
-            if (!scroll) return;
-            var anims = scroll.getAnimations();
-            var p = 0;
-            if (anims.length) {
-                var t = anims[0].effect.getComputedTiming();
-                p = t.progress || 0;
-            }
-            var pos = (dir === 'f') ? p : (1 - p);
-            dir = 'f';
-            var d = -(pos * 45);
-            scroll.style.animation = 'donation-marquee 45s linear infinite';
-            scroll.style.animationDelay = d + 's';
+            if (dir === 'f') return;
+            go('f', getPos());
         });
     }
     var obs = new MutationObserver(function(_, o) {
