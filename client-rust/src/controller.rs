@@ -214,9 +214,9 @@ fn connect_ws(ctrl: &SharedCtrl) {
         }
         update_status("Disconnected. Reconnecting...");
         let ctrl_reconnect = ctrl_close.clone();
-        let _ = gloo_timers::callback::Timeout::new(RECONNECT_DELAY, move || {
+        gloo_timers::callback::Timeout::new(RECONNECT_DELAY, move || {
             connect_ws(&ctrl_reconnect);
-        });
+        }).forget();
     }) as Box<dyn FnMut(CloseEvent)>);
 
     let on_error = Closure::wrap(Box::new(move |_: ErrorEvent| {
@@ -290,7 +290,7 @@ fn update_status(text: &str) {
 fn setup_touch_handlers(ctrl: &SharedCtrl) {
     // Wait a bit for DOM to be ready
     let ctrl_clone = ctrl.clone();
-    let _ = gloo_timers::callback::Timeout::new(100, move || {
+    gloo_timers::callback::Timeout::new(100, move || {
         let document = web_sys::window().unwrap().document().unwrap();
         let has_pad = document.get_element_by_id("ctrlPad").is_some();
         debug_log(&format!("setup_touch: ctrlPad found={}", has_pad));
@@ -414,7 +414,7 @@ fn setup_touch_handlers(ctrl: &SharedCtrl) {
             );
             te2.forget();
         }
-    });
+    }).forget();
 }
 
 fn update_knob(dx: f64, dy: f64) {
