@@ -27,7 +27,7 @@ if $BUILD_RUST; then
 fi
 
 echo ">> Building and restarting..."
-ssh "$REMOTE" "cd $REMOTE_DIR/server && go build -o /home/claude/$SERVICE . && systemctl restart $SERVICE"
+ssh "$REMOTE" "cd $REMOTE_DIR/server && go build -buildvcs=false -o $REMOTE_DIR/$SERVICE . && systemctl restart $SERVICE"
 
 echo ">> Done. https://spaceships.x.bormisov.com/"
 if $BUILD_RUST; then
