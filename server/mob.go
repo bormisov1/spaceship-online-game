@@ -29,6 +29,16 @@ const (
 	MobWanderTurn     = 1.5   // how fast mob turns toward wander heading (rad/s)
 	MobPhraseChance   = 0.15  // 15% chance of saying a phrase on state change
 	MobLowHPThreshold = 0.25  // below 25% HP triggers "almost dying" phrase
+
+	// Smart AI constants
+	MobOptimalRange   = 450.0 // preferred combat distance
+	MobOptimalRangeSq = MobOptimalRange * MobOptimalRange
+	MobDodgeRange     = 300.0 // range to detect incoming projectiles
+	MobDodgeRangeSq   = MobDodgeRange * MobDodgeRange
+	MobDodgeImpulse   = 120.0 // lateral velocity impulse when dodging
+	MobDodgeCooldown  = 0.3   // seconds between dodge reactions
+	MobStrafeFlipMin  = 1.5   // min seconds before strafe direction flip
+	MobStrafeFlipMax  = 3.5   // max seconds before strafe direction flip
 )
 
 // Mob phrase pools keyed by situation
@@ -97,6 +107,11 @@ type Mob struct {
 	BurstCD     float64 // cooldown between bursts
 	WanderAngle float64 // desired heading when idle
 
+	// Smart AI state
+	StrafeDir   float64 // +1 or -1 for circle strafe direction
+	StrafeTimer float64 // timer until strafe direction flip
+	DodgeCD     float64 // cooldown for dodge reactions
+
 	// State tracking for phrases
 	WasTracking  bool   // was tracking a player last tick
 	SaidLowHP    bool   // already said low-HP phrase
@@ -154,12 +169,20 @@ func NewMob() *Mob {
 	// Face toward center
 	m.Rotation = math.Atan2(WorldHeight/2-m.Y, WorldWidth/2-m.X)
 	m.WanderAngle = m.Rotation
+
+	// Random strafe direction
+	if rand.Float64() < 0.5 {
+		m.StrafeDir = 1
+	} else {
+		m.StrafeDir = -1
+	}
+	m.StrafeTimer = MobStrafeFlipMin + rand.Float64()*(MobStrafeFlipMax-MobStrafeFlipMin)
 	return m
 }
 
 // Update moves the mob and steers toward nearest player or center.
 // Returns true if the mob wants to fire this tick.
-func (m *Mob) Update(dt float64, players map[string]*Player) bool {
+func (m *Mob) Update(dt float64, players map[string]*Player, projectiles map[string]*Projectile) bool {
 	if !m.Alive {
 		return false
 	}
@@ -171,9 +194,12 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 	if m.BurstCD > 0 {
 		m.BurstCD -= dt
 	}
+	if m.DodgeCD > 0 {
+		m.DodgeCD -= dt
+	}
 
-	// Find nearest alive player within detect range
-	var targetX, targetY float64
+	// Find nearest alive player within detect range (also capture velocity for lead targeting)
+	var targetX, targetY, targetVX, targetVY float64
 	bestDist := math.MaxFloat64
 	found := false
 
@@ -186,6 +212,8 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 			bestDist = d2
 			targetX = p.X
 			targetY = p.Y
+			targetVX = p.VX
+			targetVY = p.VY
 			found = true
 		}
 	}
@@ -200,8 +228,14 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 		}
 		m.WasTracking = true
 
-		// Rotate toward target player
-		desiredR := math.Atan2(targetY-m.Y, targetX-m.X)
+		// --- LEAD TARGETING: aim at predicted position ---
+		dist := math.Sqrt(bestDist)
+		timeToHit := dist / ProjectileSpeed
+		leadX := targetX + targetVX*timeToHit
+		leadY := targetY + targetVY*timeToHit
+
+		// Rotate toward lead position (for aiming/shooting)
+		desiredR := math.Atan2(leadY-m.Y, leadX-m.X)
 		diff := NormalizeAngle(desiredR - m.Rotation)
 		maxTurn := MobTurnSpeed * dt
 		if diff > maxTurn {
@@ -210,6 +244,28 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 			diff = -maxTurn
 		}
 		m.Rotation += diff
+
+		// --- OPTIMAL DISTANCE + CIRCLE STRAFE: compute movement direction ---
+		angleToTarget := math.Atan2(targetY-m.Y, targetX-m.X)
+		// radial: +1 = approach, -1 = retreat
+		radial := Clamp((dist-MobOptimalRange)/(MobOptimalRange*0.5), -1, 1)
+		// tangential: strafe more when near optimal range
+		tangential := m.StrafeDir * (1.0 - math.Abs(radial)*0.7)
+		moveX := math.Cos(angleToTarget)*radial + math.Cos(angleToTarget+math.Pi/2)*tangential
+		moveY := math.Sin(angleToTarget)*radial + math.Sin(angleToTarget+math.Pi/2)*tangential
+		moveAngle := math.Atan2(moveY, moveX)
+
+		// Flip strafe direction periodically
+		m.StrafeTimer -= dt
+		if m.StrafeTimer <= 0 {
+			m.StrafeDir = -m.StrafeDir
+			m.StrafeTimer = MobStrafeFlipMin + rand.Float64()*(MobStrafeFlipMax-MobStrafeFlipMin)
+		}
+
+		// Accelerate in movement direction (decoupled from aim)
+		accel := MobAccel * dt
+		m.VX += math.Cos(moveAngle) * accel
+		m.VY += math.Sin(moveAngle) * accel
 	} else {
 		// State transition: lost player
 		if m.WasTracking {
@@ -227,12 +283,12 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 			diff = -maxTurn
 		}
 		m.Rotation += diff
-	}
 
-	// Accelerate in facing direction
-	accel := MobAccel * dt
-	m.VX += math.Cos(m.Rotation) * accel
-	m.VY += math.Sin(m.Rotation) * accel
+		// Accelerate in facing direction when wandering
+		accel := MobAccel * dt
+		m.VX += math.Cos(m.Rotation) * accel
+		m.VY += math.Sin(m.Rotation) * accel
+	}
 
 	// Friction
 	m.VX *= MobFriction
@@ -244,6 +300,56 @@ func (m *Mob) Update(dt float64, players map[string]*Player) bool {
 		scale := MobSpeed / speed
 		m.VX *= scale
 		m.VY *= scale
+	}
+
+	// --- DODGE INCOMING PROJECTILES ---
+	if m.DodgeCD <= 0 {
+		for _, proj := range projectiles {
+			if !proj.Alive || proj.OwnerID == m.ID {
+				continue
+			}
+			dx := m.X - proj.X
+			dy := m.Y - proj.Y
+			d2 := dx*dx + dy*dy
+			if d2 > MobDodgeRangeSq {
+				continue
+			}
+			// Is the projectile heading toward us?
+			dot := dx*proj.VX + dy*proj.VY
+			if dot <= 0 {
+				continue
+			}
+			// Will it pass close enough to hit?
+			projSpeed2 := proj.VX*proj.VX + proj.VY*proj.VY
+			if projSpeed2 < 1 {
+				continue
+			}
+			t := dot / projSpeed2
+			closestX := proj.X + proj.VX*t - m.X
+			closestY := proj.Y + proj.VY*t - m.Y
+			perpDist2 := closestX*closestX + closestY*closestY
+			hitZone := MobRadius + ProjectileRadius + 30
+			if perpDist2 < hitZone*hitZone {
+				// Dodge perpendicular to projectile direction
+				perpX := -proj.VY
+				perpY := proj.VX
+				perpLen := math.Sqrt(perpX*perpX + perpY*perpY)
+				if perpLen > 0 {
+					perpX /= perpLen
+					perpY /= perpLen
+				}
+				// Dodge away from the projectile path
+				cross := dx*proj.VY - dy*proj.VX
+				if cross < 0 {
+					perpX = -perpX
+					perpY = -perpY
+				}
+				m.VX += perpX * MobDodgeImpulse
+				m.VY += perpY * MobDodgeImpulse
+				m.DodgeCD = MobDodgeCooldown
+				break
+			}
+		}
 	}
 
 	// Move

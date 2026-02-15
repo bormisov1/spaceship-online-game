@@ -267,7 +267,7 @@ func (g *Game) update() {
 
 	// Update mobs
 	for id, mob := range g.mobs {
-		wantFire := mob.Update(dt, g.players)
+		wantFire := mob.Update(dt, g.players, g.projectiles)
 		if !mob.Alive {
 			delete(g.mobs, id)
 			continue

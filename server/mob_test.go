@@ -63,15 +63,16 @@ func TestMobAISteersTowardPlayer(t *testing.T) {
 	m.VY = 0
 	m.Rotation = 0
 
+	// Place player beyond optimal range (450) but within detect range (655)
 	players := map[string]*Player{
 		"p1": {
-			ID: "p1", X: 2200, Y: 2000, Alive: true,
+			ID: "p1", X: 2600, Y: 2000, Alive: true,
 		},
 	}
 
 	// Run a few updates
 	for i := 0; i < 60; i++ {
-		m.Update(1.0/60.0, players)
+		m.Update(1.0/60.0, players, make(map[string]*Projectile))
 	}
 
 	// Mob should have moved toward the player (rightward)
@@ -92,7 +93,7 @@ func TestMobAIWandersWhenIdle(t *testing.T) {
 
 	startX, startY := m.X, m.Y
 	for i := 0; i < 120; i++ {
-		m.Update(1.0/60.0, players)
+		m.Update(1.0/60.0, players, make(map[string]*Projectile))
 	}
 
 	// Mob should have moved from its starting position
