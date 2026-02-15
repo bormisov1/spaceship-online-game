@@ -243,6 +243,7 @@ fn DonationBanner() -> impl IntoView {
     const ADDRS: &[(&str, &str)] = &[
         ("BTC", "bc1qqx35t04knmy7l2y520l7tpzpmz0qvsl3289vuk"),
         ("ETH", "0x759094ACa57603032db78bE296a7EE962876E190"),
+        ("BNB", "0x759094ACa57603032db78bE296a7EE962876E190"),
         ("TRX", "TTvHHqx99xnfANinQugRyJyyXrhck7JxKi"),
         ("TON", "UQBDXLK1Qk6CfT3pI7A1ot_Y2zUtviJH_p55MTpW8lqFDwd0"),
         ("SOL", "5jDfJKRqnAbSTb2U9s1FxfXVeetm26GYXBcqLa5jGVdk"),
