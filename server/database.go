@@ -152,6 +152,18 @@ func (db *DB) migrate() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_friends_friend ON friends(friend_id);
 
+	CREATE TABLE IF NOT EXISTS analytics_events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		event_type TEXT NOT NULL,
+		player_id INTEGER,
+		session_id TEXT,
+		data TEXT,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_analytics_type ON analytics_events(event_type);
+	CREATE INDEX IF NOT EXISTS idx_analytics_player ON analytics_events(player_id);
+	CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at);
+
 	CREATE INDEX IF NOT EXISTS idx_match_players_player ON match_players(player_id);
 	CREATE INDEX IF NOT EXISTS idx_players_username ON players(username);
 	`

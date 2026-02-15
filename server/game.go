@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"sync"
@@ -99,6 +100,9 @@ type Game struct {
 
 	// Database for stat persistence (nil if no DB)
 	db *DB
+
+	// Analytics for event tracking (nil if disabled)
+	analytics *Analytics
 }
 
 // NewGame creates a new Game with the given match configuration
@@ -234,6 +238,13 @@ func (g *Game) SetDB(db *DB) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.db = db
+}
+
+// SetAnalytics sets the analytics reference for event tracking
+func (g *Game) SetAnalytics(a *Analytics) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.analytics = a
 }
 
 // HandleInput processes input from a player
@@ -620,6 +631,12 @@ func (g *Game) startMatch() {
 		Mode:     int(g.match_.Config.Mode),
 		TimeLeft: g.match_.TimeLeft,
 	}})
+
+	// Track match start
+	if g.analytics != nil {
+		g.analytics.Track(EvtMatchStart, 0, "",
+			fmt.Sprintf(`{"mode":%d,"players":%d}`, g.match_.Config.Mode, len(g.players)))
+	}
 }
 
 // endMatch transitions from playing to result
@@ -708,6 +725,13 @@ func (g *Game) persistMatchResults(mode int, duration float64, winnerTeam int, r
 		return
 	}
 
+	// Track match end event
+	if g.analytics != nil {
+		g.analytics.Track(EvtMatchEnd, 0, "",
+			fmt.Sprintf(`{"mode":%d,"duration":%.1f,"players":%d,"winner":%d}`,
+				mode, duration, len(results), winnerTeam))
+	}
+
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -744,6 +768,20 @@ func (g *Game) persistMatchResults(mode int, duration float64, winnerTeam int, r
 			continue
 		}
 
+		// Track kills and deaths
+		if g.analytics != nil {
+			for i := 0; i < r.Kills; i++ {
+				g.analytics.Track(EvtPlayerKill, p.AuthPlayerID, "", "")
+			}
+			for i := 0; i < r.Deaths; i++ {
+				g.analytics.Track(EvtPlayerDeath, p.AuthPlayerID, "", "")
+			}
+			if newLevel > prevLevel {
+				g.analytics.Track(EvtLevelUp, p.AuthPlayerID, "",
+					fmt.Sprintf(`{"from":%d,"to":%d}`, prevLevel, newLevel))
+			}
+		}
+
 		// Award credits
 		credits := CreditsPerMatch(r.Kills, r.Assists, won)
 		if err := g.db.AddCredits(p.AuthPlayerID, credits); err != nil {
@@ -778,6 +816,10 @@ func (g *Game) persistMatchResults(mode int, duration float64, winnerTeam int, r
 						Name:        ach.Name,
 						Description: ach.Description,
 					}})
+					if g.analytics != nil {
+						g.analytics.Track(EvtAchievement, p.AuthPlayerID, "",
+							`{"achievement":"`+ach.ID+`"}`)
+					}
 				}
 			}
 		}

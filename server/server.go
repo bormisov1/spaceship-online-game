@@ -90,6 +90,43 @@ func SetupRoutes(hub *Hub, clientRustDir string) *http.ServeMux {
 		json.NewEncoder(w).Encode(info)
 	})
 
+	// Analytics API endpoint
+	mux.HandleFunc("/api/analytics", func(w http.ResponseWriter, r *http.Request) {
+		if hub.analytics == nil {
+			http.Error(w, "analytics not available", http.StatusServiceUnavailable)
+			return
+		}
+
+		dau, _ := hub.analytics.DAUCount()
+		wau, _ := hub.analytics.WAUCount()
+		mau, _ := hub.analytics.MAUCount()
+		peers, sessions := hub.analytics.GetLiveMetrics()
+		eventCounts, _ := hub.analytics.EventCounts(7)
+		matchStats, _ := hub.analytics.MatchStats(7)
+		popularItems, _ := hub.analytics.PopularPurchases(10)
+		dauHistory, _ := hub.analytics.DailyActiveHistory(30)
+
+		resp := map[string]interface{}{
+			"live": map[string]interface{}{
+				"concurrent_players": peers,
+				"active_sessions":    sessions,
+				"ws_clients":         hub.ClientCount(),
+			},
+			"engagement": map[string]interface{}{
+				"dau": dau,
+				"wau": wau,
+				"mau": mau,
+			},
+			"events_7d":      eventCounts,
+			"matches_7d":     matchStats,
+			"popular_items":  popularItems,
+			"dau_history_30": dauHistory,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	})
+
 	// WebSocket endpoint
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ip := extractIP(r)

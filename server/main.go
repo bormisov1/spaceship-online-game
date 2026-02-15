@@ -62,5 +62,6 @@ func main() {
 
 	<-stop
 	log.Println("Shutting down...")
+	hub.analytics.Stop()
 	server.Close()
 }

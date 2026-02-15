@@ -3,10 +3,13 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+func itoa(n int) string { return strconv.Itoa(n) }
 
 const (
 	writeWait         = 10 * time.Second
@@ -49,6 +52,7 @@ func (c *Client) ReadPump() {
 	defer func() {
 		if c.authPlayerID > 0 {
 			c.hub.SetOffline(c.authPlayerID)
+			c.hub.analytics.Track(EvtSessionEnd, c.authPlayerID, c.sessionID, "")
 		}
 		c.hub.TrackDisconnect(c.remoteAddr)
 		c.hub.unregister <- c
@@ -254,7 +258,7 @@ func (c *Client) handleCreate(data json.RawMessage) {
 	if mode < ModeFFA || mode > ModeWaveSurvival {
 		mode = ModeFFA
 	}
-	sess := c.hub.sessions.CreateSession(sname, mode, c.hub.db)
+	sess := c.hub.sessions.CreateSession(sname, mode, c.hub.db, c.hub.analytics)
 	if sess == nil {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "too many active sessions"}})
 		return
@@ -459,6 +463,7 @@ func (c *Client) handleRegister(data json.RawMessage) {
 	c.authPlayerID = id
 	c.authUsername = msg.Username
 	c.hub.SetOnline(id, c)
+	c.hub.analytics.Track(EvtSessionStart, id, "", `{"method":"register"}`)
 	c.SendJSON(Envelope{T: MsgAuthOK, Data: AuthOKMsg{
 		Token:    token,
 		Username: msg.Username,
@@ -482,6 +487,7 @@ func (c *Client) handleLogin(data json.RawMessage) {
 	c.authPlayerID = id
 	c.authUsername = msg.Username
 	c.hub.SetOnline(id, c)
+	c.hub.analytics.Track(EvtSessionStart, id, "", `{"method":"login"}`)
 	c.SendJSON(Envelope{T: MsgAuthOK, Data: AuthOKMsg{
 		Token:    token,
 		Username: msg.Username,
@@ -505,6 +511,7 @@ func (c *Client) handleAuth(data json.RawMessage) {
 	c.authPlayerID = id
 	c.authUsername = username
 	c.hub.SetOnline(id, c)
+	c.hub.analytics.Track(EvtSessionStart, id, "", `{"method":"token"}`)
 	c.SendJSON(Envelope{T: MsgAuthOK, Data: AuthOKMsg{
 		Token:    msg.Token,
 		Username: username,
@@ -762,6 +769,8 @@ func (c *Client) handleBuy(data json.RawMessage) {
 	if err := c.hub.db.PurchaseSkin(c.authPlayerID, msg.ItemID); err != nil {
 		log.Printf("DB: failed to record purchase: %v", err)
 	}
+	c.hub.analytics.Track(EvtPurchase, c.authPlayerID, c.sessionID,
+		`{"item_id":"`+msg.ItemID+`","price":`+itoa(item.Price)+`}`)
 	credits, _ := c.hub.db.GetCredits(c.authPlayerID)
 	c.SendJSON(Envelope{T: MsgBuyRes, Data: BuyResMsg{
 		Success: true,
@@ -844,6 +853,10 @@ func (c *Client) handleDailyLogin() {
 		Streak:  streak,
 		Already: credits == 0,
 	}})
+	if credits > 0 {
+		c.hub.analytics.Track(EvtDailyLogin, c.authPlayerID, "",
+			`{"credits":`+itoa(credits)+`,"streak":`+itoa(streak)+`}`)
+	}
 	// Send updated credit balance
 	if credits > 0 {
 		total, _ := c.hub.db.GetCredits(c.authPlayerID)

@@ -1,6 +1,9 @@
 package main
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 const (
 	maxConnsPerIP = 5
@@ -24,6 +27,8 @@ type Hub struct {
 	// Online auth users: authPlayerID -> *Client
 	onlineMu    sync.RWMutex
 	onlineUsers map[int64]*Client
+	// Analytics
+	analytics *Analytics
 }
 
 // NewHub creates a new Hub with database
@@ -37,6 +42,7 @@ func NewHub(db *DB) *Hub {
 		db:          db,
 		auth:        NewAuth(db),
 		onlineUsers: make(map[int64]*Client),
+		analytics:   NewAnalytics(db),
 	}
 	return h
 }
@@ -72,6 +78,9 @@ func (h *Hub) TrackDisconnect(ip string) {
 
 // Run processes register/unregister events
 func (h *Hub) Run() {
+	metricsTicker := time.NewTicker(10 * time.Second)
+	defer metricsTicker.Stop()
+
 	for {
 		select {
 		case client := <-h.register:
@@ -96,6 +105,14 @@ func (h *Hub) Run() {
 				} else {
 					h.sessions.RemovePlayer(client.sessionID, client.playerID)
 				}
+			}
+
+		case <-metricsTicker.C:
+			// Update live analytics metrics
+			if h.analytics != nil {
+				h.analytics.SetConcurrentPeers(h.ClientCount())
+				sessions := h.sessions.ListSessions()
+				h.analytics.SetActiveSessions(len(sessions))
 			}
 		}
 	}
