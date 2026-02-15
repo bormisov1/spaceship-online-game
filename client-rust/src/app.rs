@@ -172,6 +172,7 @@ fn GameView(
     view! {
         <canvas id="bgCanvas"></canvas>
         <canvas id="gameCanvas"></canvas>
+        <DonationBanner />
 
         {move || {
             let p = phase.get();
@@ -233,6 +234,61 @@ fn IngameUI(state: SharedState, net: SharedNetwork) -> impl IntoView {
             <div class="qr-box"><img id="qrImg" alt="QR Code"/></div>
             <p class="qr-url" id="qrUrl"></p>
             <button class="btn-close" id="qrClose">"Close"</button>
+        </div>
+    }
+}
+
+#[component]
+fn DonationBanner() -> impl IntoView {
+    const ADDRS: &[(&str, &str)] = &[
+        ("BTC", "bc1qqx35t04knmy7l2y520l7tpzpmz0qvsl3289vuk"),
+        ("ETH", "0x759094ACa57603032db78bE296a7EE962876E190"),
+        ("TRX", "TTvHHqx99xnfANinQugRyJyyXrhck7JxKi"),
+        ("TON", "UQBDXLK1Qk6CfT3pI7A1ot_Y2zUtviJH_p55MTpW8lqFDwd0"),
+        ("SOL", "5jDfJKRqnAbSTb2U9s1FxfXVeetm26GYXBcqLa5jGVdk"),
+        ("SUI", "0x6dba702610c133b35f7f508acfec8461683baea2842e73a7b66015129b4c2c93"),
+    ];
+
+    let make_spans = || -> Vec<_> {
+        ADDRS.iter().map(|(net, addr)| {
+            let a = addr.to_string();
+            let display = addr.to_string();
+            let network = *net;
+            view! {
+                <span class="donation-sep">"|"</span>
+                <span class="donation-net">{network}": "</span>
+                <span class="donation-addr" title="Click to copy"
+                    on:click=move |e: web_sys::MouseEvent| {
+                        let _ = js_sys::eval(&format!("navigator.clipboard.writeText('{}')", a));
+                        if let Some(target) = e.target() {
+                            if let Ok(el) = target.dyn_into::<web_sys::HtmlElement>() {
+                                let _ = el.style().set_property("color", "#44dd88");
+                                let el2 = el.clone();
+                                gloo_timers::callback::Timeout::new(1500, move || {
+                                    let _ = el2.style().set_property("color", "");
+                                }).forget();
+                            }
+                        }
+                    }
+                >{display}</span>
+            }
+        }).collect()
+    };
+
+    view! {
+        <div class="donation-banner">
+            <div class="donation-scroll">
+                <span class="donation-text">
+                    "\u{2605} This game is free & runs on donations \u{2014} no ads, ever! "
+                    {make_spans()}
+                    " \u{2605}"
+                </span>
+                <span class="donation-text">
+                    "\u{2605} This game is free & runs on donations \u{2014} no ads, ever! "
+                    {make_spans()}
+                    " \u{2605}"
+                </span>
+            </div>
         </div>
     }
 }
