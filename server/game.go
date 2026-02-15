@@ -354,7 +354,7 @@ func (g *Game) buildSpatialGrid() {
 		if mob.Alive {
 			idx := len(g.flatMobs)
 			g.flatMobs = append(g.flatMobs, mob)
-			g.grid.InsertCircle(mob.X, mob.Y, MobRadius, EntityRef{Kind: 'm', Idx: idx})
+			g.grid.InsertCircle(mob.X, mob.Y, mob.Radius, EntityRef{Kind: 'm', Idx: idx})
 		}
 	}
 
@@ -726,7 +726,8 @@ func (g *Game) checkMobMobCollisions() {
 			dx := b.X - a.X
 			dy := b.Y - a.Y
 			dist := math.Sqrt(dx*dx + dy*dy)
-			if dist < MobRepelRadius && dist > 0.1 {
+			repelDist := a.Radius + b.Radius + 10.0
+			if dist < repelDist && dist > 0.1 {
 				// Check relative velocity for explosion
 				rvx := a.VX - b.VX
 				rvy := a.VY - b.VY
@@ -758,7 +759,7 @@ func (g *Game) checkMobMobCollisions() {
 				// Soft repulsion — gentle nudge
 				nx := dx / dist
 				ny := dy / dist
-				force := MobRepelForce * (1 - dist/MobRepelRadius)
+				force := MobRepelForce * (1 - dist/repelDist)
 				a.VX -= nx * force * (1.0 / 60.0)
 				a.VY -= ny * force * (1.0 / 60.0)
 				b.VX += nx * force * (1.0 / 60.0)
@@ -770,7 +771,7 @@ func (g *Game) checkMobMobCollisions() {
 
 // checkProjectileMobCollisions checks projectile hits on mobs using spatial grid
 func (g *Game) checkProjectileMobCollisions() {
-	const queryR = ProjectileRadius + MobRadius
+	const queryR = ProjectileRadius + SDRadius // use max mob radius for broad-phase
 	for _, proj := range g.flatProjs {
 		if !proj.Alive {
 			continue
@@ -785,7 +786,7 @@ func (g *Game) checkProjectileMobCollisions() {
 			if !mob.Alive || proj.OwnerID == mob.ID {
 				continue
 			}
-			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, MobRadius) {
+			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, mob.Radius) {
 				died := mob.TakeDamage(proj.Damage)
 				proj.Alive = false
 
@@ -856,7 +857,7 @@ func (g *Game) checkAsteroidPlayerCollisions() {
 
 // checkAsteroidMobCollisions — asteroid instantly kills mob on contact
 func (g *Game) checkAsteroidMobCollisions() {
-	const queryR = AsteroidRadius + MobRadius
+	const queryR = AsteroidRadius + SDRadius // use max mob radius for broad-phase
 	for _, ast := range g.flatAsteroids {
 		if !ast.Alive {
 			continue
@@ -870,7 +871,7 @@ func (g *Game) checkAsteroidMobCollisions() {
 			if !mob.Alive {
 				continue
 			}
-			if CheckCollision(ast.X, ast.Y, AsteroidRadius, mob.X, mob.Y, MobRadius) {
+			if CheckCollision(ast.X, ast.Y, AsteroidRadius, mob.X, mob.Y, mob.Radius) {
 				// Mob phrase before dying
 				phrase := pickPhraseAlways("asteroid_death")
 				g.broadcastMsg(Envelope{T: MsgMobSay, Data: MobSayMsg{
@@ -940,11 +941,11 @@ func (g *Game) checkPlayerPickupCollisions() {
 
 // checkPlayerMobCollisions — mob dies, player takes damage
 func (g *Game) checkPlayerMobCollisions() {
-	const queryR = MobRadius + PlayerRadius
 	for _, mob := range g.flatMobs {
 		if !mob.Alive {
 			continue
 		}
+		queryR := mob.Radius + PlayerRadius
 		g.queryBuf = g.grid.QueryBuf(mob.X, mob.Y, queryR, g.queryBuf[:0])
 		for _, ref := range g.queryBuf {
 			if ref.Kind != 'p' {
@@ -954,7 +955,7 @@ func (g *Game) checkPlayerMobCollisions() {
 			if !p.Alive {
 				continue
 			}
-			if CheckCollision(mob.X, mob.Y, MobRadius, p.X, p.Y, PlayerRadius) {
+			if CheckCollision(mob.X, mob.Y, mob.Radius, p.X, p.Y, PlayerRadius) {
 				// Mob always dies
 				mob.Alive = false
 

@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	PlayerRadius     = 20.0
+	PlayerRadius     = 25.0
 	PlayerMaxHP      = 100
 	PlayerAccel      = 600.0  // pixels/s²
 	PlayerMaxSpeed   = 350.0  // pixels/s
@@ -186,7 +186,7 @@ func (p *Player) ToState() PlayerState {
 		Name:  p.Name,
 		X:     round1(p.X),
 		Y:     round1(p.Y),
-		R:     round1(p.Rotation),
+		R:     round2(p.Rotation),
 		VX:    &vx,
 		VY:    &vy,
 		HP:    p.HP,

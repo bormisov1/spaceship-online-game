@@ -262,6 +262,11 @@ pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotati
     let beam_width = base_width * (0.9 + fast_random() * 0.2);
     let intensity = intensity * flicker;
 
+    // Scale for Star Destroyer (5x larger ship)
+    let ship_scale = if ship_type == 3 { 5.0 } else { 1.0 };
+    let beam_len = beam_len * ship_scale;
+    let beam_width = beam_width * ship_scale;
+
     // Beam points backward from ship
     let bx = -rotation.cos();
     let by = -rotation.sin();
@@ -270,8 +275,8 @@ pub fn draw_engine_beam(ctx: &CanvasRenderingContext2d, sx: f64, sy: f64, rotati
     let py = bx;
 
     // Nozzle position (back of ship)
-    let nozzle_x = sx + bx * 16.0;
-    let nozzle_y = sy + by * 16.0;
+    let nozzle_x = sx + bx * 16.0 * ship_scale;
+    let nozzle_y = sy + by * 16.0 * ship_scale;
     // Tip position
     let tip_x = nozzle_x + bx * beam_len;
     let tip_y = nozzle_y + by * beam_len;
@@ -530,9 +535,10 @@ pub fn render_mob_speech(ctx: &CanvasRenderingContext2d, speech: &[MobSpeech], m
             1.0
         }.max(0.0);
 
-        // Bubble position above mob
+        // Bubble position above mob (scaled for Star Destroyer)
+        let bubble_offset = if mob.s == 3 { 170.0 } else { 50.0 };
         let bx = sx;
-        let by = sy - 50.0;
+        let by = sy - bubble_offset;
 
         ctx.set_global_alpha(alpha);
         ctx.set_font("12px monospace");

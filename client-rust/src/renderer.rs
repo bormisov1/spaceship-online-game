@@ -298,10 +298,11 @@ fn draw_debug_hitboxes(ctx: &CanvasRenderingContext2d, s: &crate::state::GameSta
         if !mob.a { continue; }
         let sx = mob.x - offset_x;
         let sy = mob.y - offset_y;
-        if sx < -100.0 || sx > vw + 100.0 || sy < -100.0 || sy > vh + 100.0 { continue; }
+        let r = if mob.s == 3 { SD_MOB_RADIUS } else { MOB_RADIUS };
+        if sx < -r - 10.0 || sx > vw + r + 10.0 || sy < -r - 10.0 || sy > vh + r + 10.0 { continue; }
 
         ctx.begin_path();
-        let _ = ctx.arc(sx, sy, MOB_RADIUS, 0.0, std::f64::consts::PI * 2.0);
+        let _ = ctx.arc(sx, sy, r, 0.0, std::f64::consts::PI * 2.0);
         ctx.set_fill_style_str("rgba(255, 165, 0, 0.15)");
         ctx.fill();
         ctx.set_stroke_style_str("rgba(255, 165, 0, 0.6)");

@@ -1,7 +1,7 @@
 package main
 
 const (
-	SpatialCellSize = 80.0 // ~2x largest entity radius (AsteroidRadius=40)
+	SpatialCellSize = 80.0 // broad-phase cell size; large entities (SDRadius=100) span multiple cells via InsertCircle
 	SpatialCols     = 51   // ceil(4000/80) + 1
 	SpatialRows     = 51
 )
