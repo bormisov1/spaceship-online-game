@@ -123,6 +123,12 @@ pub struct XPNotification {
     pub leveled_up: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct AchievementNotification {
+    pub name: String,
+    pub description: String,
+}
+
 pub struct GameState {
     // Connection
     pub connected: bool,
@@ -196,6 +202,10 @@ pub struct GameState {
 
     // Leaderboard
     pub leaderboard: Vec<LeaderboardEntry>,
+
+    // Achievement notifications (queue, show one at a time)
+    pub achievement_queue: Vec<AchievementNotification>,
+    pub achievement_show_time: f64,
 
     // Controller
     pub controller_attached: bool,
@@ -300,6 +310,9 @@ impl GameState {
             xp_notification_time: 0.0,
 
             leaderboard: Vec::new(),
+
+            achievement_queue: Vec::new(),
+            achievement_show_time: 0.0,
 
             controller_attached: false,
 

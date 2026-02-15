@@ -565,6 +565,18 @@ fn handle_message(
                 state.borrow_mut().leaderboard = lb.entries;
             }
         }
+        "achievement" => {
+            if let Ok(ach) = serde_json::from_value::<AchievementMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.achievement_queue.push(crate::state::AchievementNotification {
+                    name: ach.name,
+                    description: ach.desc,
+                });
+                if s.achievement_show_time == 0.0 {
+                    s.achievement_show_time = web_sys::window().unwrap().performance().unwrap().now();
+                }
+            }
+        }
         "error" => {
             if let Ok(e) = serde_json::from_value::<ErrorMsg>(data) {
                 web_sys::console::error_1(&format!("Server error: {}", e.msg).into());

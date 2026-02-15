@@ -755,6 +755,20 @@ func (g *Game) persistMatchResults(mode int, duration float64, winnerTeam int, r
 				LeveledUp: newLevel > prevLevel,
 			}})
 		}
+
+		// Check achievements
+		unlocked := CheckAchievements(g.db, p.AuthPlayerID, r.Kills, r.Deaths, won)
+		if len(unlocked) > 0 {
+			if client, ok := g.clients[r.ID]; ok {
+				for _, ach := range unlocked {
+					client.SendJSON(Envelope{T: MsgAchievementUnlock, Data: AchievementMsg{
+						ID:          ach.ID,
+						Name:        ach.Name,
+						Description: ach.Description,
+					}})
+				}
+			}
+		}
 	}
 }
 

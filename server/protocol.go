@@ -41,8 +41,9 @@ const (
 	MsgMobSay      = "mob_say"      // mob speech bubble
 	MsgAuthOK         = "auth_ok"         // auth success
 	MsgProfileData    = "profile_data"    // profile/stats response
-	MsgXPUpdate       = "xp_update"       // XP gained after match
-	MsgLeaderboardRes = "leaderboard_res" // leaderboard response
+	MsgXPUpdate        = "xp_update"        // XP gained after match
+	MsgLeaderboardRes  = "leaderboard_res"  // leaderboard response
+	MsgAchievementUnlock = "achievement"    // achievement unlocked
 	MsgMatchPhase     = "match_phase"     // match phase changed
 	MsgMatchResult = "match_result" // match ended, results
 	MsgTeamUpdate  = "team_update"  // team roster/score update
@@ -330,4 +331,11 @@ type XPUpdateMsg struct {
 // LeaderboardMsg is sent to client with leaderboard data
 type LeaderboardMsg struct {
 	Entries []LeaderboardEntry `json:"entries"`
+}
+
+// AchievementMsg is sent when a player unlocks an achievement
+type AchievementMsg struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"desc"`
 }

@@ -279,6 +279,14 @@ pub struct XPUpdateMsg {
     pub leveled_up: bool,
 }
 
+// Server -> Client: achievement unlocked
+#[derive(Deserialize, Debug, Clone)]
+pub struct AchievementMsg {
+    pub id: String,
+    pub name: String,
+    pub desc: String,
+}
+
 // Server -> Client: leaderboard data
 #[derive(Deserialize, Debug, Clone)]
 pub struct LeaderboardMsg {

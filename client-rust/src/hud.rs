@@ -33,6 +33,22 @@ fn cached_measure_text(ctx: &CanvasRenderingContext2d, text: &str, font_size: i3
 }
 
 pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
+    // Advance achievement queue if current one expired
+    {
+        let mut s = state.borrow_mut();
+        if !s.achievement_queue.is_empty() {
+            let elapsed = web_sys::window().unwrap().performance().unwrap().now() - s.achievement_show_time;
+            if elapsed >= 4000.0 {
+                s.achievement_queue.remove(0);
+                if !s.achievement_queue.is_empty() {
+                    s.achievement_show_time = web_sys::window().unwrap().performance().unwrap().now();
+                } else {
+                    s.achievement_show_time = 0.0;
+                }
+            }
+        }
+    }
+
     let s = state.borrow();
     let screen_w = s.screen_w;
     let screen_h = s.screen_h;
@@ -118,6 +134,15 @@ pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
                         s.auth_xp, s.auth_level, s.auth_xp_next);
                 }
             }
+        }
+    }
+
+    // Achievement notification
+    if !s.achievement_queue.is_empty() {
+        let elapsed = web_sys::window().unwrap().performance().unwrap().now() - s.achievement_show_time;
+        if elapsed < 4000.0 {
+            let ach = &s.achievement_queue[0];
+            draw_achievement_notification(ctx, screen_w, &ach.name, &ach.description, elapsed);
         }
     }
 
@@ -639,6 +664,52 @@ fn draw_xp_bar(ctx: &CanvasRenderingContext2d, x: f64, y: f64, w: f64, h: f64, t
     ctx.set_font("bold 9px monospace");
     ctx.set_text_align("center");
     let _ = ctx.fill_text(&format!("Lv.{}", level), x, y + h + 10.0);
+}
+
+fn draw_achievement_notification(ctx: &CanvasRenderingContext2d, screen_w: f64, name: &str, description: &str, elapsed: f64) {
+    let progress = (elapsed / 4000.0).min(1.0);
+    // Slide in from right, then slide out
+    let slide = if progress < 0.1 {
+        progress / 0.1 // slide in
+    } else if progress > 0.8 {
+        (1.0 - progress) / 0.2 // slide out
+    } else {
+        1.0
+    };
+    let alpha = slide;
+    let offset_x = (1.0 - slide) * 200.0;
+
+    let box_w = 220.0;
+    let box_h = 50.0;
+    let x = screen_w - box_w - 15.0 + offset_x;
+    let y = 50.0;
+
+    ctx.set_global_alpha(alpha);
+
+    // Background
+    ctx.set_fill_style_str("rgba(20, 40, 60, 0.85)");
+    ctx.fill_rect(x, y, box_w, box_h);
+    ctx.set_stroke_style_str("#ffcc00");
+    ctx.set_line_width(1.5);
+    ctx.stroke_rect(x, y, box_w, box_h);
+
+    // Star icon
+    ctx.set_fill_style_str("#ffcc00");
+    ctx.set_font("bold 18px monospace");
+    ctx.set_text_align("left");
+    let _ = ctx.fill_text("\u{2605}", x + 8.0, y + 22.0);
+
+    // Achievement name
+    ctx.set_fill_style_str("#ffcc00");
+    ctx.set_font("bold 12px monospace");
+    let _ = ctx.fill_text(name, x + 30.0, y + 20.0);
+
+    // Description
+    ctx.set_fill_style_str("#aabbcc");
+    ctx.set_font("10px monospace");
+    let _ = ctx.fill_text(description, x + 30.0, y + 38.0);
+
+    ctx.set_global_alpha(1.0);
 }
 
 fn draw_xp_notification(ctx: &CanvasRenderingContext2d, screen_w: f64, screen_h: f64, notif: &XPNotification, elapsed: f64) {

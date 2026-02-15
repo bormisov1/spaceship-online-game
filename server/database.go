@@ -129,6 +129,13 @@ func (db *DB) migrate() error {
 		PRIMARY KEY (match_id, player_id)
 	);
 
+	CREATE TABLE IF NOT EXISTS player_achievements (
+		player_id INTEGER NOT NULL REFERENCES players(id),
+		achievement TEXT NOT NULL,
+		unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (player_id, achievement)
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_match_players_player ON match_players(player_id);
 	CREATE INDEX IF NOT EXISTS idx_players_username ON players(username);
 	`
@@ -393,4 +400,39 @@ func (db *DB) UsernameExists(username string) (bool, error) {
 	var count int
 	err := db.conn.QueryRow("SELECT COUNT(*) FROM players WHERE username = ?", username).Scan(&count)
 	return count > 0, err
+}
+
+// UnlockAchievement records a player's achievement. Returns true if newly unlocked.
+func (db *DB) UnlockAchievement(playerID int64, achievement string) (bool, error) {
+	res, err := db.conn.Exec(
+		"INSERT OR IGNORE INTO player_achievements (player_id, achievement) VALUES (?, ?)",
+		playerID, achievement,
+	)
+	if err != nil {
+		return false, err
+	}
+	affected, err := res.RowsAffected()
+	return affected > 0, err
+}
+
+// GetAchievements returns all achievements for a player
+func (db *DB) GetAchievements(playerID int64) ([]string, error) {
+	rows, err := db.conn.Query(
+		"SELECT achievement FROM player_achievements WHERE player_id = ? ORDER BY unlocked_at",
+		playerID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []string
+	for rows.Next() {
+		var a string
+		if err := rows.Scan(&a); err != nil {
+			return nil, err
+		}
+		result = append(result, a)
+	}
+	return result, rows.Err()
 }
