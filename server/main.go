@@ -51,10 +51,12 @@ func main() {
 
 	go func() {
 		log.Printf("Server starting on %s", *addr)
-		log.Printf("Serving client files from %s", *clientDir)
 		if *clientRustDir != "" {
-			log.Printf("Serving Rust client from %s at /rust/", *clientRustDir)
+			log.Printf("Serving Rust client from %s at / and /rust/", *clientRustDir)
+		} else {
+			log.Printf("Serving JS client from %s at / (no Rust dist found)", *clientDir)
 		}
+		log.Printf("Serving legacy JS client from %s at /legacy-js-client/", *clientDir)
 		if err := server.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("ListenAndServe: %v", err)
 		}

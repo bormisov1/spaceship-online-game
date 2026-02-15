@@ -16,6 +16,7 @@ import (
 
 var uuidPathRe = regexp.MustCompile(`^/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 var rustUuidPathRe = regexp.MustCompile(`^/rust/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`)
+var legacyJsUuidPathRe = regexp.MustCompile(`^/legacy-js-client/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
@@ -45,32 +46,54 @@ func extractIP(r *http.Request) string {
 func SetupRoutes(hub *Hub, clientDir string, clientRustDir string) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Serve static files with no-cache so browsers always revalidate
-	fs := http.FileServer(http.Dir(clientDir))
-	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		// SPA: serve index.html for root and UUID paths
-		if r.URL.Path == "/" || uuidPathRe.MatchString(r.URL.Path) {
-			http.ServeFile(w, r, filepath.Join(clientDir, "index.html"))
-			return
-		}
-		fs.ServeHTTP(w, r)
-	}))
-
-	// Serve Rust/WASM client at /rust/
+	// Default: serve Rust/WASM client at / (and keep /rust/ for backward compat)
 	if clientRustDir != "" {
 		rustFs := http.FileServer(http.Dir(clientRustDir))
+
+		// Serve Rust client at / (default)
+		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-cache")
+			// SPA: serve index.html for root and UUID paths
+			if r.URL.Path == "/" || uuidPathRe.MatchString(r.URL.Path) {
+				http.ServeFile(w, r, filepath.Join(clientRustDir, "index.html"))
+				return
+			}
+			// Serve static files (WASM, JS, assets) from Rust dist
+			rustFs.ServeHTTP(w, r)
+		}))
+
+		// Keep /rust/ working for backward compat
 		mux.Handle("/rust/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Cache-Control", "no-cache")
-			// SPA: serve index.html for /rust/ and /rust/{uuid} paths
 			if r.URL.Path == "/rust/" || r.URL.Path == "/rust" || rustUuidPathRe.MatchString(r.URL.Path) {
 				http.ServeFile(w, r, filepath.Join(clientRustDir, "index.html"))
 				return
 			}
-			// Strip /rust/ prefix for static files
 			http.StripPrefix("/rust/", rustFs).ServeHTTP(w, r)
 		}))
+	} else {
+		// Fallback: serve JS client at / if no Rust dist available
+		fs := http.FileServer(http.Dir(clientDir))
+		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-cache")
+			if r.URL.Path == "/" || uuidPathRe.MatchString(r.URL.Path) {
+				http.ServeFile(w, r, filepath.Join(clientDir, "index.html"))
+				return
+			}
+			fs.ServeHTTP(w, r)
+		}))
 	}
+
+	// Serve legacy JS client at /legacy-js-client/
+	jsFs := http.FileServer(http.Dir(clientDir))
+	mux.Handle("/legacy-js-client/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+		if r.URL.Path == "/legacy-js-client/" || r.URL.Path == "/legacy-js-client" || legacyJsUuidPathRe.MatchString(r.URL.Path) {
+			http.ServeFile(w, r, filepath.Join(clientDir, "index.html"))
+			return
+		}
+		http.StripPrefix("/legacy-js-client/", jsFs).ServeHTTP(w, r)
+	}))
 
 	// QR code endpoint – returns PNG for the given data parameter
 	mux.HandleFunc("/api/qr", func(w http.ResponseWriter, r *http.Request) {
