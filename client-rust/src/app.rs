@@ -8,6 +8,24 @@ use crate::game_loop;
 use crate::input;
 use crate::controller;
 
+/// Detect the base path from current URL: "/rust/" if loaded from /rust/*, otherwise "/"
+pub fn base_path() -> &'static str {
+    thread_local! {
+        static BASE: String = {
+            let pathname = web_sys::window().unwrap().location().pathname().unwrap_or_default();
+            if pathname.starts_with("/rust") { "/rust/".to_string() } else { "/".to_string() }
+        };
+    }
+    BASE.with(|b| if b == "/rust/" { "/rust/" } else { "/" })
+}
+
+const UUID_PATTERN: &str = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+
+fn extract_uuid_from_path(pathname: &str) -> Option<String> {
+    let uuid_re = js_sys::RegExp::new(&format!("^(?:/rust)?/({})$", UUID_PATTERN), "");
+    uuid_re.exec(pathname).and_then(|m| m.get(1).as_string())
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     // Check for controller mode
@@ -18,14 +36,12 @@ pub fn App() -> impl IntoView {
     let control_pid = params.get("c");
 
     let pathname = location.pathname().unwrap_or_default();
-    let uuid_re = js_sys::RegExp::new(r"^/rust/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$", "");
-    let uuid_match = uuid_re.exec(&pathname);
+    let uuid_match = extract_uuid_from_path(&pathname);
 
     // Controller mode
     if let Some(pid) = control_pid {
-        if let Some(m) = uuid_match {
-            let sid = m.get(1).as_string().unwrap_or_default();
-            return view! { <ControllerMode sid=sid pid=pid /> }.into_any();
+        if let Some(sid) = &uuid_match {
+            return view! { <ControllerMode sid=sid.clone() pid=pid /> }.into_any();
         }
     }
 
@@ -33,10 +49,7 @@ pub fn App() -> impl IntoView {
     let game_state = state::new_shared_state();
 
     // Check URL for session UUID
-    let uuid_re2 = js_sys::RegExp::new(r"^/rust/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$", "");
-    let uuid_match2 = uuid_re2.exec(&pathname);
-    if let Some(m) = uuid_match2 {
-        let sid = m.get(1).as_string().unwrap_or_default();
+    if let Some(sid) = uuid_match {
         game_state.borrow_mut().url_session_id = Some(sid);
     }
 

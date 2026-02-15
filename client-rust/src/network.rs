@@ -297,7 +297,7 @@ fn handle_message(
                 let _ = window.history().unwrap().push_state_with_url(
                     &wasm_bindgen::JsValue::NULL,
                     "",
-                    Some(&format!("/rust/{}", j.sid)),
+                    Some(&format!("{}{}", crate::app::base_path(), j.sid)),
                 );
             }
         }
@@ -306,7 +306,7 @@ fn handle_message(
                 // Update URL without full reload, then auto-join
                 let window = web_sys::window().unwrap();
                 let _ = window.history().unwrap().push_state_with_url(
-                    &wasm_bindgen::JsValue::NULL, "", Some(&format!("/rust/{}", c.sid)),
+                    &wasm_bindgen::JsValue::NULL, "", Some(&format!("{}{}", crate::app::base_path(), c.sid)),
                 );
                 let name = state.borrow_mut().pending_name.take()
                     .unwrap_or_else(|| "Pilot".to_string());
@@ -358,7 +358,7 @@ fn handle_message(
                     state.borrow_mut().url_session_id = None;
                     let window = web_sys::window().unwrap();
                     let _ = window.history().unwrap().replace_state_with_url(
-                        &wasm_bindgen::JsValue::NULL, "", Some("/rust/"),
+                        &wasm_bindgen::JsValue::NULL, "", Some(crate::app::base_path()),
                     );
                     expired_signal.set(true);
                 } else {

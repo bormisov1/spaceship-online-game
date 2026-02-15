@@ -129,7 +129,7 @@ pub fn JoinMode(
                                     view! {
                                         <div>
                                             <p class="error-msg">"Session does not exist or has ended."</p>
-                                            <a href="/rust/" class="btn btn-primary" style="text-decoration:none;display:inline-block;margin-top:12px;">"Go to Lobby"</a>
+                                            <a href={crate::app::base_path()} class="btn btn-primary" style="text-decoration:none;display:inline-block;margin-top:12px;">"Go to Lobby"</a>
                                         </div>
                                     }.into_any()
                                 } else {
