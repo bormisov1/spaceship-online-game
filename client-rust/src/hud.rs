@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use web_sys::CanvasRenderingContext2d;
-use crate::state::{SharedState, Phase};
-use crate::constants::{SHIP_COLORS, WORLD_W, WORLD_H};
+use crate::state::{SharedState, Phase, GameMode};
+use crate::constants::{SHIP_COLORS, WORLD_W, WORLD_H, TEAM_RED_COLOR, TEAM_BLUE_COLOR};
 
 thread_local! {
     static TEXT_WIDTH_CACHE: RefCell<HashMap<String, f64>> = RefCell::new(HashMap::new());
@@ -56,6 +56,28 @@ pub fn render_hud(ctx: &CanvasRenderingContext2d, state: &SharedState) {
 
     // Scoreboard
     draw_scoreboard(ctx, &s, screen_w, screen_h);
+
+    // Match timer (top center)
+    if s.match_phase == 2 && s.match_time_left > 0.0 {
+        draw_match_timer(ctx, screen_w, s.match_time_left);
+    }
+
+    // Team scores (below timer, for team modes)
+    if matches!(s.game_mode, GameMode::TDM | GameMode::CTF) && s.match_phase >= 2 {
+        draw_team_scores(ctx, screen_w, s.team_red_score, s.team_blue_score);
+    }
+
+    // Countdown overlay
+    if s.phase == Phase::Countdown {
+        draw_countdown(ctx, screen_w, screen_h, s.countdown_time);
+    }
+
+    // Result screen
+    if s.phase == Phase::Result {
+        if let Some((winner, ref players, duration)) = s.match_result {
+            draw_result_screen(ctx, screen_w, screen_h, winner, players, duration, s.game_mode);
+        }
+    }
 
     // Death screen
     if s.phase == Phase::Dead {
@@ -355,5 +377,142 @@ pub fn draw_player_health_bar(ctx: &CanvasRenderingContext2d, x: f64, y: f64, hp
     let color = if ratio > 0.6 { "#44ff44" } else if ratio > 0.3 { "#ffaa00" } else { "#ff4444" };
     ctx.set_fill_style_str(color);
     ctx.fill_rect(x - bar_w / 2.0, bar_y, bar_w * ratio, bar_h);
+}
+
+fn draw_match_timer(ctx: &CanvasRenderingContext2d, screen_w: f64, time_left: f64) {
+    let minutes = (time_left / 60.0) as i32;
+    let seconds = (time_left % 60.0) as i32;
+    let text = format!("{:02}:{:02}", minutes, seconds);
+
+    ctx.set_text_align("center");
+    ctx.set_fill_style_str("rgba(0, 0, 0, 0.5)");
+    ctx.fill_rect(screen_w / 2.0 - 40.0, 8.0, 80.0, 28.0);
+
+    ctx.set_fill_style_str(if time_left < 30.0 { "#ff4444" } else { "#ffffff" });
+    ctx.set_font("bold 18px monospace");
+    let _ = ctx.fill_text(&text, screen_w / 2.0, 28.0);
+}
+
+fn draw_team_scores(ctx: &CanvasRenderingContext2d, screen_w: f64, red: i32, blue: i32) {
+    let cx = screen_w / 2.0;
+
+    ctx.set_fill_style_str("rgba(0, 0, 0, 0.4)");
+    ctx.fill_rect(cx - 80.0, 38.0, 160.0, 22.0);
+
+    ctx.set_font("bold 14px monospace");
+    ctx.set_text_align("right");
+    ctx.set_fill_style_str(TEAM_RED_COLOR);
+    let _ = ctx.fill_text(&format!("RED {}", red), cx - 8.0, 54.0);
+
+    ctx.set_text_align("left");
+    ctx.set_fill_style_str(TEAM_BLUE_COLOR);
+    let _ = ctx.fill_text(&format!("{} BLUE", blue), cx + 8.0, 54.0);
+
+    ctx.set_text_align("center");
+    ctx.set_fill_style_str("#ffffff44");
+    let _ = ctx.fill_text("-", cx, 54.0);
+}
+
+fn draw_countdown(ctx: &CanvasRenderingContext2d, screen_w: f64, screen_h: f64, countdown: f64) {
+    ctx.set_fill_style_str("rgba(0, 0, 0, 0.4)");
+    ctx.fill_rect(0.0, 0.0, screen_w, screen_h);
+
+    ctx.set_text_align("center");
+
+    let num = countdown.ceil() as i32;
+    let text = if num <= 0 { "FIGHT!".to_string() } else { num.to_string() };
+    let frac = countdown - countdown.floor();
+    let scale = 1.0 + frac * 0.3;
+    let font_size = (72.0 * scale) as i32;
+
+    ctx.set_font(&format!("bold {}px monospace", font_size));
+    ctx.set_fill_style_str(if num <= 0 { "#44ff44" } else { "#ffcc00" });
+    let _ = ctx.fill_text(&text, screen_w / 2.0, screen_h / 2.0 + 20.0);
+}
+
+fn draw_result_screen(
+    ctx: &CanvasRenderingContext2d,
+    screen_w: f64,
+    screen_h: f64,
+    winner_team: i32,
+    players: &[crate::protocol::PlayerMatchResult],
+    duration: f64,
+    _mode: GameMode,
+) {
+    ctx.set_fill_style_str("rgba(0, 0, 0, 0.7)");
+    ctx.fill_rect(0.0, 0.0, screen_w, screen_h);
+
+    ctx.set_text_align("center");
+
+    // Winner text
+    let winner_text = match winner_team {
+        1 => "RED TEAM WINS!",
+        2 => "BLUE TEAM WINS!",
+        _ => "MATCH OVER",
+    };
+    let winner_color = match winner_team {
+        1 => TEAM_RED_COLOR,
+        2 => TEAM_BLUE_COLOR,
+        _ => "#ffcc00",
+    };
+    ctx.set_font("bold 36px monospace");
+    ctx.set_fill_style_str(winner_color);
+    let _ = ctx.fill_text(winner_text, screen_w / 2.0, screen_h * 0.2);
+
+    // Duration
+    let dur_min = (duration / 60.0) as i32;
+    let dur_sec = (duration % 60.0) as i32;
+    ctx.set_font("14px monospace");
+    ctx.set_fill_style_str("#aaaaaa");
+    let _ = ctx.fill_text(&format!("Duration: {:02}:{:02}", dur_min, dur_sec), screen_w / 2.0, screen_h * 0.2 + 30.0);
+
+    // Player table
+    ctx.set_font("bold 12px monospace");
+    ctx.set_fill_style_str("#ffffff88");
+    let table_y = screen_h * 0.32;
+    let col_name = screen_w / 2.0 - 120.0;
+    let col_k = screen_w / 2.0 + 30.0;
+    let col_d = screen_w / 2.0 + 70.0;
+    let col_a = screen_w / 2.0 + 110.0;
+
+    ctx.set_text_align("left");
+    let _ = ctx.fill_text("PLAYER", col_name, table_y);
+    ctx.set_text_align("center");
+    let _ = ctx.fill_text("K", col_k, table_y);
+    let _ = ctx.fill_text("D", col_d, table_y);
+    let _ = ctx.fill_text("A", col_a, table_y);
+
+    ctx.set_font("12px monospace");
+    let mut y = table_y + 20.0;
+    for p in players {
+        let team_color = match p.tm {
+            1 => TEAM_RED_COLOR,
+            2 => TEAM_BLUE_COLOR,
+            _ => "#ffffff",
+        };
+        let name_display = if p.mvp {
+            format!("\u{2605} {}", p.n)
+        } else {
+            p.n.clone()
+        };
+
+        ctx.set_fill_style_str(team_color);
+        ctx.set_text_align("left");
+        let _ = ctx.fill_text(&name_display, col_name, y);
+
+        ctx.set_text_align("center");
+        ctx.set_fill_style_str("#ffffff");
+        let _ = ctx.fill_text(&p.k.to_string(), col_k, y);
+        let _ = ctx.fill_text(&p.d.to_string(), col_d, y);
+        let _ = ctx.fill_text(&p.a.to_string(), col_a, y);
+
+        y += 18.0;
+    }
+
+    // Rematch hint
+    ctx.set_text_align("center");
+    ctx.set_fill_style_str("#aaaaaa");
+    ctx.set_font("14px monospace");
+    let _ = ctx.fill_text("Returning to lobby...", screen_w / 2.0, screen_h * 0.85);
 }
 

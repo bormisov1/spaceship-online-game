@@ -31,6 +31,10 @@ pub const ASTEROID_RENDER_SIZE: f64 = 120.0;
 pub const PICKUP_RADIUS: f64 = 15.0;
 pub const PICKUP_RENDER_SIZE: f64 = 30.0;
 
+// Team colors
+pub const TEAM_RED_COLOR: &str = "#ff4444";
+pub const TEAM_BLUE_COLOR: &str = "#4488ff";
+
 // Laser colors per ship type
 pub const LASER_COLORS: [&str; 6] = [
     "#ff2222",

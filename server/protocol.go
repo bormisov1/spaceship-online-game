@@ -6,31 +6,37 @@ import (
 
 // Client -> Server message types
 const (
-	MsgJoin    = "join"
-	MsgLeave   = "leave"
-	MsgInput   = "input"
-	MsgCreate  = "create"  // create session
-	MsgList    = "list"    // list sessions
-	MsgCheck   = "check"   // check if session exists
-	MsgControl = "control" // phone controller attach
+	MsgJoin     = "join"
+	MsgLeave    = "leave"
+	MsgInput    = "input"
+	MsgCreate   = "create"     // create session
+	MsgList     = "list"       // list sessions
+	MsgCheck    = "check"      // check if session exists
+	MsgControl  = "control"    // phone controller attach
+	MsgReady    = "ready"      // player ready toggle
+	MsgTeamPick = "team_pick"  // player picks team
+	MsgRematch  = "rematch"    // request rematch
 )
 
 // Server -> Client message types
 const (
-	MsgState    = "state"
-	MsgWelcome  = "welcome"
-	MsgDeath    = "death"
-	MsgKill     = "kill"
-	MsgSessions = "sessions"
-	MsgJoined   = "joined"
-	MsgCreated  = "created" // session created, client should navigate
-	MsgError    = "error"
-	MsgChecked    = "checked"    // session check response
-	MsgControlOK  = "control_ok"  // controller attach confirmed
-	MsgCtrlOn     = "ctrl_on"     // notify desktop: controller attached
-	MsgCtrlOff    = "ctrl_off"    // notify desktop: controller detached
-	MsgHit        = "hit"         // damage dealt to an entity
-	MsgMobSay     = "mob_say"     // mob speech bubble
+	MsgState       = "state"
+	MsgWelcome     = "welcome"
+	MsgDeath       = "death"
+	MsgKill        = "kill"
+	MsgSessions    = "sessions"
+	MsgJoined      = "joined"
+	MsgCreated     = "created"      // session created, client should navigate
+	MsgError       = "error"
+	MsgChecked     = "checked"      // session check response
+	MsgControlOK   = "control_ok"   // controller attach confirmed
+	MsgCtrlOn      = "ctrl_on"      // notify desktop: controller attached
+	MsgCtrlOff     = "ctrl_off"     // notify desktop: controller detached
+	MsgHit         = "hit"          // damage dealt to an entity
+	MsgMobSay      = "mob_say"      // mob speech bubble
+	MsgMatchPhase  = "match_phase"  // match phase changed
+	MsgMatchResult = "match_result" // match ended, results
+	MsgTeamUpdate  = "team_update"  // team roster/score update
 )
 
 // Envelope wraps all outgoing messages with a type field
@@ -47,10 +53,10 @@ type InEnvelope struct {
 
 // ClientInput is sent by the client at 20Hz
 type ClientInput struct {
-	MX    float64 `json:"mx"`    // mouse X (world coords)
-	MY    float64 `json:"my"`    // mouse Y (world coords)
-	Fire  bool    `json:"fire"`  // W key held
-	Boost bool    `json:"boost"` // Shift key held
+	MX     float64 `json:"mx"`    // mouse X (world coords)
+	MY     float64 `json:"my"`    // mouse Y (world coords)
+	Fire   bool    `json:"fire"`  // W key held
+	Boost  bool    `json:"boost"` // Shift key held
 	Thresh float64 `json:"thresh"` // distance threshold for speed modulation
 }
 
@@ -64,32 +70,34 @@ type JoinMsg struct {
 type CreateMsg struct {
 	Name        string `json:"name"`
 	SessionName string `json:"sname"`
+	Mode        int    `json:"mode,omitempty"`
 }
 
 // PlayerState is broadcast per player each tick
 type PlayerState struct {
-	ID   string  `json:"id" msgpack:"id"`
-	Name string  `json:"n" msgpack:"n"`
-	X    float64 `json:"x" msgpack:"x"`
-	Y    float64 `json:"y" msgpack:"y"`
-	R    float64 `json:"r" msgpack:"r"`
-	VX   *float64 `json:"vx,omitempty" msgpack:"vx,omitempty"`
-	VY   *float64 `json:"vy,omitempty" msgpack:"vy,omitempty"`
-	HP   int     `json:"hp" msgpack:"hp"`
-	MaxHP int    `json:"mhp" msgpack:"mhp"`
-	Ship int     `json:"s" msgpack:"s"`
-	Score int    `json:"sc" msgpack:"sc"`
-	Alive bool   `json:"a" msgpack:"a"`
-	Boost bool   `json:"b,omitempty" msgpack:"b,omitempty"`
+	ID    string   `json:"id" msgpack:"id"`
+	Name  string   `json:"n" msgpack:"n"`
+	X     float64  `json:"x" msgpack:"x"`
+	Y     float64  `json:"y" msgpack:"y"`
+	R     float64  `json:"r" msgpack:"r"`
+	VX    *float64 `json:"vx,omitempty" msgpack:"vx,omitempty"`
+	VY    *float64 `json:"vy,omitempty" msgpack:"vy,omitempty"`
+	HP    int      `json:"hp" msgpack:"hp"`
+	MaxHP int      `json:"mhp" msgpack:"mhp"`
+	Ship  int      `json:"s" msgpack:"s"`
+	Score int      `json:"sc" msgpack:"sc"`
+	Alive bool     `json:"a" msgpack:"a"`
+	Boost bool     `json:"b,omitempty" msgpack:"b,omitempty"`
+	Team  int      `json:"tm,omitempty" msgpack:"tm,omitempty"`
 }
 
 // ProjectileState is broadcast per projectile
 type ProjectileState struct {
-	ID string  `json:"id" msgpack:"id"`
-	X  float64 `json:"x" msgpack:"x"`
-	Y  float64 `json:"y" msgpack:"y"`
-	R  float64 `json:"r" msgpack:"r"`
-	Owner string `json:"o" msgpack:"o"`
+	ID    string  `json:"id" msgpack:"id"`
+	X     float64 `json:"x" msgpack:"x"`
+	Y     float64 `json:"y" msgpack:"y"`
+	R     float64 `json:"r" msgpack:"r"`
+	Owner string  `json:"o" msgpack:"o"`
 }
 
 // MobState is broadcast per mob
@@ -129,6 +137,10 @@ type GameState struct {
 	Asteroids   []AsteroidState   `json:"a" msgpack:"a"`
 	Pickups     []PickupState     `json:"pk" msgpack:"pk"`
 	Tick        uint64            `json:"tick" msgpack:"tick"`
+	MatchPhase  int               `json:"mp,omitempty" msgpack:"mp,omitempty"`
+	TimeLeft    float64           `json:"tl,omitempty" msgpack:"tl,omitempty"`
+	TeamRedSc   int               `json:"trs,omitempty" msgpack:"trs,omitempty"`
+	TeamBlueSc  int               `json:"tbs,omitempty" msgpack:"tbs,omitempty"`
 }
 
 // WelcomeMsg is sent to a player when they join
@@ -156,6 +168,8 @@ type SessionInfo struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
 	Players int    `json:"players"`
+	Mode    int    `json:"mode,omitempty"`
+	Phase   int    `json:"phase,omitempty"`
 }
 
 // ErrorMsg sends error to client
@@ -195,4 +209,49 @@ type HitMsg struct {
 type MobSayMsg struct {
 	MobID string `json:"mid"`
 	Text  string `json:"text"`
+}
+
+// MatchPhaseMsg is sent when match phase changes
+type MatchPhaseMsg struct {
+	Phase     int     `json:"phase"`
+	Mode      int     `json:"mode"`
+	TimeLeft  float64 `json:"time_left,omitempty"`
+	Countdown float64 `json:"countdown,omitempty"`
+}
+
+// TeamPickMsg is sent by client to pick a team
+type TeamPickMsg struct {
+	Team int `json:"team"`
+}
+
+// MatchResultMsg is sent when a match ends
+type MatchResultMsg struct {
+	WinnerTeam int                 `json:"winner_team"`
+	Players    []PlayerMatchResult `json:"players"`
+	Duration   float64             `json:"duration"`
+}
+
+// PlayerMatchResult holds end-of-match stats for one player
+type PlayerMatchResult struct {
+	ID      string `json:"id"`
+	Name    string `json:"n"`
+	Team    int    `json:"tm"`
+	Kills   int    `json:"k"`
+	Deaths  int    `json:"d"`
+	Assists int    `json:"a"`
+	Score   int    `json:"sc"`
+	MVP     bool   `json:"mvp,omitempty"`
+}
+
+// TeamUpdateMsg is sent to update team rosters
+type TeamUpdateMsg struct {
+	Red  []TeamPlayerInfo `json:"red"`
+	Blue []TeamPlayerInfo `json:"blue"`
+}
+
+// TeamPlayerInfo holds info about a player on a team
+type TeamPlayerInfo struct {
+	ID    string `json:"id"`
+	Name  string `json:"n"`
+	Ready bool   `json:"ready"`
 }

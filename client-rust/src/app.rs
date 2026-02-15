@@ -152,7 +152,7 @@ fn GameView(
             let phase_pop = _phase;
             let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_: web_sys::Event| {
                 let s = state_pop.borrow();
-                if s.phase == Phase::Playing || s.phase == Phase::Dead {
+                if matches!(s.phase, Phase::Playing | Phase::Dead | Phase::MatchLobby | Phase::Countdown | Phase::Result) {
                     drop(s);
                     Network::send_leave(&net_pop);
                     let mut s = state_pop.borrow_mut();
@@ -178,30 +178,42 @@ fn GameView(
             let p = phase.get();
             // Subscribe to expired signal to re-render when session expires
             let _expired = expired.get();
-            if p == Phase::Lobby {
-                let has_url_session = state_clone.borrow().url_session_id.is_some();
-                if has_url_session {
+            match p {
+                Phase::Lobby => {
+                    let has_url_session = state_clone.borrow().url_session_id.is_some();
+                    if has_url_session {
+                        view! {
+                            <lobby::JoinMode
+                                state=(*state_clone).clone()
+                                net=(*net_clone).clone()
+                                checked=checked
+                            />
+                        }.into_any()
+                    } else {
+                        view! {
+                            <lobby::NormalLobby
+                                state=(*state_clone).clone()
+                                net=(*net_clone).clone()
+                                sessions=sessions
+                                expired=expired
+                            />
+                        }.into_any()
+                    }
+                }
+                Phase::MatchLobby => {
                     view! {
-                        <lobby::JoinMode
+                        <IngameUI state=(*state_clone).clone() net=(*net_clone).clone() />
+                        <crate::match_lobby::MatchLobby
                             state=(*state_clone).clone()
                             net=(*net_clone).clone()
-                            checked=checked
-                        />
-                    }.into_any()
-                } else {
-                    view! {
-                        <lobby::NormalLobby
-                            state=(*state_clone).clone()
-                            net=(*net_clone).clone()
-                            sessions=sessions
-                            expired=expired
                         />
                     }.into_any()
                 }
-            } else {
-                view! {
-                    <IngameUI state=(*state_clone).clone() net=(*net_clone).clone() />
-                }.into_any()
+                _ => {
+                    view! {
+                        <IngameUI state=(*state_clone).clone() net=(*net_clone).clone() />
+                    }.into_any()
+                }
             }
         }}
     }

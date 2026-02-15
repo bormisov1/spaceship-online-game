@@ -33,7 +33,7 @@ func NewSessionManager() *SessionManager {
 }
 
 // CreateSession creates a new game session. Returns nil if limit reached.
-func (sm *SessionManager) CreateSession(name string) *Session {
+func (sm *SessionManager) CreateSession(name string, mode GameMode) *Session {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -42,7 +42,7 @@ func (sm *SessionManager) CreateSession(name string) *Session {
 	}
 
 	id := GenerateUUID()
-	game := NewGame()
+	game := NewGame(DefaultConfig(mode))
 	sess := &Session{
 		ID:   id,
 		Name: name,
@@ -108,6 +108,8 @@ func (sm *SessionManager) ListSessions() []SessionInfo {
 			ID:      sess.ID,
 			Name:    sess.Name,
 			Players: sess.Game.PlayerCount(),
+			Mode:    int(sess.Game.MatchMode()),
+			Phase:   int(sess.Game.MatchPhase()),
 		})
 	}
 	return list

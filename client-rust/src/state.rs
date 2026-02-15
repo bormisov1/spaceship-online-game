@@ -2,13 +2,44 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::protocol::{PlayerState, ProjectileState, MobState, AsteroidState, PickupState};
+use crate::protocol::{PlayerState, ProjectileState, MobState, AsteroidState, PickupState, PlayerMatchResult, TeamPlayerInfo};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Phase {
     Lobby,
+    MatchLobby,
+    Countdown,
     Playing,
     Dead,
+    Result,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum GameMode {
+    FFA = 0,
+    TDM = 1,
+    CTF = 2,
+    WaveSurvival = 3,
+}
+
+impl GameMode {
+    pub fn from_i32(v: i32) -> Self {
+        match v {
+            1 => GameMode::TDM,
+            2 => GameMode::CTF,
+            3 => GameMode::WaveSurvival,
+            _ => GameMode::FFA,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            GameMode::FFA => "Free-For-All",
+            GameMode::TDM => "Team Deathmatch",
+            GameMode::CTF => "Capture the Flag",
+            GameMode::WaveSurvival => "Wave Survival",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -124,6 +155,19 @@ pub struct GameState {
     pub kill_feed: Vec<KillFeedEntry>,
     pub death_info: Option<DeathInfo>,
 
+    // Match state
+    pub game_mode: GameMode,
+    pub match_phase: i32,       // 0=lobby, 1=countdown, 2=playing, 3=result
+    pub match_time_left: f64,
+    pub countdown_time: f64,
+    pub my_team: i32,           // 0=none, 1=red, 2=blue
+    pub team_red_score: i32,
+    pub team_blue_score: i32,
+    pub is_ready: bool,
+    pub team_red: Vec<TeamPlayerInfo>,
+    pub team_blue: Vec<TeamPlayerInfo>,
+    pub match_result: Option<(i32, Vec<PlayerMatchResult>, f64)>, // (winner_team, players, duration)
+
     // Controller
     pub controller_attached: bool,
 
@@ -197,6 +241,18 @@ impl GameState {
             phase: Phase::Lobby,
             kill_feed: Vec::new(),
             death_info: None,
+
+            game_mode: GameMode::FFA,
+            match_phase: 0,
+            match_time_left: 0.0,
+            countdown_time: 0.0,
+            my_team: 0,
+            team_red_score: 0,
+            team_blue_score: 0,
+            is_ready: false,
+            team_red: Vec::new(),
+            team_blue: Vec::new(),
+            match_result: None,
 
             controller_attached: false,
 

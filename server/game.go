@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	TickRate      = 60               // physics ticks per second
-	BroadcastRate = 30               // state broadcasts per second
-	TickDuration  = time.Second / TickRate
+	TickRate       = 60 // physics ticks per second
+	BroadcastRate  = 30 // state broadcasts per second
+	TickDuration   = time.Second / TickRate
 	BroadcastEvery = TickRate / BroadcastRate
 )
 
@@ -26,6 +26,9 @@ const (
 	AsteroidSpawnInterval    = 10.0
 	PickupSpawnInterval      = 20.0
 	DeathScorePenalty        = 10
+
+	CountdownDuration = 3.0  // seconds of countdown before match starts
+	ResultDuration    = 10.0 // seconds to show results before returning to lobby
 )
 
 // Broadcaster interface for sending messages to clients
@@ -53,6 +56,10 @@ type Game struct {
 	mobSpawnCD      float64
 	asteroidSpawnCD float64
 	pickupSpawnCD   float64
+
+	// Match state
+	match_   MatchState
+	gameTime float64 // elapsed game time in seconds
 
 	// Spatial hash grid for broad-phase collision detection
 	grid SpatialGrid
@@ -86,8 +93,9 @@ type Game struct {
 	filtPickups   []PickupState
 }
 
-// NewGame creates a new Game
-func NewGame() *Game {
+// NewGame creates a new Game with the given match configuration
+func NewGame(config MatchConfig) *Game {
+	ms := NewMatchState(config)
 	return &Game{
 		players:         make(map[string]*Player),
 		projectiles:     make(map[string]*Projectile),
@@ -100,6 +108,8 @@ func NewGame() *Game {
 		mobSpawnCD:      MobSpawnInterval,
 		asteroidSpawnCD: AsteroidSpawnInterval,
 		pickupSpawnCD:   PickupSpawnInterval,
+		match_:          ms,
+		grid:            NewSpatialGrid(config.WorldWidth, config.WorldHeight),
 		lastVX:          make(map[string]float64, maxPlayersPerSession+maxMobsPerSession),
 		lastVY:          make(map[string]float64, maxPlayersPerSession+maxMobsPerSession),
 		bcastPlayers:    make([]playerWithPos, 0, maxPlayersPerSession),
@@ -156,7 +166,9 @@ func (g *Game) AddPlayer(name string) *Player {
 	id := GenerateID(4)
 	ship := g.nextShip % 3
 	g.nextShip++
-	player := NewPlayer(id, name, ship)
+	ww := g.match_.Config.WorldWidth
+	wh := g.match_.Config.WorldHeight
+	player := NewPlayerWithWorld(id, name, ship, ww, wh)
 	g.players[id] = player
 	return player
 }
@@ -230,6 +242,57 @@ func (g *Game) HandleInput(playerID string, input ClientInput) {
 	p.SlowThresh = Clamp(input.Thresh, 50, 400)
 }
 
+// HandleReady toggles a player's ready state
+func (g *Game) HandleReady(playerID string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	p, ok := g.players[playerID]
+	if !ok {
+		return
+	}
+	p.Ready = !p.Ready
+
+	// Broadcast updated team roster
+	g.broadcastTeamUpdate()
+}
+
+// HandleTeamPick sets a player's team
+func (g *Game) HandleTeamPick(playerID string, team int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	p, ok := g.players[playerID]
+	if !ok {
+		return
+	}
+	// Only allow team picking in lobby
+	if g.match_.Phase != PhaseLobby {
+		return
+	}
+	// Validate team value
+	if team != TeamRed && team != TeamBlue && team != TeamNone {
+		return
+	}
+	p.Team = team
+
+	// Broadcast updated team roster
+	g.broadcastTeamUpdate()
+}
+
+// HandleRematch resets match to lobby for a rematch
+func (g *Game) HandleRematch(playerID string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	// Only allow rematch during result phase
+	if g.match_.Phase != PhaseResult {
+		return
+	}
+
+	g.resetToLobby()
+}
+
 // PlayerCount returns the number of players
 func (g *Game) PlayerCount() int {
 	g.mu.RLock()
@@ -237,13 +300,87 @@ func (g *Game) PlayerCount() int {
 	return len(g.players)
 }
 
-// update runs one game tick
+// MatchPhase returns the current match phase (thread-safe)
+func (g *Game) MatchPhase() MatchPhase {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.match_.Phase
+}
+
+// MatchMode returns the game mode (thread-safe)
+func (g *Game) MatchMode() GameMode {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.match_.Config.Mode
+}
+
+// update runs one game tick, dispatching to phase-specific methods
 func (g *Game) update() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
 	dt := 1.0 / float64(TickRate)
 	g.tick++
+	g.gameTime += dt
+
+	switch g.match_.Phase {
+	case PhaseLobby:
+		g.updateLobby(dt)
+	case PhaseCountdown:
+		g.updateCountdown(dt)
+	case PhasePlaying:
+		g.updatePlaying(dt)
+	case PhaseResult:
+		g.updateResult(dt)
+	}
+}
+
+// updateLobby handles the lobby phase: waiting for players to ready up
+func (g *Game) updateLobby(dt float64) {
+	// Check if all players are ready and we have enough players
+	if g.checkAllReady() {
+		g.startCountdown()
+	}
+
+	// Broadcast state so clients can see each other in lobby
+	if g.tick%BroadcastEvery == 0 {
+		g.broadcastState()
+	}
+}
+
+// updateCountdown handles the countdown phase: 3-second countdown before match
+func (g *Game) updateCountdown(dt float64) {
+	g.match_.CountdownT -= dt
+	if g.match_.CountdownT <= 0 {
+		g.startMatch()
+		return
+	}
+
+	// Broadcast state during countdown
+	if g.tick%BroadcastEvery == 0 {
+		g.broadcastState()
+	}
+}
+
+// updatePlaying handles the main gameplay phase: all existing game logic + match timer + score limit
+func (g *Game) updatePlaying(dt float64) {
+	// Update match timer
+	if g.match_.Config.TimeLimit > 0 {
+		g.match_.TimeLeft -= dt
+		if g.match_.TimeLeft <= 0 {
+			g.match_.TimeLeft = 0
+			g.endMatch()
+			return
+		}
+	}
+
+	// Check score limit
+	if g.match_.Config.ScoreLimit > 0 {
+		if g.checkScoreLimit() {
+			g.endMatch()
+			return
+		}
+	}
 
 	// Update players
 	for _, p := range g.players {
@@ -326,6 +463,260 @@ func (g *Game) update() {
 	}
 }
 
+// updateResult handles the result phase: freeze gameplay, wait for timeout or rematch
+func (g *Game) updateResult(dt float64) {
+	g.match_.ResultTimer -= dt
+	if g.match_.ResultTimer <= 0 {
+		g.resetToLobby()
+		return
+	}
+
+	// Still broadcast state so clients see the frozen scene
+	if g.tick%BroadcastEvery == 0 {
+		g.broadcastState()
+	}
+}
+
+// checkAllReady returns true if all players are ready and there are enough players
+func (g *Game) checkAllReady() bool {
+	count := len(g.players)
+	if count == 0 {
+		return false
+	}
+
+	// Team modes require at least 2 players
+	if g.match_.Config.Mode == ModeTDM {
+		if count < 2 {
+			return false
+		}
+	}
+
+	for _, p := range g.players {
+		if !p.Ready {
+			return false
+		}
+	}
+	return true
+}
+
+// startCountdown transitions from lobby to countdown
+func (g *Game) startCountdown() {
+	g.match_.Phase = PhaseCountdown
+	g.match_.CountdownT = CountdownDuration
+
+	g.broadcastMsg(Envelope{T: MsgMatchPhase, Data: MatchPhaseMsg{
+		Phase:     int(PhaseCountdown),
+		Mode:      int(g.match_.Config.Mode),
+		Countdown: CountdownDuration,
+	}})
+}
+
+// startMatch transitions from countdown to playing
+func (g *Game) startMatch() {
+	g.match_.Phase = PhasePlaying
+	g.match_.TimeLeft = g.match_.Config.TimeLimit
+	g.match_.Teams[TeamRed].Score = 0
+	g.match_.Teams[TeamBlue].Score = 0
+
+	// Reset player stats and spawn at team positions
+	for _, p := range g.players {
+		p.Kills = 0
+		p.Deaths = 0
+		p.Assists = 0
+		p.DamageDealt = 0
+		p.Score = 0
+		p.RecentDamagers = nil
+
+		// Spawn at team position
+		sx, sy := g.match_.SpawnPosition(p.Team)
+		p.SpawnAtPosition(sx, sy)
+	}
+
+	// Clear any existing entities from lobby
+	g.projectiles = make(map[string]*Projectile)
+	g.mobs = make(map[string]*Mob)
+	g.asteroids = make(map[string]*Asteroid)
+	g.pickups = make(map[string]*Pickup)
+	g.mobSpawnCD = MobSpawnInterval
+	g.asteroidSpawnCD = AsteroidSpawnInterval
+	g.pickupSpawnCD = PickupSpawnInterval
+
+	g.broadcastMsg(Envelope{T: MsgMatchPhase, Data: MatchPhaseMsg{
+		Phase:    int(PhasePlaying),
+		Mode:     int(g.match_.Config.Mode),
+		TimeLeft: g.match_.TimeLeft,
+	}})
+}
+
+// endMatch transitions from playing to result
+func (g *Game) endMatch() {
+	g.match_.Phase = PhaseResult
+	g.match_.ResultTimer = ResultDuration
+
+	// Calculate match duration
+	duration := g.match_.Config.TimeLimit - g.match_.TimeLeft
+
+	// Build player results
+	results := make([]PlayerMatchResult, 0, len(g.players))
+	var mvpID string
+	mvpKills := -1
+	for _, p := range g.players {
+		pr := PlayerMatchResult{
+			ID:      p.ID,
+			Name:    p.Name,
+			Team:    p.Team,
+			Kills:   p.Kills,
+			Deaths:  p.Deaths,
+			Assists: p.Assists,
+			Score:   p.Score,
+		}
+		results = append(results, pr)
+
+		if p.Kills > mvpKills {
+			mvpKills = p.Kills
+			mvpID = p.ID
+		}
+	}
+
+	// Mark MVP
+	for i := range results {
+		if results[i].ID == mvpID {
+			results[i].MVP = true
+			break
+		}
+	}
+
+	// Determine winner
+	winnerTeam := TeamNone
+	if g.match_.Config.Mode == ModeTDM {
+		redScore := g.match_.Teams[TeamRed].Score
+		blueScore := g.match_.Teams[TeamBlue].Score
+		if redScore > blueScore {
+			winnerTeam = TeamRed
+		} else if blueScore > redScore {
+			winnerTeam = TeamBlue
+		}
+		// If tied, winnerTeam stays TeamNone (draw)
+	} else {
+		// FFA: winner is highest individual score
+		bestScore := math.MinInt32
+		for _, p := range g.players {
+			if p.Score > bestScore {
+				bestScore = p.Score
+				winnerTeam = TeamNone // FFA has no team winner
+			}
+		}
+	}
+
+	resultMsg := MatchResultMsg{
+		WinnerTeam: winnerTeam,
+		Players:    results,
+		Duration:   duration,
+	}
+
+	g.broadcastMsg(Envelope{T: MsgMatchResult, Data: resultMsg})
+	g.broadcastMsg(Envelope{T: MsgMatchPhase, Data: MatchPhaseMsg{
+		Phase: int(PhaseResult),
+		Mode:  int(g.match_.Config.Mode),
+	}})
+}
+
+// resetToLobby transitions back to lobby for a new match
+func (g *Game) resetToLobby() {
+	g.match_.Phase = PhaseLobby
+	g.match_.TimeLeft = 0
+	g.match_.CountdownT = 0
+	g.match_.ResultTimer = 0
+	g.match_.Teams[TeamRed].Score = 0
+	g.match_.Teams[TeamBlue].Score = 0
+
+	// Reset player ready state and stats
+	for _, p := range g.players {
+		p.Ready = false
+		p.Kills = 0
+		p.Deaths = 0
+		p.Assists = 0
+		p.DamageDealt = 0
+		p.Score = 0
+		p.RecentDamagers = nil
+		p.HP = p.MaxHP
+		p.Alive = true
+		p.RespawnT = 0
+		p.SpawnProtection = 0
+
+		// Re-spawn at random position
+		ww := g.match_.Config.WorldWidth
+		wh := g.match_.Config.WorldHeight
+		p.X = ww/4 + randFloat()*ww/2
+		p.Y = wh/4 + randFloat()*wh/2
+		p.VX = 0
+		p.VY = 0
+	}
+
+	// Clear entities
+	g.projectiles = make(map[string]*Projectile)
+	g.mobs = make(map[string]*Mob)
+	g.asteroids = make(map[string]*Asteroid)
+	g.pickups = make(map[string]*Pickup)
+	g.mobSpawnCD = MobSpawnInterval
+	g.asteroidSpawnCD = AsteroidSpawnInterval
+	g.pickupSpawnCD = PickupSpawnInterval
+
+	g.broadcastMsg(Envelope{T: MsgMatchPhase, Data: MatchPhaseMsg{
+		Phase: int(PhaseLobby),
+		Mode:  int(g.match_.Config.Mode),
+	}})
+}
+
+// checkScoreLimit returns true if any team/player has reached the score limit
+func (g *Game) checkScoreLimit() bool {
+	limit := g.match_.Config.ScoreLimit
+	if limit <= 0 {
+		return false
+	}
+
+	if g.match_.Config.Mode == ModeTDM {
+		if g.match_.Teams[TeamRed].Score >= limit || g.match_.Teams[TeamBlue].Score >= limit {
+			return true
+		}
+	} else {
+		// FFA: check individual scores
+		for _, p := range g.players {
+			if p.Score >= limit {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isTeamMode returns true if the current game mode uses teams
+func (g *Game) isTeamMode() bool {
+	return g.match_.Config.Mode == ModeTDM
+}
+
+// broadcastTeamUpdate sends team roster info to all clients
+func (g *Game) broadcastTeamUpdate() {
+	var red, blue []TeamPlayerInfo
+	for _, p := range g.players {
+		info := TeamPlayerInfo{
+			ID:    p.ID,
+			Name:  p.Name,
+			Ready: p.Ready,
+		}
+		switch p.Team {
+		case TeamRed:
+			red = append(red, info)
+		case TeamBlue:
+			blue = append(blue, info)
+		}
+	}
+	g.broadcastMsg(Envelope{T: MsgTeamUpdate, Data: TeamUpdateMsg{
+		Red:  red,
+		Blue: blue,
+	}})
+}
+
 // buildSpatialGrid populates the spatial hash with all alive entities
 func (g *Game) buildSpatialGrid() {
 	g.grid.Clear()
@@ -354,7 +745,7 @@ func (g *Game) buildSpatialGrid() {
 		if mob.Alive {
 			idx := len(g.flatMobs)
 			g.flatMobs = append(g.flatMobs, mob)
-			g.grid.InsertCircle(mob.X, mob.Y, MobRadius, EntityRef{Kind: 'm', Idx: idx})
+			g.grid.InsertCircle(mob.X, mob.Y, mob.Radius, EntityRef{Kind: 'm', Idx: idx})
 		}
 	}
 
@@ -394,9 +785,25 @@ func (g *Game) checkCollisions() {
 			if !p.Alive || p.ID == proj.OwnerID {
 				continue
 			}
+
+			// Friendly fire skip: in team modes, skip if projectile owner is on same team
+			if g.isTeamMode() {
+				if owner, ok := g.players[proj.OwnerID]; ok && owner.Team != TeamNone && owner.Team == p.Team {
+					continue
+				}
+			}
+
 			if CheckCollision(proj.X, proj.Y, ProjectileRadius, p.X, p.Y, PlayerRadius) {
+				// Record damage for assist tracking
+				p.RecordDamage(proj.OwnerID, g.gameTime)
+
 				died := p.TakeDamage(proj.Damage)
 				proj.Alive = false
+
+				// Track damage dealt
+				if attacker, ok := g.players[proj.OwnerID]; ok {
+					attacker.DamageDealt += proj.Damage
+				}
 
 				// Broadcast hit event
 				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
@@ -409,6 +816,21 @@ func (g *Game) checkCollisions() {
 					// Award kill to shooter
 					if killer, ok := g.players[proj.OwnerID]; ok {
 						killer.Score++
+						killer.Kills++
+
+						// Update team score
+						if g.isTeamMode() && killer.Team != TeamNone {
+							g.match_.Teams[killer.Team].Score++
+						}
+
+						// Award assists
+						assistIDs := p.GetAssistIDs(killer.ID, g.gameTime)
+						for _, aid := range assistIDs {
+							if assister, ok := g.players[aid]; ok {
+								assister.Assists++
+							}
+						}
+
 						killMsg := Envelope{T: MsgKill, Data: KillMsg{
 							KillerID:   killer.ID,
 							KillerName: killer.Name,
@@ -458,6 +880,12 @@ func (g *Game) checkPlayerCollisions() {
 			if !a.Alive || !b.Alive {
 				continue
 			}
+
+			// Skip collision between teammates in team modes
+			if g.isTeamMode() && a.Team != TeamNone && a.Team == b.Team {
+				continue
+			}
+
 			if CheckCollision(a.X, a.Y, PlayerRadius, b.X, b.Y, PlayerRadius) {
 				a.TakeDamage(a.HP)
 				b.TakeDamage(b.HP)
@@ -639,6 +1067,10 @@ func (g *Game) broadcastState() {
 			Asteroids:   g.filtAsteroids,
 			Pickups:     g.filtPickups,
 			Tick:        g.tick,
+			MatchPhase:  int(g.match_.Phase),
+			TimeLeft:    math.Round(g.match_.TimeLeft*10) / 10,
+			TeamRedSc:   g.match_.Teams[TeamRed].Score,
+			TeamBlueSc:  g.match_.Teams[TeamBlue].Score,
 		}
 
 		data, err := msgpack.Marshal(&state)
@@ -680,6 +1112,10 @@ func (g *Game) broadcastState() {
 					Players: g.filtPlayers, Projectiles: g.filtProjs,
 					Mobs: g.filtMobs, Asteroids: g.filtAsteroids,
 					Pickups: g.filtPickups, Tick: g.tick,
+					MatchPhase: int(g.match_.Phase),
+					TimeLeft:   math.Round(g.match_.TimeLeft*10) / 10,
+					TeamRedSc:  g.match_.Teams[TeamRed].Score,
+					TeamBlueSc: g.match_.Teams[TeamBlue].Score,
 				}
 				var err error
 				fallbackData, err = msgpack.Marshal(&st)
@@ -726,7 +1162,8 @@ func (g *Game) checkMobMobCollisions() {
 			dx := b.X - a.X
 			dy := b.Y - a.Y
 			dist := math.Sqrt(dx*dx + dy*dy)
-			if dist < MobRepelRadius && dist > 0.1 {
+			repelDist := a.Radius + b.Radius + 10.0
+			if dist < repelDist && dist > 0.1 {
 				// Check relative velocity for explosion
 				rvx := a.VX - b.VX
 				rvy := a.VY - b.VY
@@ -758,7 +1195,7 @@ func (g *Game) checkMobMobCollisions() {
 				// Soft repulsion — gentle nudge
 				nx := dx / dist
 				ny := dy / dist
-				force := MobRepelForce * (1 - dist/MobRepelRadius)
+				force := MobRepelForce * (1 - dist/repelDist)
 				a.VX -= nx * force * (1.0 / 60.0)
 				a.VY -= ny * force * (1.0 / 60.0)
 				b.VX += nx * force * (1.0 / 60.0)
@@ -770,7 +1207,7 @@ func (g *Game) checkMobMobCollisions() {
 
 // checkProjectileMobCollisions checks projectile hits on mobs using spatial grid
 func (g *Game) checkProjectileMobCollisions() {
-	const queryR = ProjectileRadius + MobRadius
+	const queryR = ProjectileRadius + SDRadius // use max mob radius for broad-phase
 	for _, proj := range g.flatProjs {
 		if !proj.Alive {
 			continue
@@ -785,7 +1222,7 @@ func (g *Game) checkProjectileMobCollisions() {
 			if !mob.Alive || proj.OwnerID == mob.ID {
 				continue
 			}
-			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, MobRadius) {
+			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, mob.Radius) {
 				died := mob.TakeDamage(proj.Damage)
 				proj.Alive = false
 
@@ -856,7 +1293,7 @@ func (g *Game) checkAsteroidPlayerCollisions() {
 
 // checkAsteroidMobCollisions — asteroid instantly kills mob on contact
 func (g *Game) checkAsteroidMobCollisions() {
-	const queryR = AsteroidRadius + MobRadius
+	const queryR = AsteroidRadius + SDRadius // use max mob radius for broad-phase
 	for _, ast := range g.flatAsteroids {
 		if !ast.Alive {
 			continue
@@ -870,7 +1307,7 @@ func (g *Game) checkAsteroidMobCollisions() {
 			if !mob.Alive {
 				continue
 			}
-			if CheckCollision(ast.X, ast.Y, AsteroidRadius, mob.X, mob.Y, MobRadius) {
+			if CheckCollision(ast.X, ast.Y, AsteroidRadius, mob.X, mob.Y, mob.Radius) {
 				// Mob phrase before dying
 				phrase := pickPhraseAlways("asteroid_death")
 				g.broadcastMsg(Envelope{T: MsgMobSay, Data: MobSayMsg{
@@ -940,11 +1377,11 @@ func (g *Game) checkPlayerPickupCollisions() {
 
 // checkPlayerMobCollisions — mob dies, player takes damage
 func (g *Game) checkPlayerMobCollisions() {
-	const queryR = MobRadius + PlayerRadius
 	for _, mob := range g.flatMobs {
 		if !mob.Alive {
 			continue
 		}
+		queryR := mob.Radius + PlayerRadius
 		g.queryBuf = g.grid.QueryBuf(mob.X, mob.Y, queryR, g.queryBuf[:0])
 		for _, ref := range g.queryBuf {
 			if ref.Kind != 'p' {
@@ -954,7 +1391,7 @@ func (g *Game) checkPlayerMobCollisions() {
 			if !p.Alive {
 				continue
 			}
-			if CheckCollision(mob.X, mob.Y, MobRadius, p.X, p.Y, PlayerRadius) {
+			if CheckCollision(mob.X, mob.Y, mob.Radius, p.X, p.Y, PlayerRadius) {
 				// Mob always dies
 				mob.Alive = false
 

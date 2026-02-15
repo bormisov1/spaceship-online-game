@@ -3,7 +3,7 @@ package main
 import "math"
 
 const (
-	AsteroidRadius   = 40.0
+	AsteroidRadius   = 50.0
 	AsteroidMinSpeed = 60.0
 	AsteroidMaxSpeed = 150.0
 	AsteroidSpinMin  = 0.5

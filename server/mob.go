@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	MobRadius         = 20.0
+	TieRadius         = 25.0
+	SDRadius          = 100.0
 	MobDetectRange    = 400.0
 	MobShootRange     = 550.0  // start shooting when this close
 	MobDetectRangeSq  = MobDetectRange * MobDetectRange
@@ -50,6 +51,7 @@ const (
 	SDCollisionDmg = 90
 	SDProjDamage   = 60
 	SDBurstSize    = 8
+	SDProjOffset   = 130.0 // projectile spawn distance (nose of ship)
 
 	// Spawn chance: 1/15 Star Destroyer, 14/15 TIE
 	SDSpawnChance = 1.0 / 15.0
@@ -122,6 +124,8 @@ type Mob struct {
 	CollisionDmg int
 	ProjDamage  int
 	BurstSize   int
+	Radius      float64
+	ProjOffset  float64
 	Alive       bool
 	BurstLeft   int     // shots remaining in current burst
 	FireCD      float64 // cooldown between individual shots
@@ -180,6 +184,8 @@ func NewTieMob() *Mob {
 	m.CollisionDmg = TieCollisionDmg
 	m.ProjDamage = TieProjDamage
 	m.BurstSize = TieBurstSize
+	m.Radius = TieRadius
+	m.ProjOffset = ProjectileOffset
 	return m
 }
 
@@ -195,6 +201,8 @@ func NewStarDestroyerMob() *Mob {
 	m.CollisionDmg = SDCollisionDmg
 	m.ProjDamage = SDProjDamage
 	m.BurstSize = SDBurstSize
+	m.Radius = SDRadius
+	m.ProjOffset = SDProjOffset
 	return m
 }
 
@@ -385,7 +393,7 @@ func (m *Mob) Update(dt float64, players map[string]*Player, projectiles map[str
 			closestX := proj.X + proj.VX*t - m.X
 			closestY := proj.Y + proj.VY*t - m.Y
 			perpDist2 := closestX*closestX + closestY*closestY
-			hitZone := MobRadius + ProjectileRadius + 30
+			hitZone := m.Radius + ProjectileRadius + 30
 			if perpDist2 < hitZone*hitZone {
 				// Dodge perpendicular to projectile direction
 				perpX := -proj.VY
@@ -481,7 +489,7 @@ func (m *Mob) ToState() MobState {
 		ID:    m.ID,
 		X:     round1(m.X),
 		Y:     round1(m.Y),
-		R:     round1(m.Rotation),
+		R:     round2(m.Rotation),
 		VX:    &vx,
 		VY:    &vy,
 		HP:    m.HP,

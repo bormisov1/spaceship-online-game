@@ -178,6 +178,12 @@ func (c *Client) handleMessage(raw []byte) {
 		c.handleCheck(env.D)
 	case MsgControl:
 		c.handleControl(env.D)
+	case MsgReady:
+		c.handleReady()
+	case MsgTeamPick:
+		c.handleTeamPick(env.D)
+	case MsgRematch:
+		c.handleRematch()
 	}
 }
 
@@ -206,7 +212,11 @@ func (c *Client) handleCreate(data json.RawMessage) {
 		sname = sname[:30]
 	}
 
-	sess := c.hub.sessions.CreateSession(sname)
+	mode := GameMode(msg.Mode)
+	if mode < ModeFFA || mode > ModeWaveSurvival {
+		mode = ModeFFA
+	}
+	sess := c.hub.sessions.CreateSession(sname, mode)
 	if sess == nil {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "too many active sessions"}})
 		return
@@ -345,4 +355,41 @@ func (c *Client) handleControl(data json.RawMessage) {
 
 	sess.Game.SetController(msg.PlayerID, c)
 	c.SendJSON(Envelope{T: MsgControlOK, Data: map[string]string{"pid": msg.PlayerID}})
+}
+
+func (c *Client) handleReady() {
+	if c.sessionID == "" || c.playerID == "" {
+		return
+	}
+	sess := c.hub.sessions.GetSession(c.sessionID)
+	if sess == nil {
+		return
+	}
+	sess.Game.HandleReady(c.playerID)
+}
+
+func (c *Client) handleTeamPick(data json.RawMessage) {
+	if c.sessionID == "" || c.playerID == "" {
+		return
+	}
+	var msg TeamPickMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return
+	}
+	sess := c.hub.sessions.GetSession(c.sessionID)
+	if sess == nil {
+		return
+	}
+	sess.Game.HandleTeamPick(c.playerID, msg.Team)
+}
+
+func (c *Client) handleRematch() {
+	if c.sessionID == "" || c.playerID == "" {
+		return
+	}
+	sess := c.hub.sessions.GetSession(c.sessionID)
+	if sess == nil {
+		return
+	}
+	sess.Game.HandleRematch(c.playerID)
 }

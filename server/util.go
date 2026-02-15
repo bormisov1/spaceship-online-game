@@ -64,6 +64,11 @@ func round1(x float64) float64 {
 	return math.Round(x*10) / 10
 }
 
+// round2 rounds a float64 to 2 decimal places (used for rotation to avoid jitter on slow-turning ships)
+func round2(x float64) float64 {
+	return math.Round(x*100) / 100
+}
+
 // LerpAngle interpolates between two angles taking the short path
 func LerpAngle(from, to, t float64) float64 {
 	diff := NormalizeAngle(to - from)

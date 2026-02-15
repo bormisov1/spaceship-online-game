@@ -44,6 +44,8 @@ pub struct PlayerState {
     pub a: bool,
     #[serde(default)]
     pub b: bool,
+    #[serde(default)]
+    pub tm: i32,
 }
 
 // Server -> Client: projectile state
@@ -103,6 +105,14 @@ pub struct GameStateMsg {
     #[serde(default)]
     pub pk: Vec<PickupState>,
     pub tick: u64,
+    #[serde(default)]
+    pub mp: i32,
+    #[serde(default)]
+    pub tl: f64,
+    #[serde(default)]
+    pub trs: i32,
+    #[serde(default)]
+    pub tbs: i32,
 }
 
 // Server -> Client: kill notification
@@ -126,6 +136,10 @@ pub struct SessionInfo {
     pub id: String,
     pub name: String,
     pub players: i32,
+    #[serde(default)]
+    pub mode: i32,
+    #[serde(default)]
+    pub phase: i32,
 }
 
 // Server -> Client: session check response
@@ -159,4 +173,52 @@ pub struct HitMsg {
 pub struct MobSayMsg {
     pub mid: String,  // mob ID
     pub text: String, // phrase text (with emoji)
+}
+
+// Server -> Client: match phase changed
+#[derive(Deserialize, Debug, Clone)]
+pub struct MatchPhaseMsg {
+    pub phase: i32,
+    pub mode: i32,
+    #[serde(default)]
+    pub time_left: f64,
+    #[serde(default)]
+    pub countdown: f64,
+}
+
+// Server -> Client: match result
+#[derive(Deserialize, Debug, Clone)]
+pub struct MatchResultMsg {
+    pub winner_team: i32,
+    pub players: Vec<PlayerMatchResult>,
+    pub duration: f64,
+}
+
+// Player stats in match result
+#[derive(Deserialize, Debug, Clone)]
+pub struct PlayerMatchResult {
+    pub id: String,
+    pub n: String,
+    pub tm: i32,
+    pub k: i32,
+    pub d: i32,
+    pub a: i32,
+    pub sc: i32,
+    #[serde(default)]
+    pub mvp: bool,
+}
+
+// Server -> Client: team roster update
+#[derive(Deserialize, Debug, Clone)]
+pub struct TeamUpdateMsg {
+    pub red: Vec<TeamPlayerInfo>,
+    pub blue: Vec<TeamPlayerInfo>,
+}
+
+// Player info on a team
+#[derive(Deserialize, Debug, Clone)]
+pub struct TeamPlayerInfo {
+    pub id: String,
+    pub n: String,
+    pub ready: bool,
 }

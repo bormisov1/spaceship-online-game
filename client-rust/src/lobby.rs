@@ -24,7 +24,19 @@ pub fn NormalLobby(
             .unwrap_or_else(|| "Pilot".to_string());
         let name = if name.trim().is_empty() { "Pilot".to_string() } else { name.trim().to_string() };
         state_for_create.borrow_mut().pending_name = Some(name.clone());
-        Network::create_session(&net_create, &name, "Battle Arena");
+        let mode_str = document
+            .get_element_by_id("gameMode")
+            .and_then(|e| e.dyn_into::<web_sys::HtmlSelectElement>().ok())
+            .map(|s| s.value())
+            .unwrap_or_else(|| "0".to_string());
+        let mode: i32 = mode_str.parse().unwrap_or(0);
+        let mode_name = match mode {
+            1 => "Team Deathmatch",
+            2 => "CTF",
+            3 => "Wave Survival",
+            _ => "Battle Arena",
+        };
+        Network::create_session(&net_create, &name, mode_name, mode);
     };
 
     view! {
@@ -44,6 +56,15 @@ pub fn NormalLobby(
                 <div class="name-input-group">
                     <label for="playerName">"Pilot Name"</label>
                     <input type="text" id="playerName" maxlength="16" placeholder="Enter your name..." value="Pilot" />
+                </div>
+                <div class="mode-select-group">
+                    <label for="gameMode">"Game Mode"</label>
+                    <select id="gameMode">
+                        <option value="0">"Free-For-All"</option>
+                        <option value="1">"Team Deathmatch"</option>
+                        <option value="2">"Capture the Flag"</option>
+                        <option value="3">"Wave Survival"</option>
+                    </select>
                 </div>
                 <div class="lobby-actions">
                     <button class="btn btn-primary" on:click=on_create>"Create Battle"</button>
@@ -69,6 +90,13 @@ pub fn NormalLobby(
                                             let players = session.players;
                                             let net_click = (*net_j).clone();
                                             let sid_click = sid.clone();
+                                            let mode = session.mode;
+                                            let mode_label = match mode {
+                                                1 => "TDM",
+                                                2 => "CTF",
+                                                3 => "Survival",
+                                                _ => "FFA",
+                                            };
                                             let player_text = if players == 1 {
                                                 format!("{} pilot", players)
                                             } else {
@@ -77,6 +105,7 @@ pub fn NormalLobby(
                                             view! {
                                                 <div class="session-item">
                                                     <span class="session-name">{name}</span>
+                                                    <span class="session-mode">{mode_label}</span>
                                                     <span class="session-players">{player_text}</span>
                                                     <button class="btn btn-join" on:click=move |_| {
                                                         let document = web_sys::window().unwrap().document().unwrap();

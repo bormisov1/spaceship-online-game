@@ -4,6 +4,7 @@ mod protocol;
 mod state;
 mod network;
 mod lobby;
+mod match_lobby;
 mod canvas;
 mod game_loop;
 mod renderer;

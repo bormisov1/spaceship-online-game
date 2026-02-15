@@ -2,8 +2,6 @@ package main
 
 const (
 	SpatialCellSize = 80.0 // ~2x largest entity radius (AsteroidRadius=40)
-	SpatialCols     = 51   // ceil(4000/80) + 1
-	SpatialRows     = 51
 )
 
 // EntityRef identifies an entity in the grid
@@ -12,9 +10,19 @@ type EntityRef struct {
 	Idx  int  // index into the corresponding flat list
 }
 
-// SpatialGrid is a fixed-size grid for broad-phase collision queries
+// SpatialGrid is a dynamically-sized grid for broad-phase collision queries
 type SpatialGrid struct {
-	cells [SpatialCols * SpatialRows][]EntityRef
+	cols  int
+	rows  int
+	cells [][]EntityRef
+}
+
+// NewSpatialGrid creates a grid sized for the given world dimensions
+func NewSpatialGrid(worldW, worldH float64) SpatialGrid {
+	cols := int(worldW/SpatialCellSize) + 1
+	rows := int(worldH/SpatialCellSize) + 1
+	cells := make([][]EntityRef, cols*rows)
+	return SpatialGrid{cols: cols, rows: rows, cells: cells}
 }
 
 // Clear resets all cells (keeps allocated capacity)
@@ -24,25 +32,25 @@ func (g *SpatialGrid) Clear() {
 	}
 }
 
-func cellIdx(x, y float64) int {
+func (g *SpatialGrid) cellIdx(x, y float64) int {
 	cx := int(x / SpatialCellSize)
 	cy := int(y / SpatialCellSize)
 	if cx < 0 {
 		cx = 0
-	} else if cx >= SpatialCols {
-		cx = SpatialCols - 1
+	} else if cx >= g.cols {
+		cx = g.cols - 1
 	}
 	if cy < 0 {
 		cy = 0
-	} else if cy >= SpatialRows {
-		cy = SpatialRows - 1
+	} else if cy >= g.rows {
+		cy = g.rows - 1
 	}
-	return cy*SpatialCols + cx
+	return cy*g.cols + cx
 }
 
 // Insert adds an entity reference at the given position
 func (g *SpatialGrid) Insert(x, y float64, ref EntityRef) {
-	idx := cellIdx(x, y)
+	idx := g.cellIdx(x, y)
 	g.cells[idx] = append(g.cells[idx], ref)
 }
 
@@ -55,18 +63,18 @@ func (g *SpatialGrid) InsertCircle(x, y, radius float64, ref EntityRef) {
 	if minCX < 0 {
 		minCX = 0
 	}
-	if maxCX >= SpatialCols {
-		maxCX = SpatialCols - 1
+	if maxCX >= g.cols {
+		maxCX = g.cols - 1
 	}
 	if minCY < 0 {
 		minCY = 0
 	}
-	if maxCY >= SpatialRows {
-		maxCY = SpatialRows - 1
+	if maxCY >= g.rows {
+		maxCY = g.rows - 1
 	}
 	for cy := minCY; cy <= maxCY; cy++ {
 		for cx := minCX; cx <= maxCX; cx++ {
-			idx := cy*SpatialCols + cx
+			idx := cy*g.cols + cx
 			g.cells[idx] = append(g.cells[idx], ref)
 		}
 	}
@@ -81,19 +89,19 @@ func (g *SpatialGrid) Query(x, y, radius float64) []EntityRef {
 	if minCX < 0 {
 		minCX = 0
 	}
-	if maxCX >= SpatialCols {
-		maxCX = SpatialCols - 1
+	if maxCX >= g.cols {
+		maxCX = g.cols - 1
 	}
 	if minCY < 0 {
 		minCY = 0
 	}
-	if maxCY >= SpatialRows {
-		maxCY = SpatialRows - 1
+	if maxCY >= g.rows {
+		maxCY = g.rows - 1
 	}
 	var result []EntityRef
 	for cy := minCY; cy <= maxCY; cy++ {
 		for cx := minCX; cx <= maxCX; cx++ {
-			idx := cy*SpatialCols + cx
+			idx := cy*g.cols + cx
 			result = append(result, g.cells[idx]...)
 		}
 	}
@@ -109,18 +117,18 @@ func (g *SpatialGrid) QueryBuf(x, y, radius float64, buf []EntityRef) []EntityRe
 	if minCX < 0 {
 		minCX = 0
 	}
-	if maxCX >= SpatialCols {
-		maxCX = SpatialCols - 1
+	if maxCX >= g.cols {
+		maxCX = g.cols - 1
 	}
 	if minCY < 0 {
 		minCY = 0
 	}
-	if maxCY >= SpatialRows {
-		maxCY = SpatialRows - 1
+	if maxCY >= g.rows {
+		maxCY = g.rows - 1
 	}
 	for cy := minCY; cy <= maxCY; cy++ {
 		for cx := minCX; cx <= maxCX; cx++ {
-			idx := cy*SpatialCols + cx
+			idx := cy*g.cols + cx
 			buf = append(buf, g.cells[idx]...)
 		}
 	}

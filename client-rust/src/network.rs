@@ -146,7 +146,8 @@ impl Network {
     pub fn send_input(net: &SharedNetwork) {
         let state = net.borrow().state.clone();
         let s = state.borrow();
-        if s.phase != Phase::Playing || s.my_id.is_none() {
+        let dominated_by_playing = matches!(s.phase, Phase::Playing | Phase::Dead | Phase::Countdown);
+        if !dominated_by_playing || s.my_id.is_none() {
             return;
         }
         if s.controller_attached {
@@ -245,8 +246,8 @@ impl Network {
         Network::send_raw(net, "list", &serde_json::json!({}));
     }
 
-    pub fn create_session(net: &SharedNetwork, name: &str, session_name: &str) {
-        Network::send_raw(net, "create", &serde_json::json!({"name": name, "sname": session_name}));
+    pub fn create_session(net: &SharedNetwork, name: &str, session_name: &str, mode: i32) {
+        Network::send_raw(net, "create", &serde_json::json!({"name": name, "sname": session_name, "mode": mode}));
     }
 
     pub fn join_session(net: &SharedNetwork, name: &str, session_id: &str) {
@@ -255,6 +256,18 @@ impl Network {
 
     pub fn send_leave(net: &SharedNetwork) {
         Network::send_raw(net, "leave", &serde_json::json!({}));
+    }
+
+    pub fn send_ready(net: &SharedNetwork) {
+        Network::send_raw(net, "ready", &serde_json::json!({}));
+    }
+
+    pub fn send_team_pick(net: &SharedNetwork, team: i32) {
+        Network::send_raw(net, "team_pick", &serde_json::json!({"team": team}));
+    }
+
+    pub fn send_rematch(net: &SharedNetwork) {
+        Network::send_raw(net, "rematch", &serde_json::json!({}));
     }
 }
 
@@ -280,6 +293,7 @@ fn handle_message(
                 let mut s = state.borrow_mut();
                 s.my_id = Some(w.id);
                 s.my_ship = w.s;
+                // Default to Playing; server will send match_phase to override if needed
                 s.phase = Phase::Playing;
                 phase_signal.set(Phase::Playing);
             }
@@ -400,6 +414,54 @@ fn handle_message(
                 }
             }
         }
+        "match_phase" => {
+            if let Ok(mp) = serde_json::from_value::<MatchPhaseMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.game_mode = crate::state::GameMode::from_i32(mp.mode);
+                s.match_phase = mp.phase;
+                s.countdown_time = mp.countdown;
+                match mp.phase {
+                    0 => {
+                        // PhaseLobby
+                        s.is_ready = false;
+                        s.match_result = None;
+                        s.phase = Phase::MatchLobby;
+                        phase_signal.set(Phase::MatchLobby);
+                    }
+                    1 => {
+                        // PhaseCountdown
+                        s.phase = Phase::Countdown;
+                        phase_signal.set(Phase::Countdown);
+                    }
+                    2 => {
+                        // PhasePlaying
+                        s.phase = Phase::Playing;
+                        phase_signal.set(Phase::Playing);
+                    }
+                    3 => {
+                        // PhaseResult
+                        s.phase = Phase::Result;
+                        phase_signal.set(Phase::Result);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        "match_result" => {
+            if let Ok(mr) = serde_json::from_value::<MatchResultMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.match_result = Some((mr.winner_team, mr.players, mr.duration));
+                s.phase = Phase::Result;
+                phase_signal.set(Phase::Result);
+            }
+        }
+        "team_update" => {
+            if let Ok(tu) = serde_json::from_value::<TeamUpdateMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.team_red = tu.red;
+                s.team_blue = tu.blue;
+            }
+        }
         "ctrl_on" => {
             state.borrow_mut().controller_attached = true;
             // Dismiss QR overlay on desktop
@@ -488,6 +550,10 @@ fn handle_state(state: &SharedState, phase_signal: &leptos::prelude::RwSignal<Ph
     }
 
     s.tick = gs.tick;
+    s.match_phase = gs.mp;
+    s.match_time_left = gs.tl;
+    s.team_red_score = gs.trs;
+    s.team_blue_score = gs.tbs;
 
     // Update camera + sync controller boost state
     if let Some(my_id) = &s.my_id {

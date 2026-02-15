@@ -49,8 +49,8 @@ func NewMobProjectile(mob *Mob) *Projectile {
 	return &Projectile{
 		ID:       id,
 		OwnerID:  mob.ID,
-		X:        mob.X + math.Cos(mob.Rotation)*ProjectileOffset,
-		Y:        mob.Y + math.Sin(mob.Rotation)*ProjectileOffset,
+		X:        mob.X + math.Cos(mob.Rotation)*mob.ProjOffset,
+		Y:        mob.Y + math.Sin(mob.Rotation)*mob.ProjOffset,
 		VX:       vx + mob.VX*0.3,
 		VY:       vy + mob.VY*0.3,
 		Rotation: mob.Rotation,
