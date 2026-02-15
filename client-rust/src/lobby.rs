@@ -5,11 +5,100 @@ use crate::network::{Network, SharedNetwork};
 use crate::protocol::{SessionInfo, CheckedMsg};
 
 #[component]
+pub fn AuthPanel(
+    state: SharedState,
+    net: SharedNetwork,
+    auth_signal: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let net_login = send_wrapper::SendWrapper::new(net.clone());
+    let net_register = send_wrapper::SendWrapper::new(net.clone());
+    let state_logout = send_wrapper::SendWrapper::new(state.clone());
+    let state_info = send_wrapper::SendWrapper::new(state.clone());
+
+    let on_login = move |_: web_sys::MouseEvent| {
+        let document = web_sys::window().unwrap().document().unwrap();
+        let username = document.get_element_by_id("authUsername")
+            .and_then(|e| e.dyn_into::<web_sys::HtmlInputElement>().ok())
+            .map(|i| i.value()).unwrap_or_default();
+        let password = document.get_element_by_id("authPassword")
+            .and_then(|e| e.dyn_into::<web_sys::HtmlInputElement>().ok())
+            .map(|i| i.value()).unwrap_or_default();
+        if !username.is_empty() && !password.is_empty() {
+            if let Some(el) = document.get_element_by_id("authError") {
+                el.set_text_content(Some(""));
+            }
+            Network::send_login(&net_login, &username, &password);
+        }
+    };
+
+    let on_register = move |_: web_sys::MouseEvent| {
+        let document = web_sys::window().unwrap().document().unwrap();
+        let username = document.get_element_by_id("authUsername")
+            .and_then(|e| e.dyn_into::<web_sys::HtmlInputElement>().ok())
+            .map(|i| i.value()).unwrap_or_default();
+        let password = document.get_element_by_id("authPassword")
+            .and_then(|e| e.dyn_into::<web_sys::HtmlInputElement>().ok())
+            .map(|i| i.value()).unwrap_or_default();
+        if !username.is_empty() && !password.is_empty() {
+            if let Some(el) = web_sys::window().unwrap().document().unwrap().get_element_by_id("authError") {
+                el.set_text_content(Some(""));
+            }
+            Network::send_register(&net_register, &username, &password);
+        }
+    };
+
+    let auth_for_logout = auth_signal;
+    let on_logout = move |_: web_sys::MouseEvent| {
+        state_logout.borrow_mut().auth_token = None;
+        state_logout.borrow_mut().auth_username = None;
+        state_logout.borrow_mut().auth_player_id = 0;
+        if let Ok(Some(storage)) = web_sys::window().unwrap().local_storage() {
+            let _ = storage.remove_item("auth_token");
+            let _ = storage.remove_item("auth_username");
+        }
+        auth_for_logout.set(None);
+    };
+
+    view! {
+        <div class="auth-panel">
+            // Logged-in view
+            <div class="auth-logged-in" style:display=move || if auth_signal.get().is_some() { "flex" } else { "none" }>
+                <span class="auth-user-info">
+                    {move || {
+                        let s = state_info.borrow();
+                        let level = s.auth_level;
+                        let username = s.auth_username.clone().unwrap_or_default();
+                        let kd = if s.auth_deaths > 0 {
+                            format!("{:.1}", s.auth_kills as f64 / s.auth_deaths as f64)
+                        } else {
+                            format!("{}", s.auth_kills)
+                        };
+                        format!("Lv.{} {} | K/D: {}", level, username, kd)
+                    }}
+                </span>
+                <button class="btn btn-small btn-logout" on:click=on_logout>"Logout"</button>
+            </div>
+            // Login/Register form
+            <div class="auth-form" style:display=move || if auth_signal.get().is_none() { "flex" } else { "none" }>
+                <input type="text" id="authUsername" placeholder="Username" maxlength="16" class="auth-input" />
+                <input type="password" id="authPassword" placeholder="Password" class="auth-input" />
+                <div class="auth-buttons">
+                    <button class="btn btn-small btn-login" on:click=on_login>"Login"</button>
+                    <button class="btn btn-small btn-register" on:click=on_register>"Register"</button>
+                </div>
+                <p id="authError" class="auth-error"></p>
+            </div>
+        </div>
+    }
+}
+
+#[component]
 pub fn NormalLobby(
     state: SharedState,
     net: SharedNetwork,
     sessions: RwSignal<Vec<SessionInfo>>,
     expired: RwSignal<bool>,
+    auth_signal: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let net_create = net.clone();
     let net_join = send_wrapper::SendWrapper::new(net.clone());
@@ -39,6 +128,10 @@ pub fn NormalLobby(
         Network::create_session(&net_create, &name, mode_name, mode);
     };
 
+    let state_auth = state.clone();
+    let net_auth = net.clone();
+    let default_name = state.borrow().auth_username.clone().unwrap_or_else(|| "Pilot".to_string());
+
     view! {
         <div id="lobby">
             <div class="lobby-panel">
@@ -53,9 +146,11 @@ pub fn NormalLobby(
                 }}
                 <h1 class="title">"STAR WARS"</h1>
                 <h2 class="subtitle">"Space Battle"</h2>
+                <AuthPanel state=state_auth.clone() net=net_auth.clone() auth_signal=auth_signal />
                 <div class="name-input-group">
                     <label for="playerName">"Pilot Name"</label>
-                    <input type="text" id="playerName" maxlength="16" placeholder="Enter your name..." value="Pilot" />
+                    <input type="text" id="playerName" maxlength="16" placeholder="Enter your name..."
+                        value={default_name} />
                 </div>
                 <div class="mode-select-group">
                     <label for="gameMode">"Game Mode"</label>

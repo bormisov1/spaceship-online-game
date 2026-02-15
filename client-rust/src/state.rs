@@ -170,6 +170,17 @@ pub struct GameState {
     pub team_blue: Vec<TeamPlayerInfo>,
     pub match_result: Option<(i32, Vec<PlayerMatchResult>, f64)>, // (winner_team, players, duration)
 
+    // Auth
+    pub auth_token: Option<String>,
+    pub auth_username: Option<String>,
+    pub auth_player_id: i64,
+    pub auth_level: i32,
+    pub auth_xp: i32,
+    pub auth_kills: i32,
+    pub auth_deaths: i32,
+    pub auth_wins: i32,
+    pub auth_losses: i32,
+
     // Controller
     pub controller_attached: bool,
 
@@ -257,6 +268,16 @@ impl GameState {
             team_red: Vec::new(),
             team_blue: Vec::new(),
             match_result: None,
+
+            auth_token: None,
+            auth_username: None,
+            auth_player_id: 0,
+            auth_level: 1,
+            auth_xp: 0,
+            auth_kills: 0,
+            auth_deaths: 0,
+            auth_wins: 0,
+            auth_losses: 0,
 
             controller_attached: false,
 

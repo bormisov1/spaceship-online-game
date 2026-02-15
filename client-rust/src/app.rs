@@ -57,6 +57,17 @@ pub fn App() -> impl IntoView {
     let sessions_signal = RwSignal::new(Vec::<SessionInfo>::new());
     let checked_signal = RwSignal::new(None::<CheckedMsg>);
     let expired_signal = RwSignal::new(false);
+    let auth_signal = RwSignal::new(None::<String>);
+
+    // Check localStorage for existing auth
+    if let Ok(Some(storage)) = web_sys::window().unwrap().local_storage() {
+        if let Ok(Some(username)) = storage.get_item("auth_username") {
+            if !username.is_empty() {
+                auth_signal.set(Some(username.clone()));
+                game_state.borrow_mut().auth_username = Some(username);
+            }
+        }
+    }
 
     let net = Network::new(
         game_state.clone(),
@@ -64,6 +75,7 @@ pub fn App() -> impl IntoView {
         sessions_signal,
         checked_signal,
         expired_signal,
+        auth_signal,
     );
 
     Network::connect(&net);
@@ -97,6 +109,7 @@ pub fn App() -> impl IntoView {
             sessions=sessions_signal
             checked=checked_signal
             expired=expired_signal
+            auth=auth_signal
         />
     }.into_any()
 }
@@ -109,6 +122,7 @@ fn GameView(
     sessions: RwSignal<Vec<SessionInfo>>,
     checked: RwSignal<Option<CheckedMsg>>,
     expired: RwSignal<bool>,
+    auth: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let state_clone = send_wrapper::SendWrapper::new(state.clone());
     let net_clone = send_wrapper::SendWrapper::new(net.clone());
@@ -196,6 +210,7 @@ fn GameView(
                                 net=(*net_clone).clone()
                                 sessions=sessions
                                 expired=expired
+                                auth_signal=auth
                             />
                         }.into_any()
                     }

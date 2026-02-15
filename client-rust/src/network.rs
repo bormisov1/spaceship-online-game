@@ -15,6 +15,7 @@ pub struct Network {
     sessions_signal: leptos::prelude::RwSignal<Vec<SessionInfo>>,
     checked_signal: leptos::prelude::RwSignal<Option<CheckedMsg>>,
     expired_signal: leptos::prelude::RwSignal<bool>,
+    auth_signal: leptos::prelude::RwSignal<Option<String>>,
     // Store closures to prevent them from being dropped
     _on_open: Option<Closure<dyn FnMut()>>,
     _on_message: Option<Closure<dyn FnMut(MessageEvent)>>,
@@ -31,6 +32,7 @@ impl Network {
         sessions_signal: leptos::prelude::RwSignal<Vec<SessionInfo>>,
         checked_signal: leptos::prelude::RwSignal<Option<CheckedMsg>>,
         expired_signal: leptos::prelude::RwSignal<bool>,
+        auth_signal: leptos::prelude::RwSignal<Option<String>>,
     ) -> SharedNetwork {
         let net = Rc::new(RefCell::new(Network {
             ws: None,
@@ -39,6 +41,7 @@ impl Network {
             sessions_signal,
             checked_signal,
             expired_signal,
+            auth_signal,
             _on_open: None,
             _on_message: None,
             _on_close: None,
@@ -64,6 +67,20 @@ impl Network {
         let on_open = Closure::wrap(Box::new(move || {
             state_clone.borrow_mut().connected = true;
             web_sys::console::log_1(&"WebSocket connected".into());
+
+            // Auto-authenticate with stored token
+            if let Ok(Some(storage)) = web_sys::window().unwrap().local_storage() {
+                if let Ok(Some(token)) = storage.get_item("auth_token") {
+                    if !token.is_empty() {
+                        // Restore username from storage
+                        if let Ok(Some(username)) = storage.get_item("auth_username") {
+                            state_clone.borrow_mut().auth_username = Some(username);
+                        }
+                        Network::send_auth_token(&net_clone, &token);
+                    }
+                }
+            }
+
             // Check URL session if present
             let url_sid = state_clone.borrow().url_session_id.clone();
             if let Some(sid) = url_sid {
@@ -77,6 +94,7 @@ impl Network {
         let sessions_signal = net.borrow().sessions_signal;
         let checked_signal = net.borrow().checked_signal;
         let expired_signal = net.borrow().expired_signal;
+        let auth_signal = net.borrow().auth_signal;
         let net_for_msg = net.clone();
         let on_message = Closure::wrap(Box::new(move |e: MessageEvent| {
             let data = e.data();
@@ -89,7 +107,7 @@ impl Network {
                 }
             } else if let Some(text) = data.as_string() {
                 if let Ok(env) = serde_json::from_str::<Envelope>(&text) {
-                    handle_message(&state_clone, &net_for_msg, phase_signal, sessions_signal, checked_signal, expired_signal, env);
+                    handle_message(&state_clone, &net_for_msg, phase_signal, sessions_signal, checked_signal, expired_signal, auth_signal, env);
                 }
             }
         }) as Box<dyn FnMut(MessageEvent)>);
@@ -272,6 +290,22 @@ impl Network {
     pub fn send_rematch(net: &SharedNetwork) {
         Network::send_raw(net, "rematch", &serde_json::json!({}));
     }
+
+    pub fn send_register(net: &SharedNetwork, username: &str, password: &str) {
+        Network::send_raw(net, "register", &serde_json::json!({"username": username, "password": password}));
+    }
+
+    pub fn send_login(net: &SharedNetwork, username: &str, password: &str) {
+        Network::send_raw(net, "login", &serde_json::json!({"username": username, "password": password}));
+    }
+
+    pub fn send_auth_token(net: &SharedNetwork, token: &str) {
+        Network::send_raw(net, "auth", &serde_json::json!({"token": token}));
+    }
+
+    pub fn send_profile_request(net: &SharedNetwork) {
+        Network::send_raw(net, "profile", &serde_json::json!({}));
+    }
 }
 
 fn handle_message(
@@ -281,6 +315,7 @@ fn handle_message(
     sessions_signal: leptos::prelude::RwSignal<Vec<SessionInfo>>,
     checked_signal: leptos::prelude::RwSignal<Option<CheckedMsg>>,
     expired_signal: leptos::prelude::RwSignal<bool>,
+    auth_signal: leptos::prelude::RwSignal<Option<String>>,
     env: Envelope,
 ) {
     let data = env.d.unwrap_or(serde_json::Value::Null);
@@ -476,9 +511,43 @@ fn handle_message(
         "ctrl_off" => {
             state.borrow_mut().controller_attached = false;
         }
+        "auth_ok" => {
+            if let Ok(a) = serde_json::from_value::<AuthOKMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.auth_token = Some(a.token.clone());
+                s.auth_username = Some(a.username.clone());
+                s.auth_player_id = a.pid;
+                // Store token in localStorage
+                if let Ok(Some(storage)) = web_sys::window().unwrap().local_storage() {
+                    let _ = storage.set_item("auth_token", &a.token);
+                    let _ = storage.set_item("auth_username", &a.username);
+                }
+                drop(s);
+                // Update auth signal for reactive UI
+                auth_signal.set(Some(a.username.clone()));
+                // Request profile data
+                Network::send_profile_request(net);
+            }
+        }
+        "profile_data" => {
+            if let Ok(p) = serde_json::from_value::<ProfileDataMsg>(data) {
+                let mut s = state.borrow_mut();
+                s.auth_level = p.level;
+                s.auth_xp = p.xp;
+                s.auth_kills = p.kills;
+                s.auth_deaths = p.deaths;
+                s.auth_wins = p.wins;
+                s.auth_losses = p.losses;
+            }
+        }
         "error" => {
             if let Ok(e) = serde_json::from_value::<ErrorMsg>(data) {
                 web_sys::console::error_1(&format!("Server error: {}", e.msg).into());
+                // Show error in auth error element if it exists
+                if let Some(el) = web_sys::window().unwrap().document().unwrap()
+                    .get_element_by_id("authError") {
+                    el.set_text_content(Some(&e.msg));
+                }
             }
         }
         _ => {}

@@ -241,3 +241,26 @@ pub struct TeamPlayerInfo {
     pub n: String,
     pub ready: bool,
 }
+
+// Server -> Client: auth success
+#[derive(Deserialize, Debug, Clone)]
+pub struct AuthOKMsg {
+    pub token: String,
+    pub username: String,
+    pub pid: i64,
+    #[serde(default)]
+    pub guest: bool,
+}
+
+// Server -> Client: profile/stats data
+#[derive(Deserialize, Debug, Clone)]
+pub struct ProfileDataMsg {
+    pub username: String,
+    pub level: i32,
+    pub xp: i32,
+    pub kills: i32,
+    pub deaths: i32,
+    pub wins: i32,
+    pub losses: i32,
+    pub playtime: f64,
+}

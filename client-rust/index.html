@@ -509,6 +509,140 @@
             }
         }
 
+        /* Auth panel */
+        .auth-panel {
+            margin-bottom: 16px;
+        }
+
+        .auth-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .auth-input {
+            flex: 1 1 120px;
+            padding: 7px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 5px;
+            color: #fff;
+            font-size: 13px;
+            outline: none;
+            min-width: 0;
+        }
+
+        .auth-input:focus {
+            border-color: rgba(100, 150, 255, 0.4);
+        }
+
+        .auth-buttons {
+            display: flex;
+            gap: 4px;
+        }
+
+        .btn-small {
+            padding: 7px 12px;
+            font-size: 11px;
+        }
+
+        .btn-login {
+            background: rgba(50, 120, 220, 0.25);
+            color: #6699dd;
+            border: 1px solid rgba(50, 120, 220, 0.3);
+        }
+
+        .btn-login:hover {
+            background: rgba(50, 120, 220, 0.4);
+        }
+
+        .btn-register {
+            background: rgba(50, 200, 100, 0.15);
+            color: #55bb77;
+            border: 1px solid rgba(50, 200, 100, 0.25);
+        }
+
+        .btn-register:hover {
+            background: rgba(50, 200, 100, 0.3);
+        }
+
+        .auth-error {
+            width: 100%;
+            color: #ff6666;
+            font-size: 12px;
+            margin-top: 4px;
+            min-height: 0;
+        }
+
+        .auth-logged-in {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(50, 120, 220, 0.08);
+            border: 1px solid rgba(50, 120, 220, 0.15);
+            border-radius: 6px;
+        }
+
+        .auth-user-info {
+            font-size: 13px;
+            color: #8899bb;
+        }
+
+        .auth-level {
+            color: #ffcc00;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .auth-stats {
+            color: #667788;
+            font-size: 11px;
+        }
+
+        .btn-logout {
+            background: rgba(255, 80, 80, 0.15);
+            color: #cc6666;
+            border: 1px solid rgba(255, 80, 80, 0.2);
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 80, 80, 0.25);
+        }
+
+        .mode-select-group {
+            margin-bottom: 20px;
+        }
+
+        .mode-select-group label {
+            display: block;
+            font-size: 12px;
+            color: #6688aa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+        }
+
+        .mode-select-group select {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .session-mode {
+            color: #88aacc;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0 8px;
+        }
+
         /* Landscape mobile lobby */
         @media (max-height: 500px) and (orientation: landscape) {
             .lobby-panel {
