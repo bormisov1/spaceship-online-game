@@ -131,10 +131,17 @@ fn connect_ws(ctrl: &SharedCtrl) {
         }
     }) as Box<dyn FnMut()>);
 
-    // on message
+    // on message — handle both binary (msgpack state) and text (JSON control messages)
     let ctrl_msg = ctrl.clone();
     let on_message = Closure::wrap(Box::new(move |e: MessageEvent| {
-        if let Some(text) = e.data().as_string() {
+        let data = e.data();
+        if let Some(ab) = data.dyn_ref::<js_sys::ArrayBuffer>() {
+            let arr = js_sys::Uint8Array::new(ab);
+            let bytes = arr.to_vec();
+            if let Ok(gs) = rmp_serde::from_slice::<crate::protocol::GameStateMsg>(&bytes) {
+                handle_state(&ctrl_msg, gs);
+            }
+        } else if let Some(text) = data.as_string() {
             if let Ok(env) = serde_json::from_str::<crate::protocol::Envelope>(&text) {
                 handle_message(&ctrl_msg, env);
             }
@@ -171,6 +178,28 @@ fn connect_ws(ctrl: &SharedCtrl) {
     c._on_error = Some(on_error);
 }
 
+fn handle_state(ctrl: &SharedCtrl, gs: crate::protocol::GameStateMsg) {
+    let mut c = ctrl.borrow_mut();
+    let pid = c.pid.clone();
+    let mut new_enemies = Vec::new();
+
+    for p in &gs.p {
+        if p.id == pid {
+            c.player_x = p.x;
+            c.player_y = p.y;
+            c.player_r = p.r;
+        } else if p.a {
+            new_enemies.push(Enemy { id: format!("p_{}", p.id), x: p.x, y: p.y });
+        }
+    }
+    for m in &gs.m {
+        if m.a {
+            new_enemies.push(Enemy { id: format!("m_{}", m.id), x: m.x, y: m.y });
+        }
+    }
+    c.enemies = new_enemies;
+}
+
 fn handle_message(ctrl: &SharedCtrl, env: crate::protocol::Envelope) {
     let data = env.d.unwrap_or(serde_json::Value::Null);
     match env.t.as_str() {
@@ -178,29 +207,6 @@ fn handle_message(ctrl: &SharedCtrl, env: crate::protocol::Envelope) {
             ctrl.borrow_mut().attached = true;
             update_status("Connected");
             start_input_loop(ctrl);
-        }
-        "state" => {
-            if let Ok(gs) = serde_json::from_value::<crate::protocol::GameStateMsg>(data) {
-                let mut c = ctrl.borrow_mut();
-                let pid = c.pid.clone();
-                let mut new_enemies = Vec::new();
-
-                for p in &gs.p {
-                    if p.id == pid {
-                        c.player_x = p.x;
-                        c.player_y = p.y;
-                        c.player_r = p.r;
-                    } else if p.a {
-                        new_enemies.push(Enemy { id: format!("p_{}", p.id), x: p.x, y: p.y });
-                    }
-                }
-                for m in &gs.m {
-                    if m.a {
-                        new_enemies.push(Enemy { id: format!("m_{}", m.id), x: m.x, y: m.y });
-                    }
-                }
-                c.enemies = new_enemies;
-            }
         }
         "error" => {
             if let Ok(e) = serde_json::from_value::<crate::protocol::ErrorMsg>(data) {
