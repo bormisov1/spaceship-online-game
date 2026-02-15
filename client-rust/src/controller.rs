@@ -116,6 +116,7 @@ fn connect_ws(ctrl: &SharedCtrl) {
     let url = format!("{}//{}/ws", ws_proto, host);
 
     let ws = WebSocket::new(&url).unwrap();
+    ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
 
     // on open
     let ctrl_open = ctrl.clone();
