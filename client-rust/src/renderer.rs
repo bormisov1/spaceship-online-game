@@ -73,13 +73,23 @@ pub fn render(state: &SharedState, dt: f64) {
     // Update effects
     {
         let mut s = state.borrow_mut();
+        effects::update_shake(&mut s, dt);
         let mut particles = std::mem::take(&mut s.particles);
         let mut explosions = std::mem::take(&mut s.explosions);
+        let mut damage_numbers = std::mem::take(&mut s.damage_numbers);
+        let mut hit_markers = std::mem::take(&mut s.hit_markers);
         drop(s);
         effects::update_particles(&mut particles, &mut explosions, dt);
+        effects::update_damage_numbers(&mut damage_numbers, dt);
+        effects::update_hit_markers(&mut hit_markers, dt);
         let mut s = state.borrow_mut();
         s.particles = particles;
         s.explosions = explosions;
+        s.damage_numbers = damage_numbers;
+        s.hit_markers = hit_markers;
+        // Clean up expired mob speech
+        let now = js_sys::Date::now();
+        s.mob_speech.retain(|sp| now - sp.time < 3000.0);
     }
 
     // Animate hyperspace_t
@@ -109,11 +119,15 @@ pub fn render(state: &SharedState, dt: f64) {
     // Clear game canvas
     ctx.clear_rect(0.0, 0.0, screen_w, screen_h);
 
-    // Zoom transform
+    // Zoom transform (with screen shake offset)
     let vw = screen_w / cam_zoom;
     let vh = screen_h / cam_zoom;
-    let offset_x = cam_x - vw / 2.0;
-    let offset_y = cam_y - vh / 2.0;
+    let (shake_x, shake_y) = {
+        let s = state.borrow();
+        (s.shake_x, s.shake_y)
+    };
+    let offset_x = cam_x - vw / 2.0 + shake_x;
+    let offset_y = cam_y - vh / 2.0 + shake_y;
 
     ctx.save();
     ctx.scale(cam_zoom, cam_zoom).unwrap_or(());
@@ -198,6 +212,18 @@ pub fn render(state: &SharedState, dt: f64) {
         effects::render_explosions(&ctx, &s.explosions, offset_x, offset_y, vw, vh);
     }
 
+    // Mob speech bubbles (world-space, inside zoom)
+    {
+        let s = state.borrow();
+        effects::render_mob_speech(&ctx, &s.mob_speech, &s.mobs, offset_x, offset_y, vw, vh);
+    }
+
+    // Damage numbers (world-space, inside zoom)
+    {
+        let s = state.borrow();
+        effects::render_damage_numbers(&ctx, &s.damage_numbers, offset_x, offset_y, vw, vh);
+    }
+
     // Auto-aim reticle (when controller attached or mobile)
     {
         let s = state.borrow();
@@ -216,6 +242,12 @@ pub fn render(state: &SharedState, dt: f64) {
     }
 
     ctx.restore();
+
+    // Hit markers (screen-space, no zoom)
+    {
+        let s = state.borrow();
+        effects::render_hit_markers(&ctx, &s.hit_markers, screen_w, screen_h);
+    }
 
     // HUD (screen-space, no zoom)
     hud::render_hud(&ctx, state);

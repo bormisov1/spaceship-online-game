@@ -319,6 +319,34 @@ fn handle_message(
                 sessions_signal.set(sessions);
             }
         }
+        "hit" => {
+            if let Ok(h) = serde_json::from_value::<HitMsg>(data) {
+                let mut s = state.borrow_mut();
+                let my_id = s.my_id.clone();
+
+                // Damage number at hit position
+                effects::add_damage_number(&mut s, h.x, h.y, h.dmg, false);
+
+                // Screen shake — bigger for victim
+                let shake_amount = (h.dmg as f64 / 10.0).min(6.0);
+                if my_id.as_deref() == Some(&h.vid) {
+                    effects::trigger_shake(&mut s, shake_amount * 1.5);
+                } else {
+                    effects::trigger_shake(&mut s, shake_amount * 0.5);
+                }
+
+                // Hit marker if I'm the attacker
+                if my_id.as_deref() == Some(&h.aid) {
+                    effects::add_hit_marker(&mut s);
+                }
+            }
+        }
+        "mob_say" => {
+            if let Ok(ms) = serde_json::from_value::<MobSayMsg>(data) {
+                let mut s = state.borrow_mut();
+                effects::add_mob_speech(&mut s, ms.mid, ms.text);
+            }
+        }
         "kill" => {
             if let Ok(k) = serde_json::from_value::<KillMsg>(data) {
                 let mut s = state.borrow_mut();
@@ -340,6 +368,16 @@ fn handle_message(
                     effects::add_explosion(&mut particles, &mut explosions, vx, vy);
                     s.particles = particles;
                     s.explosions = explosions;
+                }
+
+                // Screen shake on kills
+                let my_id = s.my_id.clone();
+                if my_id.as_deref() == Some(k.kid.as_str()) {
+                    effects::trigger_shake(&mut s, 8.0); // I got a kill
+                } else if my_id.as_deref() == Some(k.vid.as_str()) {
+                    effects::trigger_shake(&mut s, 12.0); // I died
+                } else {
+                    effects::trigger_shake(&mut s, 3.0); // nearby kill
                 }
             }
         }

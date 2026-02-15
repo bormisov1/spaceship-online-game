@@ -53,6 +53,31 @@ pub struct Explosion {
 }
 
 #[derive(Debug, Clone)]
+pub struct DamageNumber {
+    pub x: f64,
+    pub y: f64,
+    pub text: String,
+    pub color: &'static str,
+    pub life: f64,
+    pub max_life: f64,
+    pub vy: f64,
+    pub offset_x: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct HitMarker {
+    pub life: f64,
+    pub max_life: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct MobSpeech {
+    pub mob_id: String,
+    pub text: String,
+    pub time: f64,  // timestamp when created (ms)
+}
+
+#[derive(Debug, Clone)]
 pub struct TouchJoystick {
     pub start_x: f64,
     pub start_y: f64,
@@ -116,6 +141,21 @@ pub struct GameState {
     pub particles: Vec<Particle>,
     pub explosions: Vec<Explosion>,
 
+    // Screen shake
+    pub shake_x: f64,
+    pub shake_y: f64,
+    pub shake_intensity: f64,
+    pub shake_decay: f64,
+
+    // Damage numbers (world-space floating text)
+    pub damage_numbers: Vec<DamageNumber>,
+
+    // Hit markers (screen-space, brief flash when own shot connects)
+    pub hit_markers: Vec<HitMarker>,
+
+    // Mob speech bubbles
+    pub mob_speech: Vec<MobSpeech>,
+
     // Interpolation: previous state for lerping between server updates
     pub prev_players: HashMap<String, PlayerState>,
     pub prev_mobs: HashMap<String, MobState>,
@@ -172,6 +212,15 @@ impl GameState {
 
             particles: Vec::with_capacity(200),
             explosions: Vec::with_capacity(10),
+
+            shake_x: 0.0,
+            shake_y: 0.0,
+            shake_intensity: 0.0,
+            shake_decay: 0.0,
+
+            damage_numbers: Vec::with_capacity(30),
+            hit_markers: Vec::with_capacity(5),
+            mob_speech: Vec::with_capacity(8),
 
             prev_players: HashMap::new(),
             prev_mobs: HashMap::new(),

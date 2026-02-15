@@ -151,3 +151,20 @@ pub struct CheckedMsg {
 pub struct ErrorMsg {
     pub msg: String,
 }
+
+// Server -> Client: hit event (damage dealt)
+#[derive(Deserialize, Debug, Clone)]
+pub struct HitMsg {
+    pub x: f64,
+    pub y: f64,
+    pub dmg: i32,
+    pub vid: String,  // victim ID
+    pub aid: String,  // attacker ID
+}
+
+// Server -> Client: mob speech bubble
+#[derive(Deserialize, Debug, Clone)]
+pub struct MobSayMsg {
+    pub mid: String,  // mob ID
+    pub text: String, // phrase text (with emoji)
+}

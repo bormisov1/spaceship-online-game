@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
-use crate::state::{Particle, ParticleKind, Explosion};
+use crate::state::{Particle, ParticleKind, Explosion, DamageNumber, HitMarker, MobSpeech, GameState};
 use crate::constants::SHIP_COLORS;
 
 const MAX_PARTICLES: usize = 200;
@@ -378,6 +378,230 @@ pub fn render_particles(ctx: &CanvasRenderingContext2d, particles: &[Particle], 
                 ctx.fill();
             }
         }
+    }
+    ctx.set_global_alpha(1.0);
+}
+
+// --- Screen Shake ---
+
+pub fn trigger_shake(state: &mut GameState, intensity: f64) {
+    state.shake_intensity = (state.shake_intensity + intensity).min(20.0);
+    state.shake_decay = state.shake_intensity;
+}
+
+pub fn update_shake(state: &mut GameState, dt: f64) {
+    if state.shake_intensity <= 0.0 {
+        state.shake_x = 0.0;
+        state.shake_y = 0.0;
+        return;
+    }
+    init_rng_if_needed();
+    let angle = fast_random() * std::f64::consts::PI * 2.0;
+    state.shake_x = angle.cos() * state.shake_intensity;
+    state.shake_y = angle.sin() * state.shake_intensity;
+    state.shake_intensity -= state.shake_decay * dt * 6.0;
+    if state.shake_intensity < 0.5 {
+        state.shake_intensity = 0.0;
+        state.shake_x = 0.0;
+        state.shake_y = 0.0;
+    }
+}
+
+// --- Damage Numbers ---
+
+const MAX_DAMAGE_NUMBERS: usize = 30;
+
+pub fn add_damage_number(state: &mut GameState, x: f64, y: f64, dmg: i32, is_heal: bool) {
+    init_rng_if_needed();
+    if state.damage_numbers.len() >= MAX_DAMAGE_NUMBERS {
+        state.damage_numbers.remove(0);
+    }
+    state.damage_numbers.push(DamageNumber {
+        x,
+        y,
+        text: if is_heal { format!("+{}", dmg) } else { format!("-{}", dmg) },
+        color: if is_heal { "#44ff44" } else { "#ff4444" },
+        life: 1.0,
+        max_life: 1.0,
+        vy: -60.0,
+        offset_x: (fast_random() - 0.5) * 20.0,
+    });
+}
+
+pub fn update_damage_numbers(numbers: &mut Vec<DamageNumber>, dt: f64) {
+    let mut i = 0;
+    while i < numbers.len() {
+        numbers[i].life -= dt;
+        numbers[i].y += numbers[i].vy * dt;
+        if numbers[i].life <= 0.0 {
+            numbers.swap_remove(i);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+pub fn render_damage_numbers(ctx: &CanvasRenderingContext2d, numbers: &[DamageNumber], offset_x: f64, offset_y: f64, vw: f64, vh: f64) {
+    ctx.set_text_align("center");
+    for dn in numbers {
+        let sx = dn.x + dn.offset_x - offset_x;
+        let sy = dn.y - offset_y;
+        if sx < -50.0 || sx > vw + 50.0 || sy < -50.0 || sy > vh + 50.0 { continue; }
+
+        let alpha = (dn.life / dn.max_life).max(0.0);
+        let scale = 1.0 + (1.0 - alpha) * 0.3;
+        let font_size = (14.0 * scale) as i32;
+
+        ctx.set_global_alpha(alpha);
+        ctx.set_font(&format!("bold {}px monospace", font_size));
+        // Shadow
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#000000"));
+        let _ = ctx.fill_text(&dn.text, sx + 1.0, sy + 1.0);
+        // Color
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str(dn.color));
+        let _ = ctx.fill_text(&dn.text, sx, sy);
+    }
+    ctx.set_global_alpha(1.0);
+}
+
+// --- Hit Markers (screen-space) ---
+
+const HIT_MARKER_DURATION: f64 = 0.25;
+
+pub fn add_hit_marker(state: &mut GameState) {
+    state.hit_markers.push(HitMarker {
+        life: HIT_MARKER_DURATION,
+        max_life: HIT_MARKER_DURATION,
+    });
+}
+
+pub fn update_hit_markers(markers: &mut Vec<HitMarker>, dt: f64) {
+    let mut i = 0;
+    while i < markers.len() {
+        markers[i].life -= dt;
+        if markers[i].life <= 0.0 {
+            markers.swap_remove(i);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+pub fn render_hit_markers(ctx: &CanvasRenderingContext2d, markers: &[HitMarker], screen_w: f64, screen_h: f64) {
+    if markers.is_empty() { return; }
+
+    let cx = screen_w / 2.0;
+    let cy = screen_h / 2.0;
+
+    for hm in markers {
+        let alpha = (hm.life / hm.max_life).max(0.0);
+        let size = 10.0 + (1.0 - alpha) * 4.0;
+        let gap = 3.0;
+
+        ctx.set_global_alpha(alpha);
+        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        ctx.set_line_width(2.5);
+        ctx.begin_path();
+        // Top-left to center
+        ctx.move_to(cx - size, cy - size);
+        ctx.line_to(cx - gap, cy - gap);
+        // Top-right to center
+        ctx.move_to(cx + size, cy - size);
+        ctx.line_to(cx + gap, cy - gap);
+        // Bottom-left to center
+        ctx.move_to(cx - size, cy + size);
+        ctx.line_to(cx - gap, cy + gap);
+        // Bottom-right to center
+        ctx.move_to(cx + size, cy + size);
+        ctx.line_to(cx + gap, cy + gap);
+        ctx.stroke();
+    }
+    ctx.set_global_alpha(1.0);
+}
+
+// --- Mob Speech Bubbles ---
+
+const MOB_SPEECH_DURATION: f64 = 3000.0; // 3 seconds in ms
+
+pub fn add_mob_speech(state: &mut GameState, mob_id: String, text: String) {
+    let now = js_sys::Date::now();
+    // Remove existing speech for this mob
+    state.mob_speech.retain(|s| s.mob_id != mob_id);
+    state.mob_speech.push(MobSpeech {
+        mob_id,
+        text,
+        time: now,
+    });
+}
+
+pub fn render_mob_speech(ctx: &CanvasRenderingContext2d, speech: &[MobSpeech], mobs: &std::collections::HashMap<String, crate::protocol::MobState>, offset_x: f64, offset_y: f64, vw: f64, vh: f64) {
+    let now = js_sys::Date::now();
+
+    for s in speech {
+        let age = now - s.time;
+        if age > MOB_SPEECH_DURATION { continue; }
+
+        let mob = match mobs.get(&s.mob_id) {
+            Some(m) if m.a => m,
+            _ => continue,
+        };
+
+        let sx = mob.x - offset_x;
+        let sy = mob.y - offset_y;
+        if sx < -100.0 || sx > vw + 100.0 || sy < -100.0 || sy > vh + 100.0 { continue; }
+
+        // Fade in/out
+        let alpha = if age < 200.0 {
+            age / 200.0
+        } else if age > MOB_SPEECH_DURATION - 500.0 {
+            (MOB_SPEECH_DURATION - age) / 500.0
+        } else {
+            1.0
+        }.max(0.0);
+
+        // Bubble position above mob
+        let bx = sx;
+        let by = sy - 50.0;
+
+        ctx.set_global_alpha(alpha);
+        ctx.set_font("12px monospace");
+        ctx.set_text_align("center");
+
+        // Measure text for bubble background
+        let metrics = ctx.measure_text(&s.text).unwrap_or_else(|_| ctx.measure_text("").unwrap());
+        let tw = metrics.width();
+        let pad = 6.0;
+        let bw = tw + pad * 2.0;
+        let bh = 20.0;
+
+        // Bubble background
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 0, 0, 0.7)"));
+        let corner_r = 6.0;
+        ctx.begin_path();
+        let _ = ctx.arc(bx - bw / 2.0 + corner_r, by - bh / 2.0 + corner_r, corner_r, std::f64::consts::PI, 1.5 * std::f64::consts::PI);
+        let _ = ctx.arc(bx + bw / 2.0 - corner_r, by - bh / 2.0 + corner_r, corner_r, 1.5 * std::f64::consts::PI, 0.0);
+        let _ = ctx.arc(bx + bw / 2.0 - corner_r, by + bh / 2.0 - corner_r, corner_r, 0.0, 0.5 * std::f64::consts::PI);
+        let _ = ctx.arc(bx - bw / 2.0 + corner_r, by + bh / 2.0 - corner_r, corner_r, 0.5 * std::f64::consts::PI, std::f64::consts::PI);
+        ctx.close_path();
+        ctx.fill();
+
+        // Bubble border
+        ctx.set_stroke_style(&wasm_bindgen::JsValue::from_str("rgba(255, 200, 50, 0.5)"));
+        ctx.set_line_width(1.0);
+        ctx.stroke();
+
+        // Small triangle pointing down to mob
+        ctx.begin_path();
+        ctx.move_to(bx - 4.0, by + bh / 2.0);
+        ctx.line_to(bx, by + bh / 2.0 + 5.0);
+        ctx.line_to(bx + 4.0, by + bh / 2.0);
+        ctx.close_path();
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("rgba(0, 0, 0, 0.7)"));
+        ctx.fill();
+
+        // Text
+        ctx.set_fill_style(&wasm_bindgen::JsValue::from_str("#ffffff"));
+        let _ = ctx.fill_text(&s.text, bx, by + 4.0);
     }
     ctx.set_global_alpha(1.0);
 }
