@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // ---------- helpers ----------
@@ -61,9 +62,17 @@ func dialWS(t *testing.T, wsURL string) *websocket.Conn {
 func readEnvelope(t *testing.T, conn *websocket.Conn) Envelope {
 	t.Helper()
 	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	_, raw, err := conn.ReadMessage()
+	msgType, raw, err := conn.ReadMessage()
 	if err != nil {
 		t.Fatalf("read WS: %v", err)
+	}
+	// Binary messages are msgpack-encoded GameState
+	if msgType == websocket.BinaryMessage {
+		var gs GameState
+		if err := msgpack.Unmarshal(raw, &gs); err != nil {
+			t.Fatalf("msgpack unmarshal: %v", err)
+		}
+		return Envelope{T: MsgState, Data: gs}
 	}
 	var env Envelope
 	if err := json.Unmarshal(raw, &env); err != nil {

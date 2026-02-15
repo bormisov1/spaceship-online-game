@@ -56,6 +56,7 @@ impl Network {
         let url = format!("{}//{}/ws", ws_proto, host);
 
         let ws = WebSocket::new(&url).unwrap();
+        ws.set_binary_type(web_sys::BinaryType::Arraybuffer);
 
         // on open
         let state_clone = net.borrow().state.clone();
@@ -78,7 +79,15 @@ impl Network {
         let expired_signal = net.borrow().expired_signal;
         let net_for_msg = net.clone();
         let on_message = Closure::wrap(Box::new(move |e: MessageEvent| {
-            if let Some(text) = e.data().as_string() {
+            let data = e.data();
+            // Binary message = msgpack-encoded GameState
+            if let Some(ab) = data.dyn_ref::<js_sys::ArrayBuffer>() {
+                let arr = js_sys::Uint8Array::new(ab);
+                let bytes = arr.to_vec();
+                if let Ok(gs) = rmp_serde::from_slice::<GameStateMsg>(&bytes) {
+                    handle_state(&state_clone, &phase_signal, gs);
+                }
+            } else if let Some(text) = data.as_string() {
                 if let Ok(env) = serde_json::from_str::<Envelope>(&text) {
                     handle_message(&state_clone, &net_for_msg, phase_signal, sessions_signal, checked_signal, expired_signal, env);
                 }
@@ -265,6 +274,7 @@ fn handle_message(
     let data = env.d.unwrap_or(serde_json::Value::Null);
     match env.t.as_str() {
         "state" => {
+            // Legacy JSON state handling (binary msgpack is preferred path)
             if let Ok(gs) = serde_json::from_value::<GameStateMsg>(data) {
                 handle_state(state, &phase_signal, gs);
             }

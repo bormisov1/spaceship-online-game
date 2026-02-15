@@ -5,6 +5,8 @@ import (
 	"math"
 	"sync"
 	"time"
+
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 const (
@@ -30,6 +32,7 @@ const (
 type Broadcaster interface {
 	SendJSON(msg interface{})
 	SendRaw(data []byte)
+	SendBinary(data []byte)
 }
 
 // Game holds the state for one game session
@@ -619,12 +622,12 @@ func (g *Game) broadcastState() {
 			Tick:        g.tick,
 		}
 
-		data, err := json.Marshal(Envelope{T: MsgState, Data: state})
+		data, err := msgpack.Marshal(&state)
 		if err != nil {
 			continue
 		}
 		playerData[playerID] = data
-		client.SendRaw(data)
+		client.SendBinary(data)
 	}
 
 	// Send to controllers using same data as their linked player
@@ -660,14 +663,14 @@ func (g *Game) broadcastState() {
 					Pickups: g.filtPickups, Tick: g.tick,
 				}
 				var err error
-				fallbackData, err = json.Marshal(Envelope{T: MsgState, Data: st})
+				fallbackData, err = msgpack.Marshal(&st)
 				if err != nil {
 					continue
 				}
 			}
 			data = fallbackData
 		}
-		client.SendRaw(data)
+		client.SendBinary(data)
 	}
 }
 

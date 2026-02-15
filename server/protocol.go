@@ -1,6 +1,8 @@
 package main
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // Client -> Server message types
 const (
@@ -64,66 +66,66 @@ type CreateMsg struct {
 
 // PlayerState is broadcast per player each tick
 type PlayerState struct {
-	ID   string  `json:"id"`
-	Name string  `json:"n"`
-	X    float64 `json:"x"`
-	Y    float64 `json:"y"`
-	R    float64 `json:"r"`           // rotation radians
-	VX   *float64 `json:"vx,omitempty"` // velocity X (omitted when unchanged)
-	VY   *float64 `json:"vy,omitempty"` // velocity Y (omitted when unchanged)
-	HP   int     `json:"hp"`
-	MaxHP int    `json:"mhp"`
-	Ship int     `json:"s"`  // ship type 0-3
-	Score int    `json:"sc"`
-	Alive bool   `json:"a"`
-	Boost bool   `json:"b,omitempty"`
+	ID   string  `json:"id" msgpack:"id"`
+	Name string  `json:"n" msgpack:"n"`
+	X    float64 `json:"x" msgpack:"x"`
+	Y    float64 `json:"y" msgpack:"y"`
+	R    float64 `json:"r" msgpack:"r"`
+	VX   *float64 `json:"vx,omitempty" msgpack:"vx,omitempty"`
+	VY   *float64 `json:"vy,omitempty" msgpack:"vy,omitempty"`
+	HP   int     `json:"hp" msgpack:"hp"`
+	MaxHP int    `json:"mhp" msgpack:"mhp"`
+	Ship int     `json:"s" msgpack:"s"`
+	Score int    `json:"sc" msgpack:"sc"`
+	Alive bool   `json:"a" msgpack:"a"`
+	Boost bool   `json:"b,omitempty" msgpack:"b,omitempty"`
 }
 
 // ProjectileState is broadcast per projectile
 type ProjectileState struct {
-	ID string  `json:"id"`
-	X  float64 `json:"x"`
-	Y  float64 `json:"y"`
-	R  float64 `json:"r"`
-	Owner string `json:"o"`
+	ID string  `json:"id" msgpack:"id"`
+	X  float64 `json:"x" msgpack:"x"`
+	Y  float64 `json:"y" msgpack:"y"`
+	R  float64 `json:"r" msgpack:"r"`
+	Owner string `json:"o" msgpack:"o"`
 }
 
 // MobState is broadcast per mob
 type MobState struct {
-	ID    string   `json:"id"`
-	X     float64  `json:"x"`
-	Y     float64  `json:"y"`
-	R     float64  `json:"r"`
-	VX    *float64 `json:"vx,omitempty"`
-	VY    *float64 `json:"vy,omitempty"`
-	HP    int      `json:"hp"`
-	MaxHP int      `json:"mhp"`
-	Alive bool     `json:"a"`
+	ID    string   `json:"id" msgpack:"id"`
+	X     float64  `json:"x" msgpack:"x"`
+	Y     float64  `json:"y" msgpack:"y"`
+	R     float64  `json:"r" msgpack:"r"`
+	VX    *float64 `json:"vx,omitempty" msgpack:"vx,omitempty"`
+	VY    *float64 `json:"vy,omitempty" msgpack:"vy,omitempty"`
+	HP    int      `json:"hp" msgpack:"hp"`
+	MaxHP int      `json:"mhp" msgpack:"mhp"`
+	Alive bool     `json:"a" msgpack:"a"`
 }
 
 // AsteroidState is broadcast per asteroid
 type AsteroidState struct {
-	ID string  `json:"id"`
-	X  float64 `json:"x"`
-	Y  float64 `json:"y"`
-	R  float64 `json:"r"`
+	ID string  `json:"id" msgpack:"id"`
+	X  float64 `json:"x" msgpack:"x"`
+	Y  float64 `json:"y" msgpack:"y"`
+	R  float64 `json:"r" msgpack:"r"`
 }
 
 // PickupState is broadcast per pickup
 type PickupState struct {
-	ID string  `json:"id"`
-	X  float64 `json:"x"`
-	Y  float64 `json:"y"`
+	ID string  `json:"id" msgpack:"id"`
+	X  float64 `json:"x" msgpack:"x"`
+	Y  float64 `json:"y" msgpack:"y"`
 }
 
 // GameState is the full state broadcast
 type GameState struct {
-	Players     []PlayerState     `json:"p"`
-	Projectiles []ProjectileState `json:"pr"`
-	Mobs        []MobState        `json:"m"`
-	Asteroids   []AsteroidState   `json:"a"`
-	Pickups     []PickupState     `json:"pk"`
-	Tick        uint64            `json:"tick"`
+	Players     []PlayerState     `json:"p" msgpack:"p"`
+	Projectiles []ProjectileState `json:"pr" msgpack:"pr"`
+	Mobs        []MobState        `json:"m" msgpack:"m"`
+	Asteroids   []AsteroidState   `json:"a" msgpack:"a"`
+	Pickups     []PickupState     `json:"pk" msgpack:"pk"`
+	Tick        uint64            `json:"tick" msgpack:"tick"`
 }
 
 // WelcomeMsg is sent to a player when they join

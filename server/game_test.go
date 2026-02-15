@@ -24,6 +24,12 @@ func (m *mockBroadcaster) SendRaw(data []byte) {
 	m.rawMsgs = append(m.rawMsgs, data)
 }
 
+func (m *mockBroadcaster) SendBinary(data []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.rawMsgs = append(m.rawMsgs, data)
+}
+
 func TestGameAddRemovePlayer(t *testing.T) {
 	g := NewGame()
 	p := g.AddPlayer("TestPilot")

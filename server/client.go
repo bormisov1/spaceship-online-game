@@ -102,7 +102,13 @@ func (c *Client) WritePump() {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			err := c.conn.WriteMessage(websocket.TextMessage, message)
+			// Check for binary marker (0xFF prefix from SendBinary)
+			var err error
+			if len(message) > 0 && message[0] == 0xFF {
+				err = c.conn.WriteMessage(websocket.BinaryMessage, message[1:])
+			} else {
+				err = c.conn.WriteMessage(websocket.TextMessage, message)
+			}
 			if err != nil {
 				return
 			}
@@ -126,13 +132,26 @@ func (c *Client) SendJSON(msg interface{}) {
 	c.SendRaw(data)
 }
 
-// SendRaw sends pre-marshaled bytes to the client
+// SendRaw sends pre-marshaled bytes as a text message to the client
 func (c *Client) SendRaw(data []byte) {
 	defer func() { recover() }()
 	select {
 	case c.send <- data:
 	default:
 		// Client too slow, drop message
+	}
+}
+
+// SendBinary sends pre-marshaled bytes as a binary WebSocket message
+// Prefixes with 0xFF marker byte so WritePump can distinguish from text
+func (c *Client) SendBinary(data []byte) {
+	defer func() { recover() }()
+	msg := make([]byte, len(data)+1)
+	msg[0] = 0xFF // binary marker
+	copy(msg[1:], data)
+	select {
+	case c.send <- msg:
+	default:
 	}
 }
 
