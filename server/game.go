@@ -881,6 +881,11 @@ func (g *Game) resetToLobby() {
 		p.Alive = true
 		p.RespawnT = 0
 		p.SpawnProtection = 0
+		p.FireCD = 0
+		p.Ability.Cooldown = 0
+		p.Ability.Active = false
+		p.Ability.Timer = 0
+		p.Ability.ShieldHP = 0
 
 		// Re-spawn at random position
 		ww := g.match_.Config.WorldWidth
@@ -923,6 +928,7 @@ func (g *Game) activateAbility(p *Player) {
 				p.Y+math.Sin(p.Rotation)*ProjectileOffset,
 				p.Rotation+offset,
 				p.ID,
+				g.match_.Config.WorldWidth, g.match_.Config.WorldHeight,
 			)
 			g.homingMissiles[hm.ID] = hm
 		}

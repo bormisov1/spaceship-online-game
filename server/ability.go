@@ -131,10 +131,14 @@ type HomingProjectile struct {
 	Alive    bool
 	Life     float64
 	Damage   int
+	worldW   float64
+	worldH   float64
 }
 
 // NewHomingProjectile creates a homing missile
-func NewHomingProjectile(x, y, rotation float64, ownerID string) *HomingProjectile {
+func NewHomingProjectile(x, y, rotation float64, ownerID string, worldW, worldH float64) *HomingProjectile {
+	if worldW == 0 { worldW = WorldWidth }
+	if worldH == 0 { worldH = WorldHeight }
 	return &HomingProjectile{
 		ID:       GenerateID(4),
 		X:        x,
@@ -146,7 +150,19 @@ func NewHomingProjectile(x, y, rotation float64, ownerID string) *HomingProjecti
 		Alive:    true,
 		Life:     MissileBarrageLifetime,
 		Damage:   MissileBarrageDamage,
+		worldW:   worldW,
+		worldH:   worldH,
 	}
+}
+
+// wrapDelta returns the shortest signed delta considering world wrapping
+func wrapDelta(d, size float64) float64 {
+	if d > size/2 {
+		d -= size
+	} else if d < -size/2 {
+		d += size
+	}
+	return d
 }
 
 // Update moves the homing projectile toward the nearest enemy
@@ -160,8 +176,11 @@ func (h *HomingProjectile) Update(dt float64, players map[string]*Player, mobs m
 		return
 	}
 
-	// Find nearest target
-	var targetX, targetY float64
+	ww := h.worldW
+	wh := h.worldH
+
+	// Find nearest target (wrap-aware)
+	var targetDX, targetDY float64
 	bestDist := math.MaxFloat64
 	found := false
 
@@ -169,11 +188,13 @@ func (h *HomingProjectile) Update(dt float64, players map[string]*Player, mobs m
 		if !p.Alive || p.ID == h.OwnerID {
 			continue
 		}
-		d2 := (p.X-h.X)*(p.X-h.X) + (p.Y-h.Y)*(p.Y-h.Y)
+		dx := wrapDelta(p.X-h.X, ww)
+		dy := wrapDelta(p.Y-h.Y, wh)
+		d2 := dx*dx + dy*dy
 		if d2 < bestDist {
 			bestDist = d2
-			targetX = p.X
-			targetY = p.Y
+			targetDX = dx
+			targetDY = dy
 			found = true
 		}
 	}
@@ -181,17 +202,19 @@ func (h *HomingProjectile) Update(dt float64, players map[string]*Player, mobs m
 		if !m.Alive {
 			continue
 		}
-		d2 := (m.X-h.X)*(m.X-h.X) + (m.Y-h.Y)*(m.Y-h.Y)
+		dx := wrapDelta(m.X-h.X, ww)
+		dy := wrapDelta(m.Y-h.Y, wh)
+		d2 := dx*dx + dy*dy
 		if d2 < bestDist {
 			bestDist = d2
-			targetX = m.X
-			targetY = m.Y
+			targetDX = dx
+			targetDY = dy
 			found = true
 		}
 	}
 
 	if found {
-		desired := math.Atan2(targetY-h.Y, targetX-h.X)
+		desired := math.Atan2(targetDY, targetDX)
 		diff := NormalizeAngle(desired - h.Rotation)
 		maxTurn := MissileBarrageTurnRate * dt
 		if diff > maxTurn {
@@ -206,4 +229,8 @@ func (h *HomingProjectile) Update(dt float64, players map[string]*Player, mobs m
 	h.VY = math.Sin(h.Rotation) * MissileBarrageSpeed
 	h.X += h.VX * dt
 	h.Y += h.VY * dt
+
+	// Wrap position
+	if h.X < 0 { h.X += ww } else if h.X > ww { h.X -= ww }
+	if h.Y < 0 { h.Y += wh } else if h.Y > wh { h.Y -= wh }
 }
