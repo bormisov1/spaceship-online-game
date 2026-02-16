@@ -499,8 +499,25 @@ fn handle_message(
                         // PhaseLobby
                         s.is_ready = false;
                         s.match_result = None;
-                        s.phase = Phase::MatchLobby;
-                        phase_signal.set(Phase::MatchLobby);
+                        if matches!(s.game_mode, crate::state::GameMode::FFA) {
+                            // FFA: return to main lobby (session selection)
+                            s.session_id = None;
+                            s.my_id = None;
+                            s.controller_attached = false;
+                            s.phase = Phase::Lobby;
+                            phase_signal.set(Phase::Lobby);
+                            // Reset URL to base path
+                            let window = web_sys::window().unwrap();
+                            let _ = window.history().unwrap().push_state_with_url(
+                                &wasm_bindgen::JsValue::NULL, "", Some(crate::app::base_path()),
+                            );
+                            drop(s);
+                            Network::send_leave(net);
+                        } else {
+                            // Team modes: stay in match lobby for rematching
+                            s.phase = Phase::MatchLobby;
+                            phase_signal.set(Phase::MatchLobby);
+                        }
                     }
                     1 => {
                         // PhaseCountdown
