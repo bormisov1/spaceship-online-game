@@ -43,8 +43,10 @@ else
     sudo systemctl stop "$SERVICE"
 
     echo ">> Installing binary..."
-    cp spaceship-server "$REMOTE_DIR/$SERVICE"
-    rm -f spaceship-server
+    if [ "$(pwd)" != "$REMOTE_DIR" ]; then
+        cp spaceship-server "$REMOTE_DIR/$SERVICE"
+        rm -f spaceship-server
+    fi
 
     echo ">> Installing client dist..."
     mkdir -p "$REMOTE_DIR/client-rust"
