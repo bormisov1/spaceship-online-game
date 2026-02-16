@@ -653,6 +653,8 @@ func (g *Game) startMatch() {
 	g.mobs = make(map[string]*Mob)
 	g.asteroids = make(map[string]*Asteroid)
 	g.pickups = make(map[string]*Pickup)
+	g.homingMissiles = make(map[string]*HomingProjectile)
+	g.healZones = make(map[string]*HealZone)
 	g.mobSpawnCD = MobSpawnInterval
 	g.asteroidSpawnCD = AsteroidSpawnInterval
 	g.pickupSpawnCD = PickupSpawnInterval
@@ -894,6 +896,8 @@ func (g *Game) resetToLobby() {
 	g.mobs = make(map[string]*Mob)
 	g.asteroids = make(map[string]*Asteroid)
 	g.pickups = make(map[string]*Pickup)
+	g.homingMissiles = make(map[string]*HomingProjectile)
+	g.healZones = make(map[string]*HealZone)
 	g.mobSpawnCD = MobSpawnInterval
 	g.asteroidSpawnCD = AsteroidSpawnInterval
 	g.pickupSpawnCD = PickupSpawnInterval
