@@ -558,6 +558,9 @@ fn handle_message(
                 let mut s = state.borrow_mut();
                 s.team_red = tu.red;
                 s.team_blue = tu.blue;
+                s.team_unassigned = tu.unassigned;
+                s.lobby_player_count = tu.count;
+                s.lobby_min_players = tu.min_players;
                 drop(s);
                 let ver = lobby_signal.get_untracked() + 1;
                 lobby_signal.set(ver);

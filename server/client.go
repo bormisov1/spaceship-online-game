@@ -311,7 +311,8 @@ func (c *Client) handleJoin(data json.RawMessage) {
 	c.SendJSON(Envelope{T: MsgJoined, Data: map[string]string{"sid": sess.ID}})
 	c.SendJSON(Envelope{T: MsgWelcome, Data: WelcomeMsg{ID: player.ID, Ship: player.ShipType}})
 
-	// Send current match phase so client shows the correct UI
+	// Send current match phase so client shows the correct UI (must come before team_update
+	// so the client knows the game mode when processing the roster)
 	phase, mode, timeLeft, countdown := sess.Game.MatchInfo()
 	c.SendJSON(Envelope{T: MsgMatchPhase, Data: MatchPhaseMsg{
 		Phase:     int(phase),
@@ -319,6 +320,11 @@ func (c *Client) handleJoin(data json.RawMessage) {
 		TimeLeft:  timeLeft,
 		Countdown: countdown,
 	}})
+
+	// Broadcast team roster now that client has game mode set
+	if phase == PhaseLobby && (mode == ModeTDM || mode == ModeCTF) {
+		sess.Game.BroadcastTeamUpdate()
+	}
 }
 
 // handleBinaryInput decodes a compact 8-byte binary input message

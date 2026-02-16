@@ -234,8 +234,16 @@ pub struct PlayerMatchResult {
 // Server -> Client: team roster update
 #[derive(Deserialize, Debug, Clone)]
 pub struct TeamUpdateMsg {
+    #[serde(default)]
     pub red: Vec<TeamPlayerInfo>,
+    #[serde(default)]
     pub blue: Vec<TeamPlayerInfo>,
+    #[serde(default)]
+    pub unassigned: Vec<TeamPlayerInfo>,
+    #[serde(default)]
+    pub count: i32,
+    #[serde(default, rename = "min")]
+    pub min_players: i32,
 }
 
 // Player info on a team

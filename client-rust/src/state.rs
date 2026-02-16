@@ -189,6 +189,9 @@ pub struct GameState {
     pub is_ready: bool,
     pub team_red: Vec<TeamPlayerInfo>,
     pub team_blue: Vec<TeamPlayerInfo>,
+    pub team_unassigned: Vec<TeamPlayerInfo>,
+    pub lobby_player_count: i32,
+    pub lobby_min_players: i32,
     pub match_result: Option<(i32, Vec<PlayerMatchResult>, f64)>, // (winner_team, players, duration)
 
     // Auth
@@ -316,6 +319,9 @@ impl GameState {
             is_ready: false,
             team_red: Vec::new(),
             team_blue: Vec::new(),
+            team_unassigned: Vec::new(),
+            lobby_player_count: 0,
+            lobby_min_players: 0,
             match_result: None,
 
             auth_token: None,

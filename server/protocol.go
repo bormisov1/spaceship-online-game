@@ -290,8 +290,11 @@ type PlayerMatchResult struct {
 
 // TeamUpdateMsg is sent to update team rosters
 type TeamUpdateMsg struct {
-	Red  []TeamPlayerInfo `json:"red"`
-	Blue []TeamPlayerInfo `json:"blue"`
+	Red        []TeamPlayerInfo `json:"red"`
+	Blue       []TeamPlayerInfo `json:"blue"`
+	Unassigned []TeamPlayerInfo `json:"unassigned,omitempty"`
+	Count      int              `json:"count"`
+	MinPlayers int              `json:"min,omitempty"`
 }
 
 // TeamPlayerInfo holds info about a player on a team

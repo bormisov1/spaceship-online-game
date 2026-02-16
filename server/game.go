@@ -184,6 +184,7 @@ func (g *Game) AddPlayer(name string) *Player {
 	wh := g.match_.Config.WorldHeight
 	player := NewPlayerWithWorld(id, name, ship, ww, wh)
 	g.players[id] = player
+
 	return player
 }
 
@@ -194,6 +195,11 @@ func (g *Game) RemovePlayer(id string) {
 	delete(g.players, id)
 	delete(g.clients, id)
 	delete(g.controllers, id)
+
+	// Update team roster so remaining players see updated count
+	if g.match_.Phase == PhaseLobby && g.match_.Config.IsTeamMode() {
+		g.broadcastTeamUpdate()
+	}
 }
 
 // SetController associates a phone controller with a player
@@ -993,9 +999,18 @@ func (g *Game) isTeamMode() bool {
 	return g.match_.Config.IsTeamMode()
 }
 
-// broadcastTeamUpdate sends team roster info to all clients
+// BroadcastTeamUpdate sends team roster info to all clients (public, takes its own lock)
+func (g *Game) BroadcastTeamUpdate() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.broadcastTeamUpdate()
+}
+
+// broadcastTeamUpdate sends team roster info to all clients (must hold lock)
 func (g *Game) broadcastTeamUpdate() {
-	var red, blue []TeamPlayerInfo
+	red := make([]TeamPlayerInfo, 0)
+	blue := make([]TeamPlayerInfo, 0)
+	unassigned := make([]TeamPlayerInfo, 0)
 	for _, p := range g.players {
 		info := TeamPlayerInfo{
 			ID:    p.ID,
@@ -1007,11 +1022,20 @@ func (g *Game) broadcastTeamUpdate() {
 			red = append(red, info)
 		case TeamBlue:
 			blue = append(blue, info)
+		default:
+			unassigned = append(unassigned, info)
 		}
 	}
+	minPlayers := 0
+	if g.match_.Config.IsTeamMode() {
+		minPlayers = 2
+	}
 	g.broadcastMsg(Envelope{T: MsgTeamUpdate, Data: TeamUpdateMsg{
-		Red:  red,
-		Blue: blue,
+		Red:        red,
+		Blue:       blue,
+		Unassigned: unassigned,
+		Count:      len(g.players),
+		MinPlayers: minPlayers,
 	}})
 }
 
