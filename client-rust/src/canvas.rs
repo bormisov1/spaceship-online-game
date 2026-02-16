@@ -6,9 +6,21 @@ use crate::state::SharedState;
 pub fn resize(state: &SharedState) {
     let window = web_sys::window().unwrap();
     let w = window.inner_width().unwrap().as_f64().unwrap();
-    let h = window.inner_height().unwrap().as_f64().unwrap();
+    let mut h = window.inner_height().unwrap().as_f64().unwrap();
 
+    // On desktop, subtract donation banner height (28px) so content doesn't overlap it
     let document = window.document().unwrap();
+    if let Some(banner) = document.query_selector(".donation-banner").ok().flatten() {
+        if let Some(el) = banner.dyn_ref::<web_sys::HtmlElement>() {
+            let display = window.get_computed_style(el)
+                .ok().flatten()
+                .and_then(|s| s.get_property_value("display").ok())
+                .unwrap_or_default();
+            if display != "none" {
+                h -= 28.0;
+            }
+        }
+    }
 
     if let Some(canvas) = document.get_element_by_id("gameCanvas") {
         let canvas: HtmlCanvasElement = canvas.unchecked_into();
