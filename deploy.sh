@@ -49,8 +49,10 @@ else
     fi
 
     echo ">> Installing client dist..."
-    mkdir -p "$REMOTE_DIR/client-rust"
-    cp -r client-rust/dist "$REMOTE_DIR/client-rust/"
+    if [ "$(pwd)" != "$REMOTE_DIR" ]; then
+        mkdir -p "$REMOTE_DIR/client-rust"
+        cp -r client-rust/dist "$REMOTE_DIR/client-rust/"
+    fi
 
     echo ">> Starting local service..."
     sudo systemctl start "$SERVICE"
