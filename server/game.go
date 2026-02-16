@@ -595,6 +595,23 @@ func (g *Game) checkAllReady() bool {
 		if count < 2 {
 			return false
 		}
+		// If everyone picked the same team (no unassigned), block start
+		hasRed, hasBlue, hasNone := false, false, false
+		for _, p := range g.players {
+			switch p.Team {
+			case TeamRed:
+				hasRed = true
+			case TeamBlue:
+				hasBlue = true
+			default:
+				hasNone = true
+			}
+		}
+		// Unassigned players get auto-balanced in startCountdown, so only
+		// block if all players explicitly chose the same team
+		if !hasNone && (hasRed != hasBlue) {
+			return false
+		}
 	}
 
 	for _, p := range g.players {

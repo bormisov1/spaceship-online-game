@@ -6,6 +6,7 @@ use crate::network::{Network, SharedNetwork};
 pub fn MatchLobby(
     state: SharedState,
     net: SharedNetwork,
+    lobby: RwSignal<u64>,
 ) -> impl IntoView {
     let state_title = send_wrapper::SendWrapper::new(state.clone());
     let state_roster_r = send_wrapper::SendWrapper::new(state.clone());
@@ -41,6 +42,7 @@ pub fn MatchLobby(
                         }>"Join Red"</button>
                         <div class="team-roster">
                             {move || {
+                                let _ver = lobby.get(); // subscribe to lobby signal for reactivity
                                 let s = state_roster_r.borrow();
                                 s.team_red.iter().map(|p| {
                                     let ready_class = if p.ready { " ready" } else { "" };
@@ -67,6 +69,7 @@ pub fn MatchLobby(
                         }>"Join Blue"</button>
                         <div class="team-roster">
                             {move || {
+                                let _ver = lobby.get(); // subscribe to lobby signal for reactivity
                                 let s = state_roster_b.borrow();
                                 s.team_blue.iter().map(|p| {
                                     let ready_class = if p.ready { " ready" } else { "" };

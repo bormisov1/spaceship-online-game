@@ -58,6 +58,7 @@ pub fn App() -> impl IntoView {
     let checked_signal = RwSignal::new(None::<CheckedMsg>);
     let expired_signal = RwSignal::new(false);
     let auth_signal = RwSignal::new(None::<String>);
+    let lobby_signal = RwSignal::new(0u64);
 
     // Check localStorage for existing auth
     if let Ok(Some(storage)) = web_sys::window().unwrap().local_storage() {
@@ -76,6 +77,7 @@ pub fn App() -> impl IntoView {
         checked_signal,
         expired_signal,
         auth_signal,
+        lobby_signal,
     );
 
     Network::connect(&net);
@@ -111,6 +113,7 @@ pub fn App() -> impl IntoView {
             checked=checked_signal
             expired=expired_signal
             auth=auth_signal
+            lobby=lobby_signal
         />
     }.into_any()
 }
@@ -124,6 +127,7 @@ fn GameView(
     checked: RwSignal<Option<CheckedMsg>>,
     expired: RwSignal<bool>,
     auth: RwSignal<Option<String>>,
+    lobby: RwSignal<u64>,
 ) -> impl IntoView {
     let state_clone = send_wrapper::SendWrapper::new(state.clone());
     let net_clone = send_wrapper::SendWrapper::new(net.clone());
@@ -222,6 +226,7 @@ fn GameView(
                         <crate::match_lobby::MatchLobby
                             state=(*state_clone).clone()
                             net=(*net_clone).clone()
+                            lobby=lobby
                         />
                     }.into_any()
                 }

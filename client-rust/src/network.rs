@@ -3,7 +3,7 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{WebSocket, MessageEvent, CloseEvent, ErrorEvent};
-use leptos::prelude::Set;
+use leptos::prelude::{Set, GetUntracked};
 use crate::state::{SharedState, Phase};
 use crate::protocol::*;
 use crate::effects;
@@ -16,6 +16,7 @@ pub struct Network {
     checked_signal: leptos::prelude::RwSignal<Option<CheckedMsg>>,
     expired_signal: leptos::prelude::RwSignal<bool>,
     auth_signal: leptos::prelude::RwSignal<Option<String>>,
+    lobby_signal: leptos::prelude::RwSignal<u64>,
     // Store closures to prevent them from being dropped
     _on_open: Option<Closure<dyn FnMut()>>,
     _on_message: Option<Closure<dyn FnMut(MessageEvent)>>,
@@ -33,6 +34,7 @@ impl Network {
         checked_signal: leptos::prelude::RwSignal<Option<CheckedMsg>>,
         expired_signal: leptos::prelude::RwSignal<bool>,
         auth_signal: leptos::prelude::RwSignal<Option<String>>,
+        lobby_signal: leptos::prelude::RwSignal<u64>,
     ) -> SharedNetwork {
         let net = Rc::new(RefCell::new(Network {
             ws: None,
@@ -42,6 +44,7 @@ impl Network {
             checked_signal,
             expired_signal,
             auth_signal,
+            lobby_signal,
             _on_open: None,
             _on_message: None,
             _on_close: None,
@@ -91,6 +94,7 @@ impl Network {
         let checked_signal = net.borrow().checked_signal;
         let expired_signal = net.borrow().expired_signal;
         let auth_signal = net.borrow().auth_signal;
+        let lobby_signal = net.borrow().lobby_signal;
         let net_for_msg = net.clone();
         let on_message = Closure::wrap(Box::new(move |e: MessageEvent| {
             let data = e.data();
@@ -103,7 +107,7 @@ impl Network {
                 }
             } else if let Some(text) = data.as_string() {
                 if let Ok(env) = serde_json::from_str::<Envelope>(&text) {
-                    handle_message(&state_clone, &net_for_msg, phase_signal, sessions_signal, checked_signal, expired_signal, auth_signal, env);
+                    handle_message(&state_clone, &net_for_msg, phase_signal, sessions_signal, checked_signal, expired_signal, auth_signal, lobby_signal, env);
                 }
             }
         }) as Box<dyn FnMut(MessageEvent)>);
@@ -352,6 +356,7 @@ fn handle_message(
     checked_signal: leptos::prelude::RwSignal<Option<CheckedMsg>>,
     expired_signal: leptos::prelude::RwSignal<bool>,
     auth_signal: leptos::prelude::RwSignal<Option<String>>,
+    lobby_signal: leptos::prelude::RwSignal<u64>,
     env: Envelope,
 ) {
     let data = env.d.unwrap_or(serde_json::Value::Null);
@@ -553,6 +558,9 @@ fn handle_message(
                 let mut s = state.borrow_mut();
                 s.team_red = tu.red;
                 s.team_blue = tu.blue;
+                drop(s);
+                let ver = lobby_signal.get_untracked() + 1;
+                lobby_signal.set(ver);
             }
         }
         "ctrl_on" => {
