@@ -686,7 +686,7 @@ func (g *Game) endMatch() {
 
 	// Determine winner
 	winnerTeam := TeamNone
-	if g.match_.Config.Mode == ModeTDM {
+	if g.isTeamMode() {
 		redScore := g.match_.Teams[TeamRed].Score
 		blueScore := g.match_.Teams[TeamBlue].Score
 		if redScore > blueScore {
@@ -922,7 +922,7 @@ func (g *Game) checkScoreLimit() bool {
 		return false
 	}
 
-	if g.match_.Config.Mode == ModeTDM {
+	if g.isTeamMode() {
 		if g.match_.Teams[TeamRed].Score >= limit || g.match_.Teams[TeamBlue].Score >= limit {
 			return true
 		}
