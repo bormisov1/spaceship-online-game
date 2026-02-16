@@ -1157,33 +1157,49 @@ func (g *Game) checkPlayerCollisions() {
 				continue
 			}
 
+			// Skip if either player has spawn protection
+			if a.SpawnProtection > 0 || b.SpawnProtection > 0 {
+				continue
+			}
+
 			if CheckCollision(a.X, a.Y, PlayerRadius, b.X, b.Y, PlayerRadius) {
-				a.TakeDamage(a.HP)
-				b.TakeDamage(b.HP)
-				a.Score -= DeathScorePenalty
-				b.Score -= DeathScorePenalty
+				aDied := a.TakeDamage(a.HP)
+				bDied := b.TakeDamage(b.HP)
 
-				// Notify kills (mutual)
-				killMsg1 := Envelope{T: MsgKill, Data: KillMsg{
-					KillerID: a.ID, KillerName: a.Name,
-					VictimID: b.ID, VictimName: b.Name,
-				}}
-				killMsg2 := Envelope{T: MsgKill, Data: KillMsg{
-					KillerID: b.ID, KillerName: b.Name,
-					VictimID: a.ID, VictimName: a.Name,
-				}}
-				g.broadcastMsg(killMsg1)
-				g.broadcastMsg(killMsg2)
+				if aDied {
+					a.Score -= DeathScorePenalty
+				}
+				if bDied {
+					b.Score -= DeathScorePenalty
+				}
 
-				if client, ok := g.clients[a.ID]; ok {
-					client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
-						KillerID: b.ID, KillerName: b.Name,
+				// Notify kills (mutual) only for actual deaths
+				if bDied {
+					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+						KillerID: a.ID, KillerName: a.Name,
+						VictimID: b.ID, VictimName: b.Name,
 					}})
 				}
-				if client, ok := g.clients[b.ID]; ok {
-					client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
-						KillerID: a.ID, KillerName: a.Name,
+				if aDied {
+					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
+						KillerID: b.ID, KillerName: b.Name,
+						VictimID: a.ID, VictimName: a.Name,
 					}})
+				}
+
+				if aDied {
+					if client, ok := g.clients[a.ID]; ok {
+						client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
+							KillerID: b.ID, KillerName: b.Name,
+						}})
+					}
+				}
+				if bDied {
+					if client, ok := g.clients[b.ID]; ok {
+						client.SendJSON(Envelope{T: MsgDeath, Data: DeathMsg{
+							KillerID: a.ID, KillerName: a.Name,
+						}})
+					}
 				}
 			}
 		}
@@ -1748,11 +1764,20 @@ func (g *Game) checkHomingMissileCollisions() {
 					VictimID: p.ID, AttackerID: hm.OwnerID,
 				}})
 				if died {
+					p.Score -= DeathScorePenalty
 					if killer, ok := g.players[hm.OwnerID]; ok {
-						killer.Score += 10
+						killer.Score++
 						killer.Kills++
 						if g.isTeamMode() && killer.Team != TeamNone {
 							g.match_.Teams[killer.Team].Score++
+						}
+
+						// Award assists
+						assistIDs := p.GetAssistIDs(killer.ID, g.gameTime)
+						for _, aid := range assistIDs {
+							if assister, ok := g.players[aid]; ok {
+								assister.Assists++
+							}
 						}
 					}
 					g.broadcastMsg(Envelope{T: MsgKill, Data: KillMsg{
