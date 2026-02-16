@@ -98,8 +98,13 @@ impl Network {
             if let Some(ab) = data.dyn_ref::<js_sys::ArrayBuffer>() {
                 let arr = js_sys::Uint8Array::new(ab);
                 let bytes = arr.to_vec();
-                if let Ok(gs) = rmp_serde::from_slice::<GameStateMsg>(&bytes) {
-                    handle_state(&state_clone, &phase_signal, gs);
+                match rmp_serde::from_slice::<GameStateMsg>(&bytes) {
+                    Ok(gs) => {
+                        handle_state(&state_clone, &phase_signal, gs);
+                    }
+                    Err(e) => {
+                        web_sys::console::error_1(&format!("[DBG] msgpack decode error: {} (len={})", e, bytes.len()).into());
+                    }
                 }
             } else if let Some(text) = data.as_string() {
                 if let Ok(env) = serde_json::from_str::<Envelope>(&text) {
@@ -162,6 +167,7 @@ impl Network {
         let s = state.borrow();
         let dominated_by_playing = matches!(s.phase, Phase::Playing | Phase::Dead | Phase::Countdown);
         if !dominated_by_playing || s.my_id.is_none() {
+            web_sys::console::log_1(&format!("[DBG input] BLOCKED phase={:?} my_id={:?}", s.phase, s.my_id).into());
             return;
         }
         if s.controller_attached {
@@ -256,6 +262,13 @@ impl Network {
             flags,
             (thresh_i >> 8) as u8, thresh_i as u8,
         ];
+
+        static DBG_INPUT_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let ic = DBG_INPUT_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if ic % 100 == 0 {
+            web_sys::console::log_1(&format!("[DBG input#{}] sent mx={} my={} fire={} boost={} ability={}", ic, mx_i, my_i, fire, boost, ability).into());
+        }
+
         Network::send_binary(net, &buf);
     }
 
@@ -364,6 +377,7 @@ fn handle_message(
         }
         "welcome" => {
             if let Ok(w) = serde_json::from_value::<WelcomeMsg>(data) {
+                web_sys::console::log_1(&format!("[DBG] welcome: id={} ship={}", w.id, w.s).into());
                 let mut s = state.borrow_mut();
                 s.my_id = Some(w.id);
                 s.my_ship = w.s;
@@ -490,6 +504,7 @@ fn handle_message(
         }
         "match_phase" => {
             if let Ok(mp) = serde_json::from_value::<MatchPhaseMsg>(data) {
+                web_sys::console::log_1(&format!("[DBG] match_phase: phase={} mode={} countdown={} time_left={}", mp.phase, mp.mode, mp.countdown, mp.time_left).into());
                 let mut s = state.borrow_mut();
                 s.game_mode = crate::state::GameMode::from_i32(mp.mode);
                 s.match_phase = mp.phase;
@@ -497,6 +512,7 @@ fn handle_message(
                 match mp.phase {
                     0 => {
                         // PhaseLobby
+                        web_sys::console::log_1(&"[DBG] -> Phase::MatchLobby".into());
                         s.is_ready = false;
                         s.match_result = None;
                         s.phase = Phase::MatchLobby;
@@ -504,20 +520,25 @@ fn handle_message(
                     }
                     1 => {
                         // PhaseCountdown
+                        web_sys::console::log_1(&"[DBG] -> Phase::Countdown".into());
                         s.phase = Phase::Countdown;
                         phase_signal.set(Phase::Countdown);
                     }
                     2 => {
                         // PhasePlaying
+                        web_sys::console::log_1(&"[DBG] -> Phase::Playing".into());
                         s.phase = Phase::Playing;
                         phase_signal.set(Phase::Playing);
                     }
                     3 => {
                         // PhaseResult
+                        web_sys::console::log_1(&"[DBG] -> Phase::Result".into());
                         s.phase = Phase::Result;
                         phase_signal.set(Phase::Result);
                     }
-                    _ => {}
+                    _ => {
+                        web_sys::console::log_1(&format!("[DBG] -> unknown phase {}", mp.phase).into());
+                    }
                 }
             }
         }
@@ -703,7 +724,16 @@ fn handle_message(
     }
 }
 
+static DBG_STATE_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
 fn handle_state(state: &SharedState, phase_signal: &leptos::prelude::RwSignal<Phase>, gs: GameStateMsg) {
+    let count = DBG_STATE_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if count % 60 == 0 {
+        web_sys::console::log_1(&format!(
+            "[DBG state#{}] players={} projs={} mobs={} asteroids={} pickups={} tick={} mp={} tl={:.1}",
+            count, gs.p.len(), gs.pr.len(), gs.m.len(), gs.a.len(), gs.pk.len(), gs.tick, gs.mp, gs.tl
+        ).into());
+    }
     let mut s = state.borrow_mut();
 
     // Save current→prev for interpolation (swap reuses allocations)
