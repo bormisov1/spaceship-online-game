@@ -124,7 +124,11 @@ func (p *Player) Update(dt float64) {
 		}
 		return
 	}
+	p.UpdateAlive(dt)
+}
 
+// UpdateAlive updates an alive player's physics (called from game loop for team-aware respawn)
+func (p *Player) UpdateAlive(dt float64) {
 	// Tick spawn protection
 	if p.SpawnProtection > 0 {
 		p.SpawnProtection -= dt

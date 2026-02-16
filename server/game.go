@@ -425,7 +425,16 @@ func (g *Game) updatePlaying(dt float64) {
 
 	// Update players
 	for _, p := range g.players {
-		p.Update(dt)
+		if !p.Alive {
+			// Tick respawn timer; spawn at team position when ready
+			p.RespawnT -= dt
+			if p.RespawnT <= 0 {
+				sx, sy := g.match_.SpawnPosition(p.Team)
+				p.SpawnAtPosition(sx, sy)
+			}
+			continue
+		}
+		p.UpdateAlive(dt)
 
 		// Handle firing (class-based)
 		if p.CanFire() && len(g.projectiles) < maxProjectilesPerSession {
