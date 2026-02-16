@@ -74,7 +74,7 @@ func DefaultConfig(mode GameMode) MatchConfig {
 	default:
 		return MatchConfig{
 			Mode:        ModeFFA,
-			TimeLimit:   300,
+			TimeLimit:   60,
 			ScoreLimit:  0,
 			WorldWidth:  4000,
 			WorldHeight: 4000,

@@ -63,7 +63,7 @@ func TestSegmentCircleIntersect(t *testing.T) {
 }
 
 func TestTriangleCircleCollision(t *testing.T) {
-	// Unrotated SD triangle at origin: nose at (-100,0), stern at (100,-70) and (100,70)
+	// Unrotated SD triangle at origin: nose at (140,0), stern at (-130,-130) and (-130,130)
 	tri := SDTriangleHitbox
 
 	// Circle at center of triangle — should collide
@@ -72,7 +72,7 @@ func TestTriangleCircleCollision(t *testing.T) {
 	}
 
 	// Circle at nose — should collide
-	if !CheckTriangleCircleCollision(0, 0, 0, tri, -95, 0, 10) {
+	if !CheckTriangleCircleCollision(0, 0, 0, tri, 135, 0, 10) {
 		t.Error("circle near nose should collide")
 	}
 
@@ -82,21 +82,21 @@ func TestTriangleCircleCollision(t *testing.T) {
 	}
 
 	// Circle just outside the stern edge — should not collide
-	if CheckTriangleCircleCollision(0, 0, 0, tri, 100, 85, 5) {
+	if CheckTriangleCircleCollision(0, 0, 0, tri, -130, 145, 5) {
 		t.Error("circle just outside stern should not collide")
 	}
 
 	// Circle touching the stern edge — should collide
-	if !CheckTriangleCircleCollision(0, 0, 0, tri, 100, 74, 5) {
+	if !CheckTriangleCircleCollision(0, 0, 0, tri, -130, 125, 5) {
 		t.Error("circle touching stern edge should collide")
 	}
 
-	// Rotated 90 degrees (pi/2): nose now at (0,-100), stern at (-70,100) and (70,100)
+	// Rotated 90 degrees (pi/2): nose now at (0,140), stern at (130,-130) and (-130,-130)
 	rot := math.Pi / 2
-	if !CheckTriangleCircleCollision(0, 0, rot, tri, 0, -95, 10) {
+	if !CheckTriangleCircleCollision(0, 0, rot, tri, 0, 135, 10) {
 		t.Error("circle near rotated nose should collide")
 	}
-	if CheckTriangleCircleCollision(0, 0, rot, tri, 0, -120, 5) {
+	if CheckTriangleCircleCollision(0, 0, rot, tri, 0, 160, 5) {
 		t.Error("circle beyond rotated nose should not collide")
 	}
 
@@ -104,7 +104,7 @@ func TestTriangleCircleCollision(t *testing.T) {
 	if !CheckTriangleCircleCollision(500, 500, 0, tri, 500, 500, 10) {
 		t.Error("circle at translated triangle center should collide")
 	}
-	if !CheckTriangleCircleCollision(500, 500, 0, tri, 400, 500, 10) {
+	if !CheckTriangleCircleCollision(500, 500, 0, tri, 640, 500, 10) {
 		t.Error("circle near translated nose should collide")
 	}
 }
@@ -118,17 +118,17 @@ func TestTrianglePointCollision(t *testing.T) {
 	}
 
 	// Point at nose
-	if !CheckTrianglePointCollision(0, 0, 0, tri, -100, 0) {
+	if !CheckTrianglePointCollision(0, 0, 0, tri, 140, 0) {
 		t.Error("point at nose vertex should be inside")
 	}
 
-	// Point outside
-	if CheckTrianglePointCollision(0, 0, 0, tri, -110, 0) {
+	// Point outside beyond nose
+	if CheckTrianglePointCollision(0, 0, 0, tri, 150, 0) {
 		t.Error("point beyond nose should be outside")
 	}
 
 	// Point inside near stern
-	if !CheckTrianglePointCollision(0, 0, 0, tri, 90, 0) {
+	if !CheckTrianglePointCollision(0, 0, 0, tri, -120, 0) {
 		t.Error("point near stern center should be inside")
 	}
 
@@ -152,10 +152,9 @@ func TestCheckMobCollision(t *testing.T) {
 	if CheckMobCollision(sd, 300, 0, 10) {
 		t.Error("SD: circle far away should not collide")
 	}
-	// Circle outside the triangle but within the old circle radius
-	// At (0, 90) with r=10: outside the triangle (max y at x=0 is ~35 for the SD triangle)
-	if CheckMobCollision(sd, 0, 90, 5) {
-		t.Error("SD: circle outside triangle but within old circle hitbox should NOT collide")
+	// Circle outside the triangle but near stern — at (0, 140) the triangle half-height at x=0 is ~67
+	if CheckMobCollision(sd, 0, 140, 5) {
+		t.Error("SD: circle outside triangle should NOT collide")
 	}
 
 	// TIE fighter (ShipType 4) uses circle hitbox

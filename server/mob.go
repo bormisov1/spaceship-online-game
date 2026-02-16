@@ -7,7 +7,7 @@ import (
 
 const (
 	TieRadius         = 25.0
-	SDRadius          = 100.0
+	SDRadius          = 185.0
 	MobDetectRange    = 400.0
 	MobShootRange     = 550.0  // start shooting when this close
 	MobDetectRangeSq  = MobDetectRange * MobDetectRange
@@ -51,7 +51,7 @@ const (
 	SDCollisionDmg = 90
 	SDProjDamage   = 60
 	SDBurstSize    = 8
-	SDProjOffset   = 130.0 // projectile spawn distance (nose of ship)
+	SDProjOffset   = 140.0 // projectile spawn distance (nose of ship)
 
 	// Spawn chance: 1/15 Star Destroyer, 14/15 TIE
 	SDSpawnChance = 1.0 / 15.0

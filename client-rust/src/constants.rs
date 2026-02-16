@@ -26,7 +26,7 @@ pub const SHIP_COLORS: [ShipColor; 6] = [
 
 // New entity sizes (must match server)
 pub const MOB_RADIUS: f64 = 25.0;       // TIE fighter radius
-pub const SD_MOB_RADIUS: f64 = 100.0;   // Star Destroyer radius
+pub const SD_MOB_RADIUS: f64 = 185.0;   // Star Destroyer radius (broad-phase)
 pub const ASTEROID_RADIUS: f64 = 50.0;
 pub const ASTEROID_RENDER_SIZE: f64 = 120.0;
 pub const PICKUP_RADIUS: f64 = 15.0;

@@ -434,13 +434,13 @@ fn draw_debug_hitboxes(ctx: &CanvasRenderingContext2d, s: &crate::state::GameSta
         ctx.begin_path();
         if mob.s == 3 {
             // Star Destroyer: draw triangle hitbox matching server-side SDTriangleHitbox
-            // Vertices relative to center (unrotated): nose(-100,0), stern-top(100,-70), stern-bot(100,70)
+            // Vertices relative to center (unrotated): nose(140,0), stern(-130,±130)
             let cos_r = mob.r.cos();
             let sin_r = mob.r.sin();
             let verts: [(f64, f64); 3] = [
-                (-100.0, 0.0),   // nose
-                (100.0, -70.0),  // stern top
-                (100.0, 70.0),   // stern bottom
+                (140.0, 0.0),     // nose
+                (-130.0, -130.0), // stern top-left
+                (-130.0, 130.0),  // stern bottom-left
             ];
             for (i, &(vx, vy)) in verts.iter().enumerate() {
                 let wx = sx + vx * cos_r - vy * sin_r;

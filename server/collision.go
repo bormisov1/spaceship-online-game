@@ -19,11 +19,12 @@ type TriangleHitbox struct {
 	X2, Y2 float64
 }
 
-// Star Destroyer triangle hitbox — sprite faces LEFT, nose at left, wide stern at right.
+// Star Destroyer triangle hitbox — rotation=0 faces RIGHT (+X).
+// Vertices sized to match the 300-unit rendered sprite.
 var SDTriangleHitbox = TriangleHitbox{
-	X0: -100, Y0: 0,   // nose (front tip)
-	X1: 100, Y1: -70,  // top-right (stern)
-	X2: 100, Y2: 70,   // bottom-right (stern)
+	X0: 140, Y0: 0,     // nose (front tip, +X = forward)
+	X1: -130, Y1: -130, // stern top-left
+	X2: -130, Y2: 130,  // stern bottom-left
 }
 
 // transformedTriangle returns the world-space vertices of a triangle hitbox
