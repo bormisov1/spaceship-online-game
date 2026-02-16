@@ -1278,6 +1278,10 @@ func (g *Game) broadcastState() {
 
 	// Viewport culling radius (half-viewport + margin)
 	const cullDist = 1200.0
+	ww := g.match_.Config.WorldWidth
+	wh := g.match_.Config.WorldHeight
+	halfW := ww / 2
+	halfH := wh / 2
 
 	// Cache marshaled data per player to reuse for controllers
 	playerData := make(map[string][]byte, len(g.clients))
@@ -1289,43 +1293,43 @@ func (g *Game) broadcastState() {
 		}
 		px, py := player.X, player.Y
 
-		// Filter all entity types by viewport distance
+		// Filter all entity types by viewport distance (wrap-aware)
 		g.filtPlayers = g.filtPlayers[:0]
 		for _, p := range g.bcastPlayers {
-			dx := p.x - px; if dx < 0 { dx = -dx }
-			dy := p.y - py; if dy < 0 { dy = -dy }
+			dx := p.x - px; if dx < 0 { dx = -dx }; if dx > halfW { dx = ww - dx }
+			dy := p.y - py; if dy < 0 { dy = -dy }; if dy > halfH { dy = wh - dy }
 			if dx <= cullDist && dy <= cullDist {
 				g.filtPlayers = append(g.filtPlayers, p.state)
 			}
 		}
 		g.filtProjs = g.filtProjs[:0]
 		for _, p := range g.bcastProjs {
-			dx := p.x - px; if dx < 0 { dx = -dx }
-			dy := p.y - py; if dy < 0 { dy = -dy }
+			dx := p.x - px; if dx < 0 { dx = -dx }; if dx > halfW { dx = ww - dx }
+			dy := p.y - py; if dy < 0 { dy = -dy }; if dy > halfH { dy = wh - dy }
 			if dx <= cullDist && dy <= cullDist {
 				g.filtProjs = append(g.filtProjs, p.state)
 			}
 		}
 		g.filtMobs = g.filtMobs[:0]
 		for _, m := range g.bcastMobs {
-			dx := m.x - px; if dx < 0 { dx = -dx }
-			dy := m.y - py; if dy < 0 { dy = -dy }
+			dx := m.x - px; if dx < 0 { dx = -dx }; if dx > halfW { dx = ww - dx }
+			dy := m.y - py; if dy < 0 { dy = -dy }; if dy > halfH { dy = wh - dy }
 			if dx <= cullDist && dy <= cullDist {
 				g.filtMobs = append(g.filtMobs, m.state)
 			}
 		}
 		g.filtAsteroids = g.filtAsteroids[:0]
 		for _, a := range g.bcastAsteroids {
-			dx := a.x - px; if dx < 0 { dx = -dx }
-			dy := a.y - py; if dy < 0 { dy = -dy }
+			dx := a.x - px; if dx < 0 { dx = -dx }; if dx > halfW { dx = ww - dx }
+			dy := a.y - py; if dy < 0 { dy = -dy }; if dy > halfH { dy = wh - dy }
 			if dx <= cullDist && dy <= cullDist {
 				g.filtAsteroids = append(g.filtAsteroids, a.state)
 			}
 		}
 		g.filtPickups = g.filtPickups[:0]
 		for _, pk := range g.bcastPickups {
-			dx := pk.x - px; if dx < 0 { dx = -dx }
-			dy := pk.y - py; if dy < 0 { dy = -dy }
+			dx := pk.x - px; if dx < 0 { dx = -dx }; if dx > halfW { dx = ww - dx }
+			dy := pk.y - py; if dy < 0 { dy = -dy }; if dy > halfH { dy = wh - dy }
 			if dx <= cullDist && dy <= cullDist {
 				g.filtPickups = append(g.filtPickups, pk.state)
 			}
