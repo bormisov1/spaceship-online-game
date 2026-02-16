@@ -10,16 +10,19 @@ pub fn render_mob(
 ) {
     let sx = x - offset_x;
     let sy = y - offset_y;
-    if sx < -60.0 || sx > vw + 60.0 || sy < -60.0 || sy > vh + 60.0 { return; }
+    let is_sd = ship_type == 3;
+    let margin = if is_sd { 200.0 } else { 60.0 };
+    if sx < -margin || sx > vw + margin || sy < -margin || sy > vh + margin { return; }
 
     let speed = (vx * vx + vy * vy).sqrt();
     effects::draw_engine_beam(ctx, sx, sy, r, speed, ship_type, false);
     ships::draw_ship(ctx, sx, sy, r, ship_type);
 
-    // Health bar above mob
-    let bar_w = 40.0;
+    // Health bar above mob (scaled for Star Destroyer)
+    let scale = if is_sd { 5.0 } else { 1.0 };
+    let bar_w = if is_sd { 120.0 } else { 40.0 };
     let bar_h = 4.0;
-    let bar_y = sy - 35.0;
+    let bar_y = sy - 30.0 * scale - 5.0;
     let ratio = hp as f64 / mhp as f64;
 
     ctx.set_fill_style_str("rgba(0,0,0,0.5)");

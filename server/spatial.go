@@ -1,7 +1,7 @@
 package main
 
 const (
-	SpatialCellSize = 80.0 // ~2x largest entity radius (AsteroidRadius=40)
+	SpatialCellSize = 80.0 // broad-phase cell size; large entities (SDRadius=100) span multiple cells via InsertCircle
 )
 
 // EntityRef identifies an entity in the grid

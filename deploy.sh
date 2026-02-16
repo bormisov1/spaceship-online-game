@@ -17,8 +17,15 @@ if $BUILD_RUST; then
     (cd client-rust && PATH="$HOME/.cargo/bin:$PATH" trunk build --release)
 fi
 
-echo ">> Copying files..."
-scp -rq server "$REMOTE:$REMOTE_DIR/"
+echo ">> Building server binary..."
+(cd server && CGO_ENABLED=0 go build -buildvcs=false -o ../spaceship-server .)
+
+echo ">> Stopping service..."
+ssh "$REMOTE" "systemctl stop $SERVICE"
+
+echo ">> Deploying binary..."
+scp -q spaceship-server "$REMOTE:$REMOTE_DIR/$SERVICE"
+rm -f spaceship-server
 
 if $BUILD_RUST; then
     echo ">> Copying Rust client dist..."
@@ -26,10 +33,7 @@ if $BUILD_RUST; then
     scp -rq client-rust/dist "$REMOTE:$REMOTE_DIR/client-rust/"
 fi
 
-echo ">> Building and restarting..."
-ssh "$REMOTE" "cd $REMOTE_DIR/server && go build -buildvcs=false -o $REMOTE_DIR/$SERVICE . && systemctl restart $SERVICE"
+echo ">> Starting service..."
+ssh "$REMOTE" "systemctl start $SERVICE"
 
 echo ">> Done. https://spaceships.x.bormisov.com/"
-if $BUILD_RUST; then
-    echo ">>       https://spaceships.x.bormisov.com/rust/"
-fi

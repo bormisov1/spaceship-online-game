@@ -23,6 +23,16 @@ pub fn load_ship_images() {
 // Ship type 3 (Star Destroyer) renders 5x larger
 const SHIP_SCALE: [f64; 6] = [1.0, 1.0, 1.0, 5.0, 1.0, 1.0];
 
+// Per-ship sprite rotation offset: rebel/TIE sprites face UP (+π/2), Star Destroyer faces LEFT (+π)
+const SHIP_ROT_OFFSET: [f64; 6] = [
+    std::f64::consts::FRAC_PI_2, // rebel 1 (faces up)
+    std::f64::consts::FRAC_PI_2, // rebel 2 (faces up)
+    std::f64::consts::FRAC_PI_2, // rebel 3 (faces up)
+    std::f64::consts::PI,        // Star Destroyer (faces left)
+    std::f64::consts::FRAC_PI_2, // TIE 1 (faces up)
+    std::f64::consts::FRAC_PI_2, // TIE 2 (faces up)
+];
+
 pub fn draw_ship(ctx: &CanvasRenderingContext2d, x: f64, y: f64, rotation: f64, ship_type: i32) {
     SHIP_IMAGES.with(|si| {
         let images = si.borrow();
@@ -38,7 +48,8 @@ pub fn draw_ship(ctx: &CanvasRenderingContext2d, x: f64, y: f64, rotation: f64, 
 
         ctx.save();
         ctx.translate(x, y).unwrap_or(());
-        ctx.rotate(rotation + std::f64::consts::FRAC_PI_2).unwrap_or(());
+        let rot_offset = SHIP_ROT_OFFSET.get(idx).copied().unwrap_or(std::f64::consts::FRAC_PI_2);
+        ctx.rotate(rotation + rot_offset).unwrap_or(());
 
         let _ = ctx.draw_image_with_html_image_element_and_dw_and_dh(
             img, -half, -half, size, size,
