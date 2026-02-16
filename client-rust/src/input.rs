@@ -253,13 +253,9 @@ fn setup_touch_input(state: SharedState, canvas: &web_sys::Element) {
                 // Left zone: release joystick
                 if cx < center_left {
                     if s.touch_joystick.is_some() {
-                        if let Some(ref tj) = s.touch_joystick {
-                            if (cx - tj.start_x).abs() < 200.0 {
-                                s.touch_joystick = None;
-                                s.mouse_x = s.screen_w / 2.0;
-                                s.mouse_y = s.screen_h / 2.0;
-                            }
-                        }
+                        s.touch_joystick = None;
+                        s.mouse_x = s.screen_w / 2.0;
+                        s.mouse_y = s.screen_h / 2.0;
                     }
                 }
 
