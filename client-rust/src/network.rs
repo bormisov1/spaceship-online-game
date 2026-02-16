@@ -497,12 +497,14 @@ fn handle_message(
                 match mp.phase {
                     0 => {
                         // PhaseLobby
+                        let was_result = matches!(s.phase, Phase::Result);
                         s.is_ready = false;
                         s.match_result = None;
-                        if matches!(s.game_mode, crate::state::GameMode::FFA) {
-                            // FFA: return to main lobby (session selection)
+                        if was_result && matches!(s.game_mode, crate::state::GameMode::FFA) {
+                            // FFA post-match: return to main lobby (session selection)
                             s.session_id = None;
                             s.my_id = None;
+                            s.url_session_id = None;
                             s.controller_attached = false;
                             s.phase = Phase::Lobby;
                             phase_signal.set(Phase::Lobby);
@@ -514,7 +516,7 @@ fn handle_message(
                             drop(s);
                             Network::send_leave(net);
                         } else {
-                            // Team modes: stay in match lobby for rematching
+                            // Initial join or team modes: stay in match lobby
                             s.phase = Phase::MatchLobby;
                             phase_signal.set(Phase::MatchLobby);
                         }
