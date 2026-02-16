@@ -593,6 +593,16 @@ func (g *Game) checkAllReady() bool {
 
 // startCountdown transitions from lobby to countdown
 func (g *Game) startCountdown() {
+	// Auto-assign unassigned players to teams in team modes
+	if g.match_.Config.IsTeamMode() {
+		for _, p := range g.players {
+			if p.Team == TeamNone {
+				p.Team = g.match_.AssignTeam(g.players)
+			}
+		}
+		g.broadcastTeamUpdate()
+	}
+
 	g.match_.Phase = PhaseCountdown
 	g.match_.CountdownT = CountdownDuration
 
