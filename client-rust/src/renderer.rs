@@ -90,6 +90,10 @@ pub fn render(state: &SharedState, dt: f64) {
         // Clean up expired mob speech
         let now = js_sys::Date::now();
         s.mob_speech.retain(|sp| now - sp.time < 3000.0);
+        // Tick down countdown timer locally
+        if s.phase == crate::state::Phase::Countdown && s.countdown_time > 0.0 {
+            s.countdown_time -= dt;
+        }
     }
 
     // Animate hyperspace_t
