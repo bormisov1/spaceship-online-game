@@ -276,6 +276,11 @@ func (g *Game) HandleReady(playerID string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
+	// Only allow ready toggle in lobby
+	if g.match_.Phase != PhaseLobby {
+		return
+	}
+
 	p, ok := g.players[playerID]
 	if !ok {
 		return
