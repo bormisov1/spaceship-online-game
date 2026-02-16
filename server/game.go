@@ -1535,7 +1535,7 @@ func (g *Game) checkProjectileMobCollisions() {
 			if !mob.Alive || proj.OwnerID == mob.ID {
 				continue
 			}
-			if CheckCollision(proj.X, proj.Y, ProjectileRadius, mob.X, mob.Y, mob.Radius) {
+			if CheckMobCollision(mob, proj.X, proj.Y, ProjectileRadius) {
 				died := mob.TakeDamage(proj.Damage)
 				proj.Alive = false
 
@@ -1620,7 +1620,7 @@ func (g *Game) checkAsteroidMobCollisions() {
 			if !mob.Alive {
 				continue
 			}
-			if CheckCollision(ast.X, ast.Y, AsteroidRadius, mob.X, mob.Y, mob.Radius) {
+			if CheckMobCollision(mob, ast.X, ast.Y, AsteroidRadius) {
 				// Mob phrase before dying
 				phrase := pickPhraseAlways("asteroid_death")
 				g.broadcastMsg(Envelope{T: MsgMobSay, Data: MobSayMsg{
@@ -1704,7 +1704,7 @@ func (g *Game) checkPlayerMobCollisions() {
 			if !p.Alive || p.SpawnProtection > 0 {
 				continue
 			}
-			if CheckCollision(mob.X, mob.Y, mob.Radius, p.X, p.Y, PlayerRadius) {
+			if CheckMobCollision(mob, p.X, p.Y, PlayerRadius) {
 				// Mob always dies
 				mob.Alive = false
 
@@ -1811,7 +1811,7 @@ func (g *Game) checkHomingMissileCollisions() {
 			if !mob.Alive {
 				continue
 			}
-			if CheckCollision(hm.X, hm.Y, ProjectileRadius, mob.X, mob.Y, mob.Radius) {
+			if CheckMobCollision(mob, hm.X, hm.Y, ProjectileRadius) {
 				hm.Alive = false
 				died := mob.TakeDamage(hm.Damage)
 				g.broadcastMsg(Envelope{T: MsgHit, Data: HitMsg{
