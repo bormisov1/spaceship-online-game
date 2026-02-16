@@ -18,14 +18,20 @@ type Asteroid struct {
 	Rotation float64
 	Spin     float64
 	Alive    bool
+	worldW   float64
+	worldH   float64
 }
 
 // NewAsteroid spawns an asteroid at a random edge heading inward
-func NewAsteroid() *Asteroid {
+func NewAsteroid(worldW, worldH float64) *Asteroid {
+	if worldW == 0 { worldW = WorldWidth }
+	if worldH == 0 { worldH = WorldHeight }
 	id := GenerateID(4)
 	a := &Asteroid{
-		ID:    id,
-		Alive: true,
+		ID:     id,
+		Alive:  true,
+		worldW: worldW,
+		worldH: worldH,
 	}
 
 	// Random speed
@@ -42,34 +48,34 @@ func NewAsteroid() *Asteroid {
 	switch edge {
 	case 0: // left
 		a.X = -AsteroidRadius
-		a.Y = randFloat() * WorldHeight
+		a.Y = randFloat() * worldH
 		// Aim toward right half
-		targetX := WorldWidth/2 + randFloat()*WorldWidth/2
-		targetY := randFloat() * WorldHeight
+		targetX := worldW/2 + randFloat()*worldW/2
+		targetY := randFloat() * worldH
 		angle := math.Atan2(targetY-a.Y, targetX-a.X)
 		a.VX = math.Cos(angle) * speed
 		a.VY = math.Sin(angle) * speed
 	case 1: // right
-		a.X = WorldWidth + AsteroidRadius
-		a.Y = randFloat() * WorldHeight
-		targetX := randFloat() * WorldWidth / 2
-		targetY := randFloat() * WorldHeight
+		a.X = worldW + AsteroidRadius
+		a.Y = randFloat() * worldH
+		targetX := randFloat() * worldW / 2
+		targetY := randFloat() * worldH
 		angle := math.Atan2(targetY-a.Y, targetX-a.X)
 		a.VX = math.Cos(angle) * speed
 		a.VY = math.Sin(angle) * speed
 	case 2: // top
-		a.X = randFloat() * WorldWidth
+		a.X = randFloat() * worldW
 		a.Y = -AsteroidRadius
-		targetX := randFloat() * WorldWidth
-		targetY := WorldHeight/2 + randFloat()*WorldHeight/2
+		targetX := randFloat() * worldW
+		targetY := worldH/2 + randFloat()*worldH/2
 		angle := math.Atan2(targetY-a.Y, targetX-a.X)
 		a.VX = math.Cos(angle) * speed
 		a.VY = math.Sin(angle) * speed
 	default: // bottom
-		a.X = randFloat() * WorldWidth
-		a.Y = WorldHeight + AsteroidRadius
-		targetX := randFloat() * WorldWidth
-		targetY := randFloat() * WorldHeight / 2
+		a.X = randFloat() * worldW
+		a.Y = worldH + AsteroidRadius
+		targetX := randFloat() * worldW
+		targetY := randFloat() * worldH / 2
 		angle := math.Atan2(targetY-a.Y, targetX-a.X)
 		a.VX = math.Cos(angle) * speed
 		a.VY = math.Sin(angle) * speed
@@ -90,9 +96,13 @@ func (a *Asteroid) Update(dt float64) {
 	a.Rotation += a.Spin * dt
 
 	// Mark dead if fully off-map (no wrapping)
+	ww := a.worldW
+	wh := a.worldH
+	if ww == 0 { ww = WorldWidth }
+	if wh == 0 { wh = WorldHeight }
 	margin := AsteroidRadius * 2
-	if a.X < -margin || a.X > WorldWidth+margin ||
-		a.Y < -margin || a.Y > WorldHeight+margin {
+	if a.X < -margin || a.X > ww+margin ||
+		a.Y < -margin || a.Y > wh+margin {
 		a.Alive = false
 	}
 }

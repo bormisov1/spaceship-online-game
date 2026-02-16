@@ -7,7 +7,7 @@ import (
 
 func TestMobEdgeSpawn(t *testing.T) {
 	for i := 0; i < 20; i++ {
-		m := NewMob()
+		m := NewMob(0, 0)
 		onEdge := m.X == 0 || m.X == WorldWidth || m.Y == 0 || m.Y == WorldHeight
 		if !onEdge {
 			t.Errorf("mob should spawn on edge, got (%f, %f)", m.X, m.Y)
@@ -22,7 +22,7 @@ func TestMobEdgeSpawn(t *testing.T) {
 }
 
 func TestMobTakeDamage(t *testing.T) {
-	m := NewTieMob() // TIE has 60 HP
+	m := NewTieMob(0, 0) // TIE has 60 HP
 
 	died := m.TakeDamage(20)
 	if died {
@@ -47,7 +47,7 @@ func TestMobTakeDamage(t *testing.T) {
 }
 
 func TestMobTakeDamageWhenDead(t *testing.T) {
-	m := NewMob()
+	m := NewMob(0, 0)
 	m.Alive = false
 	died := m.TakeDamage(100)
 	if died {
@@ -56,7 +56,7 @@ func TestMobTakeDamageWhenDead(t *testing.T) {
 }
 
 func TestMobAISteersTowardPlayer(t *testing.T) {
-	m := NewMob()
+	m := NewMob(0, 0)
 	m.X = 2000
 	m.Y = 2000
 	m.VX = 0
@@ -82,7 +82,7 @@ func TestMobAISteersTowardPlayer(t *testing.T) {
 }
 
 func TestMobAIWandersWhenIdle(t *testing.T) {
-	m := NewMob()
+	m := NewMob(0, 0)
 	m.X = 2000
 	m.Y = 2000
 	m.VX = 0

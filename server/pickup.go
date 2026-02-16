@@ -15,11 +15,13 @@ type Pickup struct {
 }
 
 // NewPickup spawns a pickup at a random position away from edges
-func NewPickup() *Pickup {
+func NewPickup(worldW, worldH float64) *Pickup {
+	if worldW == 0 { worldW = WorldWidth }
+	if worldH == 0 { worldH = WorldHeight }
 	return &Pickup{
 		ID:    GenerateID(4),
-		X:     50 + randFloat()*3900,
-		Y:     50 + randFloat()*3900,
+		X:     50 + randFloat()*(worldW-100),
+		Y:     50 + randFloat()*(worldH-100),
 		Life:  PickupTimeout,
 		Alive: true,
 	}

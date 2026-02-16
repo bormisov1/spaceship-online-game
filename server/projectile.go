@@ -20,6 +20,8 @@ type Projectile struct {
 	Life     float64
 	Damage   int
 	Alive    bool
+	worldW   float64
+	worldH   float64
 }
 
 // NewProjectile creates a projectile from a player's position and facing direction
@@ -42,7 +44,7 @@ func NewProjectile(owner *Player) *Projectile {
 }
 
 // NewProjectileWithClass creates a projectile using class-specific stats
-func NewProjectileWithClass(owner *Player, def ShipClassDef, angleOffset float64) *Projectile {
+func NewProjectileWithClass(owner *Player, def ShipClassDef, angleOffset float64, worldW, worldH float64) *Projectile {
 	id := GenerateID(3)
 	angle := owner.Rotation + angleOffset
 	vx := math.Cos(angle) * def.ProjSpeed
@@ -58,6 +60,8 @@ func NewProjectileWithClass(owner *Player, def ShipClassDef, angleOffset float64
 		Life:     ProjectileLifetime,
 		Damage:   def.ProjDamage,
 		Alive:    true,
+		worldW:   worldW,
+		worldH:   worldH,
 	}
 }
 
@@ -77,6 +81,8 @@ func NewMobProjectile(mob *Mob) *Projectile {
 		Life:     ProjectileLifetime,
 		Damage:   mob.ProjDamage,
 		Alive:    true,
+		worldW:   mob.worldW,
+		worldH:   mob.worldH,
 	}
 }
 
@@ -90,15 +96,19 @@ func (p *Projectile) Update(dt float64) {
 	p.Life -= dt
 
 	// Wrap around world
+	ww := p.worldW
+	wh := p.worldH
+	if ww == 0 { ww = WorldWidth }
+	if wh == 0 { wh = WorldHeight }
 	if p.X < 0 {
-		p.X += WorldWidth
-	} else if p.X > WorldWidth {
-		p.X -= WorldWidth
+		p.X += ww
+	} else if p.X > ww {
+		p.X -= ww
 	}
 	if p.Y < 0 {
-		p.Y += WorldHeight
-	} else if p.Y > WorldHeight {
-		p.Y -= WorldHeight
+		p.Y += wh
+	} else if p.Y > wh {
+		p.Y -= wh
 	}
 
 	if p.Life <= 0 {

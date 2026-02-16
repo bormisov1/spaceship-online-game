@@ -141,6 +141,10 @@ type Mob struct {
 	WasTracking  bool   // was tracking a player last tick
 	SaidLowHP    bool   // already said low-HP phrase
 	PendingPhrase string // phrase to broadcast this tick
+
+	// World bounds
+	worldW float64
+	worldH float64
 }
 
 // pickPhrase randomly selects a phrase from a pool (with chance gate)
@@ -165,16 +169,16 @@ func pickPhraseAlways(pool string) string {
 }
 
 // NewMob spawns a random mob type at a random map edge
-func NewMob() *Mob {
+func NewMob(worldW, worldH float64) *Mob {
 	if rand.Float64() < SDSpawnChance {
-		return NewStarDestroyerMob()
+		return NewStarDestroyerMob(worldW, worldH)
 	}
-	return NewTieMob()
+	return NewTieMob(worldW, worldH)
 }
 
 // NewTieMob spawns a TIE fighter mob (regular)
-func NewTieMob() *Mob {
-	m := newBaseMob()
+func NewTieMob(worldW, worldH float64) *Mob {
+	m := newBaseMob(worldW, worldH)
 	m.HP = TieMaxHP
 	m.MaxHP = TieMaxHP
 	m.ShipType = 4 + rand.Intn(2) // type 4 or 5
@@ -190,8 +194,8 @@ func NewTieMob() *Mob {
 }
 
 // NewStarDestroyerMob spawns a Star Destroyer mob (elite: 5x HP, 3x damage, 3x slower)
-func NewStarDestroyerMob() *Mob {
-	m := newBaseMob()
+func NewStarDestroyerMob(worldW, worldH float64) *Mob {
+	m := newBaseMob(worldW, worldH)
 	m.HP = SDMaxHP
 	m.MaxHP = SDMaxHP
 	m.ShipType = 3
@@ -207,11 +211,15 @@ func NewStarDestroyerMob() *Mob {
 }
 
 // newBaseMob creates a mob with shared setup (position, rotation, strafe)
-func newBaseMob() *Mob {
+func newBaseMob(worldW, worldH float64) *Mob {
+	if worldW == 0 { worldW = WorldWidth }
+	if worldH == 0 { worldH = WorldHeight }
 	id := GenerateID(4)
 	m := &Mob{
-		ID:    id,
-		Alive: true,
+		ID:     id,
+		Alive:  true,
+		worldW: worldW,
+		worldH: worldH,
 	}
 
 	// Pick a random edge: 0=left, 1=right, 2=top, 3=bottom
@@ -219,20 +227,20 @@ func newBaseMob() *Mob {
 	switch edge {
 	case 0: // left
 		m.X = 0
-		m.Y = randFloat() * WorldHeight
+		m.Y = randFloat() * worldH
 	case 1: // right
-		m.X = WorldWidth
-		m.Y = randFloat() * WorldHeight
+		m.X = worldW
+		m.Y = randFloat() * worldH
 	case 2: // top
-		m.X = randFloat() * WorldWidth
+		m.X = randFloat() * worldW
 		m.Y = 0
 	default: // bottom
-		m.X = randFloat() * WorldWidth
-		m.Y = WorldHeight
+		m.X = randFloat() * worldW
+		m.Y = worldH
 	}
 
 	// Face toward center
-	m.Rotation = math.Atan2(WorldHeight/2-m.Y, WorldWidth/2-m.X)
+	m.Rotation = math.Atan2(worldH/2-m.Y, worldW/2-m.X)
 	m.WanderAngle = m.Rotation
 
 	// Random strafe direction
@@ -422,15 +430,19 @@ func (m *Mob) Update(dt float64, players map[string]*Player, projectiles map[str
 	m.Y += m.VY * dt
 
 	// Wrap around world edges
+	ww := m.worldW
+	wh := m.worldH
+	if ww == 0 { ww = WorldWidth }
+	if wh == 0 { wh = WorldHeight }
 	if m.X < 0 {
-		m.X += WorldWidth
-	} else if m.X > WorldWidth {
-		m.X -= WorldWidth
+		m.X += ww
+	} else if m.X > ww {
+		m.X -= ww
 	}
 	if m.Y < 0 {
-		m.Y += WorldHeight
-	} else if m.Y > WorldHeight {
-		m.Y -= WorldHeight
+		m.Y += wh
+	} else if m.Y > wh {
+		m.Y -= wh
 	}
 
 	// Burst fire logic

@@ -440,7 +440,7 @@ func (g *Game) updatePlaying(dt float64) {
 		if p.CanFire() && len(g.projectiles) < maxProjectilesPerSession {
 			def := GetClassDef(p.Class)
 			if def.ProjCount <= 1 {
-				proj := NewProjectileWithClass(p, def, 0)
+				proj := NewProjectileWithClass(p, def, 0, g.match_.Config.WorldWidth, g.match_.Config.WorldHeight)
 				g.projectiles[proj.ID] = proj
 			} else {
 				// Spread shot (e.g. Tank shotgun)
@@ -448,7 +448,7 @@ func (g *Game) updatePlaying(dt float64) {
 				step := def.ProjSpread / float64(def.ProjCount-1)
 				for i := 0; i < def.ProjCount && len(g.projectiles) < maxProjectilesPerSession; i++ {
 					offset := -half + step*float64(i)
-					proj := NewProjectileWithClass(p, def, offset)
+					proj := NewProjectileWithClass(p, def, offset, g.match_.Config.WorldWidth, g.match_.Config.WorldHeight)
 					g.projectiles[proj.ID] = proj
 				}
 			}
@@ -1842,7 +1842,7 @@ func (g *Game) spawnEntities(dt float64) {
 	g.mobSpawnCD -= dt
 	if g.mobSpawnCD <= 0 && len(g.mobs) < maxMobsPerSession {
 		// Spawn one mob per tick until we reach the cap
-		mob := NewMob()
+		mob := NewMob(g.match_.Config.WorldWidth, g.match_.Config.WorldHeight)
 		g.mobs[mob.ID] = mob
 		if len(g.mobs) < maxMobsPerSession {
 			g.mobSpawnCD = 0.5 // quick respawn to fill back up
@@ -1853,14 +1853,14 @@ func (g *Game) spawnEntities(dt float64) {
 
 	g.asteroidSpawnCD -= dt
 	if g.asteroidSpawnCD <= 0 && len(g.asteroids) < maxAsteroidsPerSession {
-		ast := NewAsteroid()
+		ast := NewAsteroid(g.match_.Config.WorldWidth, g.match_.Config.WorldHeight)
 		g.asteroids[ast.ID] = ast
 		g.asteroidSpawnCD = AsteroidSpawnInterval
 	}
 
 	g.pickupSpawnCD -= dt
 	if g.pickupSpawnCD <= 0 && len(g.pickups) < maxPickupsPerSession {
-		pk := NewPickup()
+		pk := NewPickup(g.match_.Config.WorldWidth, g.match_.Config.WorldHeight)
 		g.pickups[pk.ID] = pk
 		g.pickupSpawnCD = PickupSpawnInterval
 	}
