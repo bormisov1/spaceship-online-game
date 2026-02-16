@@ -29,7 +29,7 @@ const (
 	PickupSpawnInterval      = 20.0
 	DeathScorePenalty        = 10
 
-	CountdownDuration = 3.0  // seconds of countdown before match starts
+	CountdownDuration = 4.0  // seconds of countdown before match starts (3-2-1-FIGHT)
 	ResultDuration    = 10.0 // seconds to show results before returning to lobby
 )
 
