@@ -68,14 +68,10 @@ impl Network {
             state_clone.borrow_mut().connected = true;
             web_sys::console::log_1(&"WebSocket connected".into());
 
-            // Auto-authenticate with stored token
+            // Auto-authenticate with stored token (don't restore username yet — wait for auth_ok)
             if let Ok(Some(storage)) = web_sys::window().unwrap().local_storage() {
                 if let Ok(Some(token)) = storage.get_item("auth_token") {
                     if !token.is_empty() {
-                        // Restore username from storage
-                        if let Ok(Some(username)) = storage.get_item("auth_username") {
-                            state_clone.borrow_mut().auth_username = Some(username);
-                        }
                         Network::send_auth_token(&net_clone, &token);
                     }
                 }
@@ -683,6 +679,19 @@ fn handle_message(
         "error" => {
             if let Ok(e) = serde_json::from_value::<ErrorMsg>(data) {
                 web_sys::console::error_1(&format!("Server error: {}", e.msg).into());
+                // Invalid token — clear stale auth from state and storage
+                if e.msg == "invalid token" {
+                    let mut s = state.borrow_mut();
+                    s.auth_token = None;
+                    s.auth_username = None;
+                    s.auth_player_id = 0;
+                    drop(s);
+                    auth_signal.set(None);
+                    if let Ok(Some(storage)) = web_sys::window().unwrap().local_storage() {
+                        let _ = storage.remove_item("auth_token");
+                        let _ = storage.remove_item("auth_username");
+                    }
+                }
                 // Show error in auth error element if it exists
                 if let Some(el) = web_sys::window().unwrap().document().unwrap()
                     .get_element_by_id("authError") {

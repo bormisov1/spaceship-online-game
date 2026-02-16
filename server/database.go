@@ -164,6 +164,11 @@ func (db *DB) migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_analytics_player ON analytics_events(player_id);
 	CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics_events(created_at);
 
+	CREATE TABLE IF NOT EXISTS settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL
+	);
+
 	CREATE INDEX IF NOT EXISTS idx_match_players_player ON match_players(player_id);
 	CREATE INDEX IF NOT EXISTS idx_players_username ON players(username);
 	`
@@ -792,4 +797,23 @@ func (db *DB) GetAchievements(playerID int64) ([]string, error) {
 		result = append(result, a)
 	}
 	return result, rows.Err()
+}
+
+// GetSetting returns a setting value by key, or "" if not found.
+func (db *DB) GetSetting(key string) string {
+	var val string
+	err := db.conn.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&val)
+	if err != nil {
+		return ""
+	}
+	return val
+}
+
+// SetSetting upserts a setting key-value pair.
+func (db *DB) SetSetting(key, value string) error {
+	_, err := db.conn.Exec(
+		"INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+		key, value,
+	)
+	return err
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -39,16 +40,35 @@ type rateEntry struct {
 
 // NewAuth creates a new Auth handler
 func NewAuth(db *DB) *Auth {
-	// Generate random JWT secret on startup
-	secret := make([]byte, 32)
-	if _, err := rand.Read(secret); err != nil {
-		panic("failed to generate JWT secret: " + err.Error())
-	}
+	secret := loadOrCreateSecret(db)
 	return &Auth{
 		db:        db,
 		jwtSecret: secret,
 		rateMap:   make(map[string]*rateEntry),
 	}
+}
+
+// loadOrCreateSecret loads the JWT secret from the database, or generates
+// and persists a new one if none exists.
+func loadOrCreateSecret(db *DB) []byte {
+	if db != nil {
+		if h := db.GetSetting("jwt_secret"); h != "" {
+			if b, err := hex.DecodeString(h); err == nil && len(b) == 32 {
+				return b
+			}
+		}
+	}
+	// Generate a new secret
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		panic("failed to generate JWT secret: " + err.Error())
+	}
+	if db != nil {
+		if err := db.SetSetting("jwt_secret", hex.EncodeToString(secret)); err != nil {
+			log.Printf("warning: could not persist JWT secret: %v", err)
+		}
+	}
+	return secret
 }
 
 // Register creates a new account
