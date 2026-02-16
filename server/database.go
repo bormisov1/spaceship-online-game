@@ -663,6 +663,50 @@ func (db *DB) PurchaseSkin(playerID int64, skinID string) error {
 	return err
 }
 
+// PurchaseSkinWithCredits atomically deducts credits and records the purchase.
+// Returns (success, error) where success=false means insufficient credits.
+func (db *DB) PurchaseSkinWithCredits(playerID int64, skinID string, price int) (bool, error) {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	// Check if already owned
+	var count int
+	err = tx.QueryRow("SELECT COUNT(*) FROM player_skins WHERE player_id = ? AND skin_id = ?",
+		playerID, skinID).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return false, nil // already owned
+	}
+
+	// Check and deduct credits
+	var credits int
+	err = tx.QueryRow("SELECT credits FROM stats WHERE player_id = ?", playerID).Scan(&credits)
+	if err != nil {
+		return false, err
+	}
+	if credits < price {
+		return false, nil
+	}
+	_, err = tx.Exec("UPDATE stats SET credits = credits - ? WHERE player_id = ?", price, playerID)
+	if err != nil {
+		return false, err
+	}
+
+	// Record purchase
+	_, err = tx.Exec("INSERT OR IGNORE INTO player_skins (player_id, skin_id) VALUES (?, ?)",
+		playerID, skinID)
+	if err != nil {
+		return false, err
+	}
+
+	return true, tx.Commit()
+}
+
 // HasSkin checks if a player owns a skin
 func (db *DB) HasSkin(playerID int64, skinID string) (bool, error) {
 	var count int

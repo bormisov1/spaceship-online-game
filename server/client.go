@@ -758,25 +758,15 @@ func (c *Client) handleBuy(data json.RawMessage) {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "item not found"}})
 		return
 	}
-	// Check if already owned
-	has, _ := c.hub.db.HasSkin(c.authPlayerID, msg.ItemID)
-	if has {
-		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "already owned"}})
-		return
-	}
-	// Spend credits
-	ok, err := c.hub.db.SpendCredits(c.authPlayerID, item.Price)
+	// Atomic purchase: check ownership, deduct credits, record purchase in one transaction
+	ok, err := c.hub.db.PurchaseSkinWithCredits(c.authPlayerID, msg.ItemID, item.Price)
 	if err != nil {
 		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "purchase failed"}})
 		return
 	}
 	if !ok {
-		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "not enough credits"}})
+		c.SendJSON(Envelope{T: MsgError, Data: ErrorMsg{Msg: "not enough credits or already owned"}})
 		return
-	}
-	// Record purchase
-	if err := c.hub.db.PurchaseSkin(c.authPlayerID, msg.ItemID); err != nil {
-		log.Printf("DB: failed to record purchase: %v", err)
 	}
 	c.hub.analytics.Track(EvtPurchase, c.authPlayerID, c.sessionID,
 		`{"item_id":"`+msg.ItemID+`","price":`+itoa(item.Price)+`}`)
