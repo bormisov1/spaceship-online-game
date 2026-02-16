@@ -116,6 +116,7 @@ func createAndJoin(t *testing.T, conn *websocket.Conn, name, sname string) strin
 		t.Fatalf("expected joined, got %s", joined.T)
 	}
 	_ = readEnvelope(t, conn) // welcome
+	_ = readEnvelope(t, conn) // match_phase
 	return sid
 }
 

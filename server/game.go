@@ -343,6 +343,13 @@ func (g *Game) MatchMode() GameMode {
 	return g.match_.Config.Mode
 }
 
+// MatchInfo returns full match info for sending to a newly joined client
+func (g *Game) MatchInfo() (MatchPhase, GameMode, float64, float64) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.match_.Phase, g.match_.Config.Mode, g.match_.TimeLeft, g.match_.CountdownT
+}
+
 // update runs one game tick, dispatching to phase-specific methods
 func (g *Game) update() {
 	g.mu.Lock()

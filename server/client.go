@@ -310,6 +310,15 @@ func (c *Client) handleJoin(data json.RawMessage) {
 
 	c.SendJSON(Envelope{T: MsgJoined, Data: map[string]string{"sid": sess.ID}})
 	c.SendJSON(Envelope{T: MsgWelcome, Data: WelcomeMsg{ID: player.ID, Ship: player.ShipType}})
+
+	// Send current match phase so client shows the correct UI
+	phase, mode, timeLeft, countdown := sess.Game.MatchInfo()
+	c.SendJSON(Envelope{T: MsgMatchPhase, Data: MatchPhaseMsg{
+		Phase:     int(phase),
+		Mode:      int(mode),
+		TimeLeft:  timeLeft,
+		Countdown: countdown,
+	}})
 }
 
 // handleBinaryInput decodes a compact 8-byte binary input message

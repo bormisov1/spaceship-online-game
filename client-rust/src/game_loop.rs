@@ -19,15 +19,18 @@ pub fn start_game_loop(state: SharedState) {
 
         {
             let s = state.borrow();
-            if s.phase == Phase::Playing || s.phase == Phase::Dead {
-                drop(s);
-                renderer::render(&state, dt);
-            } else if s.phase == Phase::Lobby {
-                let w = s.screen_w;
-                let h = s.screen_h;
-                drop(s);
-                if let Some(ctx) = crate::canvas::get_canvas_context("bgCanvas") {
-                    crate::hyperspace::render_hyperspace(&ctx, w, h, dt);
+            match s.phase {
+                Phase::Playing | Phase::Dead | Phase::Countdown | Phase::MatchLobby | Phase::Result => {
+                    drop(s);
+                    renderer::render(&state, dt);
+                }
+                Phase::Lobby => {
+                    let w = s.screen_w;
+                    let h = s.screen_h;
+                    drop(s);
+                    if let Some(ctx) = crate::canvas::get_canvas_context("bgCanvas") {
+                        crate::hyperspace::render_hyperspace(&ctx, w, h, dt);
+                    }
                 }
             }
         }
