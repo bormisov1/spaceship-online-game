@@ -428,7 +428,25 @@ fn draw_debug_hitboxes(ctx: &CanvasRenderingContext2d, s: &crate::state::GameSta
         if sx < -r - 10.0 || sx > vw + r + 10.0 || sy < -r - 10.0 || sy > vh + r + 10.0 { continue; }
 
         ctx.begin_path();
-        let _ = ctx.arc(sx, sy, r, 0.0, std::f64::consts::PI * 2.0);
+        if mob.s == 3 {
+            // Star Destroyer: draw triangle hitbox matching server-side SDTriangleHitbox
+            // Vertices relative to center (unrotated): nose(-100,0), stern-top(100,-70), stern-bot(100,70)
+            let cos_r = mob.r.cos();
+            let sin_r = mob.r.sin();
+            let verts: [(f64, f64); 3] = [
+                (-100.0, 0.0),   // nose
+                (100.0, -70.0),  // stern top
+                (100.0, 70.0),   // stern bottom
+            ];
+            for (i, &(vx, vy)) in verts.iter().enumerate() {
+                let wx = sx + vx * cos_r - vy * sin_r;
+                let wy = sy + vx * sin_r + vy * cos_r;
+                if i == 0 { ctx.move_to(wx, wy); } else { ctx.line_to(wx, wy); }
+            }
+            ctx.close_path();
+        } else {
+            let _ = ctx.arc(sx, sy, r, 0.0, std::f64::consts::PI * 2.0);
+        }
         ctx.set_fill_style_str("rgba(255, 165, 0, 0.15)");
         ctx.fill();
         ctx.set_stroke_style_str("rgba(255, 165, 0, 0.6)");
