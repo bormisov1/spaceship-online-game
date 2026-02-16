@@ -577,7 +577,7 @@ func (g *Game) checkAllReady() bool {
 	}
 
 	// Team modes require at least 2 players
-	if g.match_.Config.Mode == ModeTDM {
+	if g.match_.Config.IsTeamMode() {
 		if count < 2 {
 			return false
 		}
@@ -939,7 +939,7 @@ func (g *Game) checkScoreLimit() bool {
 
 // isTeamMode returns true if the current game mode uses teams
 func (g *Game) isTeamMode() bool {
-	return g.match_.Config.Mode == ModeTDM
+	return g.match_.Config.IsTeamMode()
 }
 
 // broadcastTeamUpdate sends team roster info to all clients
