@@ -1053,7 +1053,7 @@ func (g *Game) checkCollisions() {
 				continue
 			}
 			p := g.flatPlayers[ref.Idx]
-			if !p.Alive || p.ID == proj.OwnerID {
+			if !p.Alive || p.ID == proj.OwnerID || p.SpawnProtection > 0 {
 				continue
 			}
 
@@ -1567,7 +1567,7 @@ func (g *Game) checkAsteroidPlayerCollisions() {
 				continue
 			}
 			p := g.flatPlayers[ref.Idx]
-			if !p.Alive {
+			if !p.Alive || p.SpawnProtection > 0 {
 				continue
 			}
 			if CheckCollision(ast.X, ast.Y, AsteroidRadius, p.X, p.Y, PlayerRadius) {
@@ -1691,7 +1691,7 @@ func (g *Game) checkPlayerMobCollisions() {
 				continue
 			}
 			p := g.flatPlayers[ref.Idx]
-			if !p.Alive {
+			if !p.Alive || p.SpawnProtection > 0 {
 				continue
 			}
 			if CheckCollision(mob.X, mob.Y, mob.Radius, p.X, p.Y, PlayerRadius) {
